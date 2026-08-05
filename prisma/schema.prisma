@@ -1,0 +1,386 @@
+// FarmaTrade data model.
+//
+// Single connected graph: every farm, buyer, seller, and transporter is a
+// Party. A Party can extend itself with a Farm profile (asset inventory)
+// and/or a TransportProfile (hauling capacity) — these aren't separate
+// systems, just optional facets of the same node.
+//
+// Trading is symmetric: a Party posts what it HAS or what it NEEDS, and
+// the matching engine pairs HAVE posts against NEED posts. No payment
+// rails — settlement happens off-platform (cash, EcoCash, bank transfer).
+// Reputation is seeded by self-reported transaction confirmations from
+// both sides of a match, not by verified payment data (that's a known,
+// deliberate weak point until a licensed payment aggregator is wired in).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity & parties
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  party Party?
+}
+
+enum PartyRole {
+  FARM
+  TRADER
+  TRANSPORTER
+}
+
+// A second, honest trust signal for cold start — kept structurally separate
+// from Reputation (which is computed from transaction history) so it never
+// gets blended into a rating average it didn't earn. Set by the founder/an
+// admin, never self-declared by the party it describes.
+enum VerificationSource {
+  FOUNDER
+  NETWORK
+}
+
+// A Party is any actor in the network: a farm owner, a buyer/seller with no
+// farm of their own (e.g. a produce trader or a grocery store), or a
+// transport provider. Roles aren't exclusive — a farm can also haul.
+model Party {
+  id         String              @id @default(cuid())
+  userId     String?             @unique
+  user       User?               @relation(fields: [userId], references: [id])
+  name       String
+  roles      PartyRole[]
+  phone      String?
+  province   String
+  district   String
+  latitude   Float?
+  longitude  Float?
+  verifiedBy VerificationSource?
+  createdAt  DateTime            @default(now())
+
+  farm             Farm?
+  transportProfile TransportProfile?
+  posts            Post[]
+  reputation       Reputation?
+
+  ratingsAuthored Rating[] @relation("RatingAuthor")
+  ratingsReceived Rating[] @relation("RatingSubject")
+
+  confirmations TransactionConfirmation[]
+
+  relationsAsA Relation[] @relation("RelationPartyA")
+  relationsAsB Relation[] @relation("RelationPartyB")
+
+  @@index([province, district])
+}
+
+// ---------------------------------------------------------------------------
+// Farm profile & inventory
+// ---------------------------------------------------------------------------
+
+model Farm {
+  id           String   @id @default(cuid())
+  partyId      String   @unique
+  party        Party    @relation(fields: [partyId], references: [id])
+  farmName     String
+  sizeHectares Float?
+  createdAt    DateTime @default(now())
+
+  livestock Livestock[]
+  produce   ProduceStock[]
+  equipment Equipment[]
+}
+
+enum LivestockSpecies {
+  CATTLE
+  GOAT
+  SHEEP
+  PIG
+  POULTRY
+  OTHER
+}
+
+enum LivestockSex {
+  MALE
+  FEMALE
+  MIXED
+}
+
+// A row is a group (or a single animal, quantity = 1) — real use cases
+// (offloading breeding stock, swapping males for genetic diversity) need
+// sex tracked at this granularity, not just a species headcount.
+model Livestock {
+  id        String           @id @default(cuid())
+  farmId    String
+  farm      Farm             @relation(fields: [farmId], references: [id])
+  species   LivestockSpecies
+  breed     String?
+  sex       LivestockSex
+  quantity  Int              @default(1)
+  birthDate DateTime?
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  posts Post[]
+}
+
+enum ProduceUnit {
+  KG
+  TONNE
+  BAG
+  CRATE
+  LITRE
+  HEAD
+}
+
+model ProduceStock {
+  id                  String      @id @default(cuid())
+  farmId              String
+  farm                Farm        @relation(fields: [farmId], references: [id])
+  cropType            String
+  quantity            Float
+  unit                ProduceUnit
+  harvestDate         DateTime?
+  expectedHarvestDate DateTime?
+  perishable          Boolean     @default(true)
+  notes               String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  posts Post[]
+}
+
+enum EquipmentCategory {
+  TRACTOR
+  PLOUGH
+  IRRIGATION
+  TRAILER
+  OTHER
+}
+
+model Equipment {
+  id        String            @id @default(cuid())
+  farmId    String
+  farm      Farm              @relation(fields: [farmId], references: [id])
+  name      String
+  category  EquipmentCategory
+  condition String?
+  available Boolean           @default(true)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  posts Post[]
+}
+
+// ---------------------------------------------------------------------------
+// Transport
+// ---------------------------------------------------------------------------
+
+enum VehicleType {
+  TRUCK
+  REFRIGERATED_TRUCK
+  PICKUP
+  TRAILER
+  OTHER
+}
+
+model TransportProfile {
+  id            String      @id @default(cuid())
+  partyId       String      @unique
+  party         Party       @relation(fields: [partyId], references: [id])
+  vehicleType   VehicleType
+  capacityKg    Float?
+  serviceRegion String?
+  createdAt     DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Posts: the symmetric "I have / I need" trading unit
+// ---------------------------------------------------------------------------
+
+enum PostType {
+  HAVE
+  NEED
+}
+
+// Extensible on purpose: v1 ships four categories, but new verticals
+// (mechanics, vets, inputs, storage, ...) are future enum values, not new
+// subsystems — the Post/Match/Reputation graph doesn't change shape.
+enum PostCategory {
+  LIVESTOCK
+  PRODUCE
+  EQUIPMENT
+  TRANSPORT
+}
+
+enum PostStatus {
+  OPEN
+  MATCHED
+  CLOSED
+}
+
+model Post {
+  id          String       @id @default(cuid())
+  partyId     String
+  party       Party        @relation(fields: [partyId], references: [id])
+  type        PostType
+  category    PostCategory
+  title       String
+  description String?
+  quantity    Float?
+  unit        String?
+  province    String
+  district    String
+  askingPrice Decimal?     @db.Decimal(12, 2)
+  status      PostStatus   @default(OPEN)
+  // Urgency drives display/ordering today; it's the seam for the delivery
+  // layer's pacing rules later — perishables and deadlines shouldn't wait
+  // behind a uniform notification cap the way a routine listing can.
+  urgent      Boolean      @default(false)
+  neededBy    DateTime?
+
+  // Optional link to the specific inventory item this post refers to.
+  livestockId String?
+  livestock   Livestock?    @relation(fields: [livestockId], references: [id])
+  produceId   String?
+  produce     ProduceStock? @relation(fields: [produceId], references: [id])
+  equipmentId String?
+  equipment   Equipment?    @relation(fields: [equipmentId], references: [id])
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  matchesAsA Match[] @relation("MatchPostA")
+  matchesAsB Match[] @relation("MatchPostB")
+
+  @@index([category, status, province, district])
+}
+
+// ---------------------------------------------------------------------------
+// Matching
+// ---------------------------------------------------------------------------
+
+enum MatchStatus {
+  SUGGESTED
+  ACCEPTED
+  DECLINED
+  COMPLETED
+}
+
+model Match {
+  id        String      @id @default(cuid())
+  postAId   String
+  postA     Post        @relation("MatchPostA", fields: [postAId], references: [id])
+  postBId   String
+  postB     Post        @relation("MatchPostB", fields: [postBId], references: [id])
+  score     Float
+  // The kernel's score is never a bare number a projection layer has to
+  // trust blindly — it's cited. Each entry is a plain-language reason the
+  // match fired ("same district", "counterparty: 3 completed, 4.7★"), so
+  // anything downstream (this UI today, WhatsApp phrasing later) renders
+  // evidence instead of inventing a justification.
+  reasons   String[]
+  status    MatchStatus @default(SUGGESTED)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  confirmations TransactionConfirmation[]
+  ratings       Rating[]
+
+  @@unique([postAId, postBId])
+}
+
+// ---------------------------------------------------------------------------
+// Trust: self-reported completion + ratings feed the reputation aggregate
+// ---------------------------------------------------------------------------
+
+enum ConfirmationOutcome {
+  COMPLETED_GOOD
+  COMPLETED_ISSUE
+  DID_NOT_HAPPEN
+}
+
+model TransactionConfirmation {
+  id        String              @id @default(cuid())
+  matchId   String
+  match     Match               @relation(fields: [matchId], references: [id])
+  partyId   String
+  party     Party               @relation(fields: [partyId], references: [id])
+  outcome   ConfirmationOutcome
+  notes     String?
+  createdAt DateTime            @default(now())
+
+  @@unique([matchId, partyId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  matchId   String?
+  match     Match?   @relation(fields: [matchId], references: [id])
+  authorId  String
+  author    Party    @relation("RatingAuthor", fields: [authorId], references: [id])
+  subjectId String
+  subject   Party    @relation("RatingSubject", fields: [subjectId], references: [id])
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([matchId, authorId, subjectId])
+}
+
+// Denormalized aggregate, recomputed from TransactionConfirmation + Rating
+// whenever they change — kept so directory/listing queries don't have to
+// scan history on every read.
+model Reputation {
+  id                  String   @id @default(cuid())
+  partyId             String   @unique
+  party               Party    @relation(fields: [partyId], references: [id])
+  completedCount      Int      @default(0)
+  completedGoodCount  Int      @default(0)
+  completedIssueCount Int      @default(0)
+  averageRating       Float?
+  ratingCount         Int      @default(0)
+  updatedAt           DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Relations: repeat trading pairs, as an emergent view over Match history —
+// not a separate system, a derived read over the same graph.
+// ---------------------------------------------------------------------------
+
+enum RelationKind {
+  PREFERRED_PARTNER
+  // Not computed yet — detecting a standing recurring order needs pattern
+  // inference over time that isn't worth building before there's real
+  // transaction volume to infer from. The primitive is modeled now so
+  // adding it later is a new enum value, not a new subsystem.
+  RECURRING_BUYER
+}
+
+// partyAId/partyBId are stored in sorted order (no canonical "direction"
+// between two trading partners) so a pair never produces two rows.
+model Relation {
+  id        String       @id @default(cuid())
+  partyAId  String
+  partyA    Party        @relation("RelationPartyA", fields: [partyAId], references: [id])
+  partyBId  String
+  partyB    Party        @relation("RelationPartyB", fields: [partyBId], references: [id])
+  kind      RelationKind
+  strength  Int          @default(1)
+  formedAt  DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([partyAId, partyBId, kind])
+}
