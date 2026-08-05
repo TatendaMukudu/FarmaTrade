@@ -7,15 +7,25 @@ import {
   upsertEquipment,
   type FarmActionState,
 } from "./actions";
+import type { Livestock, ProduceStock, Equipment } from "@/generated/prisma/client";
 
 const initialState: FarmActionState = {};
 
-export function LivestockForm() {
+export function LivestockForm({
+  initial,
+  onDone,
+}: {
+  initial?: Livestock;
+  onDone?: () => void;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: FarmActionState, formData: FormData) => {
       const result = await upsertLivestock(prev, formData);
-      if (!result.error) formRef.current?.reset();
+      if (!result.error) {
+        formRef.current?.reset();
+        onDone?.();
+      }
       return result;
     },
     initialState,
@@ -27,27 +37,52 @@ export function LivestockForm() {
       action={formAction}
       className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
     >
+      {initial && <input type="hidden" name="id" value={initial.id} />}
       <SelectField
         label="Species"
         name="species"
+        defaultValue={initial?.species}
         options={["CATTLE", "GOAT", "SHEEP", "PIG", "POULTRY", "OTHER"]}
       />
-      <SelectField label="Sex" name="sex" options={["MALE", "FEMALE", "MIXED"]} />
-      <TextField label="Breed (optional)" name="breed" />
-      <NumberField label="Quantity" name="quantity" defaultValue="1" />
-      <TextField label="Notes (optional)" name="notes" />
-      <SubmitButton pending={pending} label="Add livestock" />
+      <SelectField
+        label="Sex"
+        name="sex"
+        defaultValue={initial?.sex}
+        options={["MALE", "FEMALE", "MIXED"]}
+      />
+      <TextField label="Breed (optional)" name="breed" defaultValue={initial?.breed ?? undefined} />
+      <NumberField
+        label="Quantity"
+        name="quantity"
+        defaultValue={String(initial?.quantity ?? 1)}
+      />
+      <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
+      <SubmitButton pending={pending} label={initial ? "Save" : "Add livestock"} />
+      {onDone && (
+        <button type="button" onClick={onDone} className="text-xs text-gray-500 underline">
+          Cancel
+        </button>
+      )}
       {state.error && <Error message={state.error} />}
     </form>
   );
 }
 
-export function ProduceForm() {
+export function ProduceForm({
+  initial,
+  onDone,
+}: {
+  initial?: ProduceStock;
+  onDone?: () => void;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: FarmActionState, formData: FormData) => {
       const result = await upsertProduce(prev, formData);
-      if (!result.error) formRef.current?.reset();
+      if (!result.error) {
+        formRef.current?.reset();
+        onDone?.();
+      }
       return result;
     },
     initialState,
@@ -59,30 +94,54 @@ export function ProduceForm() {
       action={formAction}
       className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
     >
-      <TextField label="Crop type" name="cropType" />
-      <NumberField label="Quantity" name="quantity" defaultValue="1" />
+      {initial && <input type="hidden" name="id" value={initial.id} />}
+      <TextField label="Crop type" name="cropType" defaultValue={initial?.cropType} />
+      <NumberField
+        label="Quantity"
+        name="quantity"
+        defaultValue={String(initial?.quantity ?? 1)}
+      />
       <SelectField
         label="Unit"
         name="unit"
+        defaultValue={initial?.unit}
         options={["KG", "TONNE", "BAG", "CRATE", "LITRE", "HEAD"]}
       />
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="perishable" defaultChecked />
+        <input
+          type="checkbox"
+          name="perishable"
+          defaultChecked={initial ? initial.perishable : true}
+        />
         Perishable
       </label>
-      <TextField label="Notes (optional)" name="notes" />
-      <SubmitButton pending={pending} label="Add produce" />
+      <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
+      <SubmitButton pending={pending} label={initial ? "Save" : "Add produce"} />
+      {onDone && (
+        <button type="button" onClick={onDone} className="text-xs text-gray-500 underline">
+          Cancel
+        </button>
+      )}
       {state.error && <Error message={state.error} />}
     </form>
   );
 }
 
-export function EquipmentForm() {
+export function EquipmentForm({
+  initial,
+  onDone,
+}: {
+  initial?: Equipment;
+  onDone?: () => void;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: FarmActionState, formData: FormData) => {
       const result = await upsertEquipment(prev, formData);
-      if (!result.error) formRef.current?.reset();
+      if (!result.error) {
+        formRef.current?.reset();
+        onDone?.();
+      }
       return result;
     },
     initialState,
@@ -94,25 +153,48 @@ export function EquipmentForm() {
       action={formAction}
       className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
     >
-      <TextField label="Name" name="name" />
+      {initial && <input type="hidden" name="id" value={initial.id} />}
+      <TextField label="Name" name="name" defaultValue={initial?.name} />
       <SelectField
         label="Category"
         name="category"
+        defaultValue={initial?.category}
         options={["TRACTOR", "PLOUGH", "IRRIGATION", "TRAILER", "OTHER"]}
       />
-      <TextField label="Condition (optional)" name="condition" />
+      <TextField
+        label="Condition (optional)"
+        name="condition"
+        defaultValue={initial?.condition ?? undefined}
+      />
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="available" defaultChecked />
+        <input
+          type="checkbox"
+          name="available"
+          defaultChecked={initial ? initial.available : true}
+        />
         Available to lend
       </label>
-      <TextField label="Notes (optional)" name="notes" />
-      <SubmitButton pending={pending} label="Add equipment" />
+      <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
+      <SubmitButton pending={pending} label={initial ? "Save" : "Add equipment"} />
+      {onDone && (
+        <button type="button" onClick={onDone} className="text-xs text-gray-500 underline">
+          Cancel
+        </button>
+      )}
       {state.error && <Error message={state.error} />}
     </form>
   );
 }
 
-function TextField({ label, name }: { label: string; name: string }) {
+function TextField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs text-gray-500" htmlFor={name}>
@@ -122,6 +204,7 @@ function TextField({ label, name }: { label: string; name: string }) {
         id={name}
         name={name}
         type="text"
+        defaultValue={defaultValue}
         className="rounded border px-2 py-1 text-sm"
       />
     </div>
@@ -159,17 +242,24 @@ function SelectField({
   label,
   name,
   options,
+  defaultValue,
 }: {
   label: string;
   name: string;
   options: string[];
+  defaultValue?: string;
 }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs text-gray-500" htmlFor={name}>
         {label}
       </label>
-      <select id={name} name={name} className="rounded border px-2 py-1 text-sm">
+      <select
+        id={name}
+        name={name}
+        defaultValue={defaultValue}
+        className="rounded border px-2 py-1 text-sm"
+      >
         {options.map((o) => (
           <option key={o} value={o}>
             {o}

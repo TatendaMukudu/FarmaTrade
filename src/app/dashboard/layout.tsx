@@ -28,11 +28,16 @@ export default async function DashboardLayout({
             <Link href="/dashboard/opportunities">Opportunities</Link>
           </nav>
         </div>
-        <form action={logoutAction}>
-          <button type="submit" className="text-sm text-gray-600 underline">
-            Log out
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/settings" className="text-sm text-gray-600 underline">
+            Settings
+          </Link>
+          <form action={logoutAction}>
+            <button type="submit" className="text-sm text-gray-600 underline">
+              Log out
+            </button>
+          </form>
+        </div>
       </header>
       <main className="flex-1 px-6 py-8">{children}</main>
     </div>

@@ -36,6 +36,27 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const profileSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  phone: z.string().trim().optional(),
+  province: z.string().trim().min(1, "Province is required"),
+  district: z.string().trim().min(1, "District is required"),
+  farmName: z.string().trim().optional(),
+  sizeHectares: z.coerce.number().positive().optional(),
+  vehicleType: z
+    .enum(["TRUCK", "REFRIGERATED_TRUCK", "PICKUP", "TRAILER", "OTHER"])
+    .optional(),
+  capacityKg: z.coerce.number().positive().optional(),
+  serviceRegion: z.string().trim().optional(),
+});
+
+export const confirmationSchema = z.object({
+  matchId: z.string().min(1),
+  outcome: z.enum(["COMPLETED_GOOD", "COMPLETED_ISSUE", "DID_NOT_HAPPEN"]),
+  score: z.coerce.number().int().min(1).max(5).optional(),
+  comment: z.string().trim().optional(),
+});
+
 export const livestockSchema = z.object({
   id: z.string().optional(),
   species: z.enum(["CATTLE", "GOAT", "SHEEP", "PIG", "POULTRY", "OTHER"]),
