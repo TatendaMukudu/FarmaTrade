@@ -42,21 +42,31 @@ enum PartyRole {
   TRANSPORTER
 }
 
+// A second, honest trust signal for cold start — kept structurally separate
+// from Reputation (which is computed from transaction history) so it never
+// gets blended into a rating average it didn't earn. Set by the founder/an
+// admin, never self-declared by the party it describes.
+enum VerificationSource {
+  FOUNDER
+  NETWORK
+}
+
 // A Party is any actor in the network: a farm owner, a buyer/seller with no
 // farm of their own (e.g. a produce trader or a grocery store), or a
 // transport provider. Roles aren't exclusive — a farm can also haul.
 model Party {
-  id        String      @id @default(cuid())
-  userId    String?     @unique
-  user      User?       @relation(fields: [userId], references: [id])
-  name      String
-  roles     PartyRole[]
-  phone     String?
-  province  String
-  district  String
-  latitude  Float?
-  longitude Float?
-  createdAt DateTime    @default(now())
+  id         String              @id @default(cuid())
+  userId     String?             @unique
+  user       User?               @relation(fields: [userId], references: [id])
+  name       String
+  roles      PartyRole[]
+  phone      String?
+  province   String
+  district   String
+  latitude   Float?
+  longitude  Float?
+  verifiedBy VerificationSource?
+  createdAt  DateTime            @default(now())
 
   farm             Farm?
   transportProfile TransportProfile?
@@ -67,6 +77,9 @@ model Party {
   ratingsReceived Rating[] @relation("RatingSubject")
 
   confirmations TransactionConfirmation[]
+
+  relationsAsA Relation[] @relation("RelationPartyA")
+  relationsAsB Relation[] @relation("RelationPartyB")
 
   @@index([province, district])
 }
@@ -232,6 +245,11 @@ model Post {
   district    String
   askingPrice Decimal?     @db.Decimal(12, 2)
   status      PostStatus   @default(OPEN)
+  // Urgency drives display/ordering today; it's the seam for the delivery
+  // layer's pacing rules later — perishables and deadlines shouldn't wait
+  // behind a uniform notification cap the way a routine listing can.
+  urgent      Boolean      @default(false)
+  neededBy    DateTime?
 
   // Optional link to the specific inventory item this post refers to.
   livestockId String?
@@ -268,6 +286,12 @@ model Match {
   postBId   String
   postB     Post        @relation("MatchPostB", fields: [postBId], references: [id])
   score     Float
+  // The kernel's score is never a bare number a projection layer has to
+  // trust blindly — it's cited. Each entry is a plain-language reason the
+  // match fired ("same district", "counterparty: 3 completed, 4.7★"), so
+  // anything downstream (this UI today, WhatsApp phrasing later) renders
+  // evidence instead of inventing a justification.
+  reasons   String[]
   status    MatchStatus @default(SUGGESTED)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -329,4 +353,34 @@ model Reputation {
   averageRating       Float?
   ratingCount         Int      @default(0)
   updatedAt           DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Relations: repeat trading pairs, as an emergent view over Match history —
+// not a separate system, a derived read over the same graph.
+// ---------------------------------------------------------------------------
+
+enum RelationKind {
+  PREFERRED_PARTNER
+  // Not computed yet — detecting a standing recurring order needs pattern
+  // inference over time that isn't worth building before there's real
+  // transaction volume to infer from. The primitive is modeled now so
+  // adding it later is a new enum value, not a new subsystem.
+  RECURRING_BUYER
+}
+
+// partyAId/partyBId are stored in sorted order (no canonical "direction"
+// between two trading partners) so a pair never produces two rows.
+model Relation {
+  id        String       @id @default(cuid())
+  partyAId  String
+  partyA    Party        @relation("RelationPartyA", fields: [partyAId], references: [id])
+  partyBId  String
+  partyB    Party        @relation("RelationPartyB", fields: [partyBId], references: [id])
+  kind      RelationKind
+  strength  Int          @default(1)
+  formedAt  DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([partyAId, partyBId, kind])
 }

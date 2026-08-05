@@ -28,6 +28,8 @@ export async function createPost(
     province: formData.get("province"),
     district: formData.get("district"),
     askingPrice: formData.get("askingPrice") || undefined,
+    urgent: formData.get("urgent") === "on",
+    neededBy: formData.get("neededBy") || undefined,
   });
 
   if (!parsed.success) {
@@ -48,6 +50,8 @@ export async function createPost(
       province: data.province,
       district: data.district,
       askingPrice: data.askingPrice,
+      urgent: data.urgent ?? false,
+      neededBy: data.neededBy,
     },
   });
 

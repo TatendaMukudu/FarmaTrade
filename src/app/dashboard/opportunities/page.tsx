@@ -8,7 +8,7 @@ export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
   if (!party) return null;
 
-  const [active, history] = await Promise.all([
+  const [active, history, relations] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SUGGESTED", "ACCEPTED"] },
@@ -33,7 +33,16 @@ export default async function OpportunitiesPage() {
       },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.relation.findMany({
+      where: { OR: [{ partyAId: party.id }, { partyBId: party.id }] },
+    }),
   ]);
+
+  const strengthByCounterparty = new Map<string, number>();
+  for (const r of relations) {
+    const counterpartyId = r.partyAId === party.id ? r.partyBId : r.partyAId;
+    strengthByCounterparty.set(counterpartyId, r.strength);
+  }
 
   return (
     <div className="flex flex-col gap-10">
@@ -51,15 +60,31 @@ export default async function OpportunitiesPage() {
           const myConfirmation = m.confirmations.find(
             (c) => c.partyId === party.id,
           );
+          const strength = strengthByCounterparty.get(theirs.party.id);
           return (
             <li key={m.id} className="rounded border p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs text-gray-400">
-                    Score {m.score} · {m.status}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                    <span>{m.status}</span>
+                    {(yours.urgent || theirs.urgent) && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                        Time-sensitive
+                      </span>
+                    )}
+                    {strength && strength >= 2 && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800">
+                        Preferred partner · {strength} completed
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 font-medium">Your post: {yours.title}</p>
                   <MatchCounterpart post={theirs} />
+                  {m.reasons.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Why: {m.reasons.join(" · ")}
+                    </p>
+                  )}
                 </div>
                 {m.status === "SUGGESTED" && (
                   <form action={respondToMatch} className="flex gap-2">

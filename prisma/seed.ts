@@ -21,6 +21,7 @@ async function createAccount(opts: {
   district: string;
   roles: Role[];
   passwordHash: string;
+  verifiedBy?: "FOUNDER" | "NETWORK";
   farm?: { farmName: string; sizeHectares?: number };
   transport?: {
     vehicleType: "TRUCK" | "REFRIGERATED_TRUCK" | "PICKUP" | "TRAILER" | "OTHER";
@@ -45,6 +46,7 @@ async function createAccount(opts: {
       province: opts.province,
       district: opts.district,
       roles: opts.roles,
+      verifiedBy: opts.verifiedBy,
     },
   });
 
@@ -93,8 +95,28 @@ async function recomputeReputation(partyId: string) {
   });
 }
 
+async function recomputeRelation(partyId1: string, partyId2: string) {
+  const [partyAId, partyBId] = [partyId1, partyId2].sort();
+  const completedCount = await prisma.match.count({
+    where: {
+      status: "COMPLETED",
+      OR: [
+        { postA: { partyId: partyAId }, postB: { partyId: partyBId } },
+        { postA: { partyId: partyBId }, postB: { partyId: partyAId } },
+      ],
+    },
+  });
+  if (completedCount === 0) return;
+  await prisma.relation.upsert({
+    where: { partyAId_partyBId_kind: { partyAId, partyBId, kind: "PREFERRED_PARTNER" } },
+    create: { partyAId, partyBId, kind: "PREFERRED_PARTNER", strength: completedCount },
+    update: { strength: completedCount },
+  });
+}
+
 async function main() {
   console.log("Wiping existing data...");
+  await prisma.relation.deleteMany();
   await prisma.rating.deleteMany();
   await prisma.transactionConfirmation.deleteMany();
   await prisma.match.deleteMany();
@@ -121,6 +143,7 @@ async function main() {
     district: "Chinhoyi",
     roles: ["FARM"],
     passwordHash,
+    verifiedBy: "FOUNDER",
     farm: { farmName: "Moyo Family Farm", sizeHectares: 45 },
   });
   await prisma.livestock.create({
@@ -171,6 +194,7 @@ async function main() {
     district: "Chinhoyi",
     roles: ["TRADER"],
     passwordHash,
+    verifiedBy: "FOUNDER",
   });
 
   // --- Midlands / Gweru ---
@@ -182,6 +206,7 @@ async function main() {
     district: "Gweru",
     roles: ["FARM"],
     passwordHash,
+    verifiedBy: "NETWORK",
     farm: { farmName: "Chikafu Ranch", sizeHectares: 120 },
   });
   await prisma.livestock.create({
@@ -312,6 +337,7 @@ async function main() {
       district: "Mutare",
       quantity: 3,
       unit: "TONNE",
+      urgent: true,
     },
   });
   const orangesNeed = await prisma.post.create({
@@ -325,7 +351,13 @@ async function main() {
     },
   });
   await prisma.match.create({
-    data: { postAId: orangesHave.id, postBId: orangesNeed.id, score: 78, status: "SUGGESTED" },
+    data: {
+      postAId: orangesHave.id,
+      postBId: orangesNeed.id,
+      score: 78,
+      status: "SUGGESTED",
+      reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
+    },
   });
 
   // Live opportunity: Rudo needs refrigerated transport <-> Nyasha has it (Mutare)
@@ -337,6 +369,7 @@ async function main() {
       title: "Refrigerated truck needed this week",
       province: "Manicaland",
       district: "Mutare",
+      urgent: true,
     },
   });
   const transportHave = await prisma.post.create({
@@ -350,7 +383,13 @@ async function main() {
     },
   });
   await prisma.match.create({
-    data: { postAId: transportNeed.id, postBId: transportHave.id, score: 82, status: "SUGGESTED" },
+    data: {
+      postAId: transportNeed.id,
+      postBId: transportHave.id,
+      score: 82,
+      status: "SUGGESTED",
+      reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
+    },
   });
 
   // Open posts with no live match yet — realistic "waiting" state
@@ -394,6 +433,7 @@ async function main() {
       district: "Gweru",
       quantity: 50,
       unit: "BAG",
+      neededBy: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     },
   });
   await prisma.post.create({
@@ -408,80 +448,109 @@ async function main() {
     },
   });
 
-  console.log("Backfilling a completed transaction (Tendai <-> Grace)...");
+  console.log("Backfilling repeat completed transactions (Tendai <-> Grace)...");
 
-  // Historical, already-settled transaction — gives the Directory real
-  // reputation data instead of every party showing "New".
-  const cattleHave = await prisma.post.create({
-    data: {
-      partyId: tendai.party.id,
-      type: "HAVE",
-      category: "LIVESTOCK",
-      title: "3 breeding bulls, offloading for genetic diversity swap",
-      province: "Mashonaland West",
-      district: "Chinhoyi",
-      quantity: 3,
-      status: "CLOSED",
-    },
-  });
-  const cattleNeed = await prisma.post.create({
-    data: {
-      partyId: grace.party.id,
-      type: "NEED",
-      category: "LIVESTOCK",
-      title: "Breeding bulls for herd",
-      province: "Mashonaland West",
-      district: "Chinhoyi",
-      quantity: 3,
-      status: "CLOSED",
-    },
-  });
-  const cattleMatch = await prisma.match.create({
-    data: {
-      postAId: cattleHave.id,
-      postBId: cattleNeed.id,
-      score: 90,
-      status: "COMPLETED",
-    },
-  });
+  // Three historical, already-settled transactions between the same pair —
+  // one alone would cross into "★5.0" off a single rating, which is more
+  // precise-looking than it's earned (the Directory now hides the average
+  // below n=3 ratings for exactly this reason). Three real transactions
+  // also makes them each other's first "Preferred partner" via Relation.
+  async function seedCompletedTransaction(opts: {
+    title: string;
+    quantity: number;
+    graceScore: number;
+    graceComment: string;
+    tendaiScore: number;
+    tendaiComment: string;
+  }) {
+    const have = await prisma.post.create({
+      data: {
+        partyId: tendai.party.id,
+        type: "HAVE",
+        category: "LIVESTOCK",
+        title: opts.title,
+        province: "Mashonaland West",
+        district: "Chinhoyi",
+        quantity: opts.quantity,
+        status: "CLOSED",
+      },
+    });
+    const need = await prisma.post.create({
+      data: {
+        partyId: grace.party.id,
+        type: "NEED",
+        category: "LIVESTOCK",
+        title: `Need: ${opts.title}`,
+        province: "Mashonaland West",
+        district: "Chinhoyi",
+        quantity: opts.quantity,
+        status: "CLOSED",
+      },
+    });
+    const match = await prisma.match.create({
+      data: {
+        postAId: have.id,
+        postBId: need.id,
+        score: 90,
+        status: "COMPLETED",
+        reasons: ["same district", "repeat trading partner"],
+      },
+    });
 
-  await prisma.transactionConfirmation.create({
-    data: {
-      matchId: cattleMatch.id,
-      partyId: tendai.party.id,
-      outcome: "COMPLETED_GOOD",
-      notes: "Paid promptly via EcoCash",
-    },
+    await prisma.transactionConfirmation.create({
+      data: { matchId: match.id, partyId: tendai.party.id, outcome: "COMPLETED_GOOD" },
+    });
+    await prisma.transactionConfirmation.create({
+      data: { matchId: match.id, partyId: grace.party.id, outcome: "COMPLETED_GOOD" },
+    });
+    await prisma.rating.create({
+      data: {
+        matchId: match.id,
+        authorId: grace.party.id,
+        subjectId: tendai.party.id,
+        score: opts.graceScore,
+        comment: opts.graceComment,
+      },
+    });
+    await prisma.rating.create({
+      data: {
+        matchId: match.id,
+        authorId: tendai.party.id,
+        subjectId: grace.party.id,
+        score: opts.tendaiScore,
+        comment: opts.tendaiComment,
+      },
+    });
+  }
+
+  await seedCompletedTransaction({
+    title: "3 breeding bulls, offloaded for genetic diversity swap",
+    quantity: 3,
+    graceScore: 5,
+    graceComment: "Great communication, healthy cattle",
+    tendaiScore: 5,
+    tendaiComment: "Paid promptly, easy to deal with",
   });
-  await prisma.transactionConfirmation.create({
-    data: {
-      matchId: cattleMatch.id,
-      partyId: grace.party.id,
-      outcome: "COMPLETED_GOOD",
-      notes: "Healthy cattle, exactly as described",
-    },
+  await seedCompletedTransaction({
+    title: "5 head of cattle for resale",
+    quantity: 5,
+    graceScore: 4,
+    graceComment: "Good, one animal was smaller than described",
+    tendaiScore: 5,
+    tendaiComment: "Paid promptly via EcoCash again",
   });
-  await prisma.rating.create({
-    data: {
-      matchId: cattleMatch.id,
-      authorId: grace.party.id,
-      subjectId: tendai.party.id,
-      score: 5,
-      comment: "Great communication, healthy cattle",
-    },
-  });
-  await prisma.rating.create({
-    data: {
-      matchId: cattleMatch.id,
-      authorId: tendai.party.id,
-      subjectId: grace.party.id,
-      score: 5,
-      comment: "Paid promptly, easy to deal with",
-    },
+  await seedCompletedTransaction({
+    title: "2 goats, quick sale",
+    quantity: 2,
+    graceScore: 5,
+    graceComment: "Reliable as always",
+    tendaiScore: 4,
+    tendaiComment: "Slight delay picking up but paid in full",
   });
 
   await recomputeReputation(tendai.party.id);
   await recomputeReputation(grace.party.id);
+  await recomputeRelation(tendai.party.id, grace.party.id);
 
   console.log("\nSeed complete. Demo accounts (all share one password):\n");
   console.log(`  Password: ${DEMO_PASSWORD}\n`);

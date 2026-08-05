@@ -104,7 +104,15 @@ export function PostForm({
             className="w-32 rounded border px-2 py-1 text-sm"
           />
         </Field>
+        <Field label="Needed by (optional)">
+          <input name="neededBy" type="date" className="rounded border px-2 py-1 text-sm" />
+        </Field>
       </div>
+
+      <label className="flex w-fit items-center gap-2 text-sm">
+        <input type="checkbox" name="urgent" />
+        Time-sensitive (e.g. spoiling, breaking down, needed immediately)
+      </label>
 
       {state.error && (
         <p className="text-sm text-red-600" role="alert">

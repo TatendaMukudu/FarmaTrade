@@ -85,6 +85,8 @@ export const postSchema = z.object({
   province: z.string().trim().min(1, "Province is required"),
   district: z.string().trim().min(1, "District is required"),
   askingPrice: z.coerce.number().positive().optional(),
+  urgent: z.coerce.boolean().optional(),
+  neededBy: z.coerce.date().optional(),
 });
 
 export const equipmentSchema = z.object({

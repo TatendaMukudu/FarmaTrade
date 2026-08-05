@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
-import type { ConfirmationOutcome } from "@/generated/prisma/client";
+import { recomputeRelation } from "@/lib/relations";
+import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
 export type ConfirmActionState = { error?: string };
 
@@ -71,50 +72,54 @@ export async function confirmMatch(
     return { error: "Not part of this match" };
   }
 
-  await prisma.transactionConfirmation.upsert({
-    where: { matchId_partyId: { matchId, partyId: party.id } },
-    create: {
-      matchId,
-      partyId: party.id,
-      outcome: outcome as ConfirmationOutcome,
-      notes: comment,
-    },
-    update: { outcome: outcome as ConfirmationOutcome, notes: comment },
-  });
+  // Append-only: a confirmation, once logged, is evidence — never silently
+  // overwritten by a resubmission. The UI already hides the form after a
+  // first submission; this is what actually enforces it, since a server
+  // action is a POST endpoint anyone can hit directly.
+  try {
+    await prisma.transactionConfirmation.create({
+      data: {
+        matchId,
+        partyId: party.id,
+        outcome: outcome as ConfirmationOutcome,
+        notes: comment,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { error: "You've already logged this transaction" };
+    }
+    throw err;
+  }
 
   if (score) {
-    await prisma.rating.upsert({
-      where: {
-        matchId_authorId_subjectId: {
-          matchId,
-          authorId: party.id,
-          subjectId: counterpartyId,
-        },
-      },
-      create: {
-        matchId,
-        authorId: party.id,
-        subjectId: counterpartyId,
-        score,
-        comment,
-      },
-      update: { score, comment },
-    });
+    try {
+      await prisma.rating.create({
+        data: { matchId, authorId: party.id, subjectId: counterpartyId, score, comment },
+      });
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) {
+        throw err;
+      }
+    }
   }
 
   const confirmationCount = await prisma.transactionConfirmation.count({
     where: { matchId },
   });
+  let justCompleted = false;
   if (confirmationCount >= 2) {
-    await prisma.match.update({
-      where: { id: matchId },
+    const updated = await prisma.match.updateMany({
+      where: { id: matchId, status: { not: "COMPLETED" } },
       data: { status: "COMPLETED" },
     });
+    justCompleted = updated.count > 0;
   }
 
   await Promise.all([
     recomputeReputation(party.id),
     recomputeReputation(counterpartyId),
+    ...(justCompleted ? [recomputeRelation(party.id, counterpartyId)] : []),
   ]);
 
   revalidatePath("/dashboard/opportunities");

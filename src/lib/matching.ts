@@ -1,26 +1,53 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Post, Reputation } from "@/generated/prisma/client";
+import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
 
 // Deterministic, rules-based scoring — no ML, no history to learn from yet.
 // Geography and category are the qualifying filters (local-first: a match is
 // only ever suggested within the same province); reputation only ever adds,
 // never subtracts, so new parties with no history aren't penalized.
-function scoreMatch(candidate: Post, newPost: Post, reputation: Reputation | null) {
+//
+// The score is never handed downstream on its own — it's cited. Each reason
+// is plain language a projection layer (this UI today, WhatsApp phrasing
+// later) can render directly instead of inventing its own justification.
+function scoreMatch(
+  candidate: Post,
+  newPost: Post,
+  reputation: Reputation | null,
+  verifiedBy: VerificationSource | null,
+): { score: number; reasons: string[] } {
   let score = 50;
+  const reasons: string[] = ["same province"];
 
   if (candidate.district === newPost.district) {
     score += 20;
+    reasons.push("same district");
   }
 
-  if (reputation?.averageRating) {
+  if (reputation?.averageRating && reputation.ratingCount >= 3) {
     score += (reputation.averageRating / 5) * 20;
-  }
-  if (reputation?.completedCount) {
+    reasons.push(
+      `counterparty: ${reputation.completedCount} completed, ${reputation.averageRating.toFixed(1)}★ (${reputation.ratingCount} ratings)`,
+    );
+  } else if (reputation?.completedCount) {
     score += Math.min(reputation.completedCount, 10);
+    reasons.push(`counterparty: ${reputation.completedCount} completed (still building rating history)`);
+  } else {
+    reasons.push("counterparty: new, no history yet");
   }
 
-  return Math.round(Math.min(score, 100));
+  if (verifiedBy) {
+    score += 10;
+    reasons.push(
+      verifiedBy === "FOUNDER" ? "founder-vouched" : "network-referred",
+    );
+  }
+
+  if (candidate.urgent || newPost.urgent) {
+    reasons.push("time-sensitive");
+  }
+
+  return { score: Math.round(Math.min(score, 100)), reasons };
 }
 
 // Called right after a Post is created. Finds OPEN posts of the opposite
@@ -47,11 +74,15 @@ export async function generateMatchesForPost(postId: string) {
   if (candidates.length === 0) return;
 
   await prisma.match.createMany({
-    data: candidates.map((candidate) => ({
-      postAId: candidate.id,
-      postBId: post.id,
-      score: scoreMatch(candidate, post, candidate.party.reputation),
-    })),
+    data: candidates.map((candidate) => {
+      const { score, reasons } = scoreMatch(
+        candidate,
+        post,
+        candidate.party.reputation,
+        candidate.party.verifiedBy,
+      );
+      return { postAId: candidate.id, postBId: post.id, score, reasons };
+    }),
     skipDuplicates: true,
   });
 }

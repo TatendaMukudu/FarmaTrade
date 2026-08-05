@@ -47,6 +47,12 @@ export default async function PostsPage() {
                   </p>
                   <p className="text-sm text-gray-500">
                     {p.category} · {p.district}, {p.province} · {p.status}
+                    {p.urgent && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        Time-sensitive
+                      </span>
+                    )}
+                    {p.neededBy && ` · needed by ${p.neededBy.toLocaleDateString()}`}
                   </p>
                   {p.description && (
                     <p className="mt-1 text-sm text-gray-600">{p.description}</p>
