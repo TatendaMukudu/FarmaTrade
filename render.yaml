@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: farmatrade
+    runtime: node
+    plan: free
+    region: oregon
+    branch: claude/exclusive-farmatrade-session-6r0qkt
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

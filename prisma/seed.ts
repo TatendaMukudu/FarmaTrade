@@ -115,6 +115,20 @@ async function recomputeRelation(partyId1: string, partyId2: string) {
 }
 
 async function main() {
+  // This script wipes every table before reseeding. Once there's a
+  // production database with real farmer data in it, that's not a demo
+  // reset anymore, it's data loss — require an explicit opt-in rather than
+  // let `npm run db:seed` run against it by accident (e.g. from a Render
+  // shell against the same DATABASE_URL the app is using).
+  if (process.env.NODE_ENV === "production" && process.env.SEED_CONFIRM !== "WIPE") {
+    console.error(
+      "Refusing to seed: NODE_ENV=production and SEED_CONFIRM=WIPE was not set.\n" +
+        "This script deletes all existing data. If you really mean to wipe this\n" +
+        "database, rerun with SEED_CONFIRM=WIPE set explicitly.",
+    );
+    process.exit(1);
+  }
+
   console.log("Wiping existing data...");
   await prisma.relation.deleteMany();
   await prisma.rating.deleteMany();
