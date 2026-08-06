@@ -23,7 +23,10 @@ export default async function PostsPage({
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { matchesAsA: true, matchesAsB: true } } },
+    include: {
+      _count: { select: { matchesAsA: true, matchesAsB: true } },
+      photos: { select: { id: true } },
+    },
   });
 
   return (
@@ -71,6 +74,19 @@ export default async function PostsPage({
                   </p>
                   {p.description && (
                     <p className="mt-1 text-sm text-gray-600">{p.description}</p>
+                  )}
+                  {p.photos.length > 0 && (
+                    <div className="mt-2 flex gap-2">
+                      {p.photos.map((photo) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={photo.id}
+                          src={`/api/photos/${photo.id}`}
+                          alt=""
+                          className="h-16 w-16 rounded object-cover"
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-2">

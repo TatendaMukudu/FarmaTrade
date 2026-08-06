@@ -9,6 +9,9 @@ import type { PostType, PostCategory } from "@/generated/prisma/client";
 
 export type PostActionState = { error?: string };
 
+const MAX_PHOTOS = 4;
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+
 export async function createPost(
   _prevState: PostActionState,
   formData: FormData,
@@ -16,6 +19,22 @@ export async function createPost(
   const party = await getCurrentParty();
   if (!party) {
     return { error: "Not signed in" };
+  }
+
+  const photoFiles = formData
+    .getAll("photos")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+
+  if (photoFiles.length > MAX_PHOTOS) {
+    return { error: `Please attach at most ${MAX_PHOTOS} photos` };
+  }
+  for (const file of photoFiles) {
+    if (!file.type.startsWith("image/")) {
+      return { error: "Photos must be image files" };
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      return { error: `Each photo must be under ${MAX_PHOTO_BYTES / (1024 * 1024)}MB` };
+    }
   }
 
   const parsed = postSchema.safeParse({
@@ -54,6 +73,18 @@ export async function createPost(
       neededBy: data.neededBy,
     },
   });
+
+  if (photoFiles.length > 0) {
+    await prisma.photo.createMany({
+      data: await Promise.all(
+        photoFiles.map(async (file) => ({
+          postId: post.id,
+          mimeType: file.type,
+          data: Buffer.from(await file.arrayBuffer()),
+        })),
+      ),
+    });
+  }
 
   await generateMatchesForPost(post.id);
 

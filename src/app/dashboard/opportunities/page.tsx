@@ -3,7 +3,7 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
-import type { Post, Party, Reputation } from "@/generated/prisma/client";
+import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
 const MIN_RATINGS_FOR_AVERAGE = 3;
 
@@ -20,8 +20,12 @@ export default async function OpportunitiesPage() {
         OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
       },
       include: {
-        postA: { include: { party: { include: { reputation: true } } } },
-        postB: { include: { party: { include: { reputation: true } } } },
+        postA: {
+          include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
+        },
+        postB: {
+          include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
+        },
         confirmations: true,
       },
       orderBy: { score: "desc" },
@@ -201,7 +205,7 @@ function MatchCounterpart({
   myDistrict,
   myProvince,
 }: {
-  post: Post & { party: PartyWithReputation };
+  post: Post & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
   myDistrict: string;
   myProvince: string;
 }) {
@@ -222,6 +226,19 @@ function MatchCounterpart({
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
         {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
       </p>
+      {post.photos.length > 0 && (
+        <div className="mt-2 flex gap-2">
+          {post.photos.map((photo) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.id}
+              src={`/api/photos/${photo.id}`}
+              alt=""
+              className="h-16 w-16 rounded object-cover"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

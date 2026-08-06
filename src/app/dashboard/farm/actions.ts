@@ -8,6 +8,7 @@ import {
   produceSchema,
   equipmentSchema,
 } from "@/lib/validation";
+import { parseCsv, normalizeRow } from "@/lib/csv";
 import type {
   LivestockSpecies,
   LivestockSex,
@@ -155,4 +156,121 @@ export async function deleteEquipment(formData: FormData) {
   const id = String(formData.get("id"));
   await prisma.equipment.delete({ where: { id, farmId } });
   revalidatePath("/dashboard/farm");
+}
+
+export type ImportActionState = {
+  error?: string;
+  success?: string;
+  skipped?: string[];
+};
+
+const IMPORT_FIELDS = {
+  LIVESTOCK: ["species", "breed", "sex", "quantity", "notes"],
+  PRODUCE: ["cropType", "quantity", "unit", "perishable", "notes"],
+  EQUIPMENT: ["name", "category", "condition", "available", "notes"],
+} as const;
+
+const ENUM_FIELDS = new Set(["species", "sex", "unit", "category"]);
+const BOOLEAN_FIELDS = new Set(["perishable", "available"]);
+
+function isTruthyCell(value: string) {
+  return /^(1|true|yes|y)$/i.test(value.trim());
+}
+
+// Tolerant of case and phrasing (a farmer's own spreadsheet, not a machine
+// export): enum-like columns are upper-cased and yes/no-style booleans are
+// normalized to what the checkbox-driven schemas already expect ("on"/"").
+function prepareRow(row: Record<string, string>, fields: readonly string[]) {
+  const normalized = normalizeRow(row, [...fields]);
+  for (const key of Object.keys(normalized)) {
+    if (ENUM_FIELDS.has(key)) normalized[key] = normalized[key].toUpperCase();
+    if (BOOLEAN_FIELDS.has(key)) normalized[key] = isTruthyCell(normalized[key]) ? "on" : "";
+  }
+  return normalized;
+}
+
+export async function importInventory(
+  _prevState: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const farmId = await requireFarmId();
+
+  const category = String(formData.get("category"));
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a CSV file" };
+  }
+  if (file.type && file.type !== "text/csv" && !file.name.toLowerCase().endsWith(".csv")) {
+    return { error: "Only CSV files are supported right now" };
+  }
+
+  const rows = parseCsv(await file.text());
+  if (rows.length === 0) {
+    return { error: "That file has no data rows" };
+  }
+
+  const skipped: string[] = [];
+
+  if (category === "LIVESTOCK") {
+    const values: { species: LivestockSpecies; breed?: string; sex: LivestockSex; quantity: number; notes?: string }[] = [];
+    rows.forEach((row, i) => {
+      const parsed = livestockSchema.safeParse(prepareRow(row, IMPORT_FIELDS.LIVESTOCK));
+      if (!parsed.success) {
+        skipped.push(`Row ${i + 2}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+        return;
+      }
+      values.push({ ...parsed.data, species: parsed.data.species as LivestockSpecies, sex: parsed.data.sex as LivestockSex });
+    });
+    if (values.length > 0) {
+      await prisma.livestock.createMany({ data: values.map((v) => ({ ...v, farmId })) });
+    }
+    revalidatePath("/dashboard/farm");
+    return finishImport(values.length, skipped);
+  }
+
+  if (category === "PRODUCE") {
+    const values: { cropType: string; quantity: number; unit: ProduceUnit; perishable?: boolean; notes?: string }[] = [];
+    rows.forEach((row, i) => {
+      const parsed = produceSchema.safeParse(prepareRow(row, IMPORT_FIELDS.PRODUCE));
+      if (!parsed.success) {
+        skipped.push(`Row ${i + 2}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+        return;
+      }
+      values.push({ ...parsed.data, unit: parsed.data.unit as ProduceUnit });
+    });
+    if (values.length > 0) {
+      await prisma.produceStock.createMany({ data: values.map((v) => ({ ...v, farmId })) });
+    }
+    revalidatePath("/dashboard/farm");
+    return finishImport(values.length, skipped);
+  }
+
+  if (category === "EQUIPMENT") {
+    const values: { name: string; category: EquipmentCategory; condition?: string; available?: boolean; notes?: string }[] = [];
+    rows.forEach((row, i) => {
+      const parsed = equipmentSchema.safeParse(prepareRow(row, IMPORT_FIELDS.EQUIPMENT));
+      if (!parsed.success) {
+        skipped.push(`Row ${i + 2}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+        return;
+      }
+      values.push({ ...parsed.data, category: parsed.data.category as EquipmentCategory });
+    });
+    if (values.length > 0) {
+      await prisma.equipment.createMany({ data: values.map((v) => ({ ...v, farmId })) });
+    }
+    revalidatePath("/dashboard/farm");
+    return finishImport(values.length, skipped);
+  }
+
+  return { error: "Pick what kind of inventory you're importing" };
+}
+
+function finishImport(createdCount: number, skipped: string[]): ImportActionState {
+  return {
+    success: `${createdCount} row${createdCount === 1 ? "" : "s"} imported${
+      skipped.length > 0 ? `, ${skipped.length} skipped` : ""
+    }`,
+    skipped: skipped.slice(0, 8),
+  };
 }

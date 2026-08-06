@@ -16,8 +16,8 @@ export default async function ConversationPage({
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
-      postA: { include: { party: true } },
-      postB: { include: { party: true } },
+      postA: { include: { party: true, photos: { select: { id: true } } } },
+      postB: { include: { party: true, photos: { select: { id: true } } } },
       confirmations: true,
       conversation: {
         include: { messages: { include: { author: true }, orderBy: { createdAt: "asc" } } },
@@ -50,6 +50,19 @@ export default async function ConversationPage({
           Your post: {yours.title} ↔ Their post: {theirs.title}
         </p>
         <p className="mt-1 text-xs text-gray-400">Status: {match.status}</p>
+        {theirs.photos.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            {theirs.photos.map((photo) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={photo.id}
+                src={`/api/photos/${photo.id}`}
+                alt=""
+                className="h-20 w-20 rounded object-cover"
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {match.status === "SUGGESTED" && (

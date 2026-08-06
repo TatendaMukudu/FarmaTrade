@@ -266,8 +266,24 @@ model Post {
 
   matchesAsA Match[] @relation("MatchPostA")
   matchesAsB Match[] @relation("MatchPostB")
+  photos     Photo[]
 
   @@index([category, status, province, district])
+}
+
+// Stored inline in Postgres (bytea) rather than an object-storage bucket —
+// deliberate for pilot scale (a handful of photos per post, capped size at
+// upload time). Swapping to a bucket later is a change to how `data` is
+// populated/served, not to the Post/Photo shape or the upload UI.
+model Photo {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  data      Bytes
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
 }
 
 // ---------------------------------------------------------------------------

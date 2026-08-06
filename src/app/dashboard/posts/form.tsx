@@ -67,6 +67,16 @@ export function PostForm({
         />
       </Field>
 
+      <Field label="Photos (optional, up to 4 — quality sells)">
+        <input
+          name="photos"
+          type="file"
+          accept="image/*"
+          multiple
+          className="w-full text-sm"
+        />
+      </Field>
+
       <div className="flex flex-wrap gap-3">
         <Field label="Quantity (optional)">
           <input
