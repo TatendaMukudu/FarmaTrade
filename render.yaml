@@ -22,3 +22,30 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+
+  # Staging: same build, deployed from a separate branch against a separate
+  # database, so a migration or a bad deploy shows up here before it ever
+  # touches production. This config is ready to sync, but two manual steps
+  # remain (no Render/Neon API access from this environment to do them):
+  #   1. In Render: New > Blueprint, point at this repo, let it create
+  #      "farmatrade-staging" from this block.
+  #   2. In Neon: create a branch off the production database (Neon branches
+  #      are cheap, copy-on-write — this does not duplicate storage), copy
+  #      its connection string into farmatrade-staging's DATABASE_URL.
+  - type: web
+    name: farmatrade-staging
+    runtime: node
+    plan: free
+    region: oregon
+    branch: staging
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
