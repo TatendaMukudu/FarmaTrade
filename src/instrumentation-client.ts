@@ -10,3 +10,7 @@ Sentry.init({
   environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
   tracesSampleRate: 0.1,
 });
+
+// Required for the SDK to trace client-side navigations (App Router route
+// changes) rather than only the initial page load.
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

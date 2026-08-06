@@ -35,6 +35,14 @@ services:
         value: production
       - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
         value: production
+      # Slugs aren't secret (same reasoning as the DSN); the auth token is
+      # — sync:false, set by hand from Sentry's Organization Tokens page.
+      - key: SENTRY_ORG
+        value: mukudu-ltd
+      - key: SENTRY_PROJECT
+        value: javascript-nextjs
+      - key: SENTRY_AUTH_TOKEN
+        sync: false
       # R2 credentials genuinely are secret (unlike the Sentry DSN above) —
       # sync:false, set by hand in Render's dashboard from the values in
       # Cloudflare's R2 > Manage R2 API Tokens.
@@ -81,6 +89,12 @@ services:
         value: staging
       - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
         value: staging
+      - key: SENTRY_ORG
+        value: mukudu-ltd
+      - key: SENTRY_PROJECT
+        value: javascript-nextjs
+      - key: SENTRY_AUTH_TOKEN
+        sync: false
       # Point at a separate bucket if you create one for staging — worth
       # doing eventually so a staging test upload never lands next to real
       # user photos, but reusing the production bucket for now is fine too.
