@@ -83,7 +83,9 @@ export default async function DirectoryPage({
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{p.name}</p>
+                    <Link href={`/dashboard/directory/${p.id}`} className="font-medium hover:underline">
+                      {p.name}
+                    </Link>
                     {p.verifiedBy && <VerifiedBadge source={p.verifiedBy} />}
                     {strength && strength >= 2 && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
@@ -142,15 +144,30 @@ function ReputationBadge({
   const hasEnoughRatings =
     reputation.averageRating !== null && reputation.ratingCount >= MIN_RATINGS_FOR_AVERAGE;
   return (
-    <div className="text-right text-xs text-gray-500">
-      <p>
-        {hasEnoughRatings
-          ? `★ ${reputation.averageRating!.toFixed(1)} (${reputation.ratingCount})`
-          : reputation.ratingCount > 0
-            ? `Building history (${reputation.ratingCount} rating${reputation.ratingCount === 1 ? "" : "s"})`
-            : "Not yet rated"}
-      </p>
-      <p>{reputation.completedCount} completed</p>
+    <div className="text-right">
+      {hasEnoughRatings ? (
+        <>
+          <p className="text-2xl leading-none font-semibold text-amber-500">
+            ★ {reputation.averageRating!.toFixed(1)}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {reputation.completedCount} completed trade
+            {reputation.completedCount === 1 ? "" : "s"}
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-medium text-gray-600">
+            {reputation.ratingCount > 0
+              ? `Building history (${reputation.ratingCount})`
+              : "Not yet rated"}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {reputation.completedCount} completed trade
+            {reputation.completedCount === 1 ? "" : "s"}
+          </p>
+        </>
+      )}
     </div>
   );
 }

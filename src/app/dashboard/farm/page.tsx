@@ -3,6 +3,7 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { LivestockForm, ProduceForm, EquipmentForm } from "./forms";
 import { LivestockRow, ProduceRow, EquipmentRow } from "./rows";
+import { ImportForm } from "./import-form";
 
 export default async function FarmPage() {
   const party = await getCurrentParty();
@@ -34,6 +35,8 @@ export default async function FarmPage() {
           {party.farm.sizeHectares ? ` · ${party.farm.sizeHectares} ha` : ""}
         </p>
       </div>
+
+      <ImportForm />
 
       <Section title="Livestock">
         <ul className="flex flex-col gap-2">

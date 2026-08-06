@@ -3,14 +3,30 @@ import { prisma } from "@/lib/prisma";
 import { PostForm } from "./form";
 import { closePost } from "./actions";
 
-export default async function PostsPage() {
+const VALID_TYPES = new Set(["HAVE", "NEED"]);
+const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
+
+export default async function PostsPage({
+  searchParams,
+}: PageProps<"/dashboard/posts">) {
   const party = await getCurrentParty();
   if (!party) return null;
+
+  const params = await searchParams;
+  const typeParam = Array.isArray(params.type) ? params.type[0] : params.type;
+  const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
+  const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
+  const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
+    ? (categoryParam as "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT")
+    : undefined;
 
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { matchesAsA: true, matchesAsB: true } } },
+    include: {
+      _count: { select: { matchesAsA: true, matchesAsB: true } },
+      photos: { select: { id: true } },
+    },
   });
 
   return (
@@ -26,6 +42,8 @@ export default async function PostsPage() {
       <PostForm
         defaultProvince={party.province}
         defaultDistrict={party.district}
+        defaultType={defaultType}
+        defaultCategory={defaultCategory}
       />
 
       <ul className="flex flex-col gap-3">
@@ -56,6 +74,19 @@ export default async function PostsPage() {
                   </p>
                   {p.description && (
                     <p className="mt-1 text-sm text-gray-600">{p.description}</p>
+                  )}
+                  {p.photos.length > 0 && (
+                    <div className="mt-2 flex gap-2">
+                      {p.photos.map((photo) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={photo.id}
+                          src={`/api/photos/${photo.id}`}
+                          alt=""
+                          className="h-16 w-16 rounded object-cover"
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
