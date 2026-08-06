@@ -81,6 +81,8 @@ model Party {
   relationsAsA Relation[] @relation("RelationPartyA")
   relationsAsB Relation[] @relation("RelationPartyB")
 
+  messages Message[]
+
   @@index([province, district])
 }
 
@@ -298,8 +300,33 @@ model Match {
 
   confirmations TransactionConfirmation[]
   ratings       Rating[]
+  conversation  Conversation?
 
   @@unique([postAId, postBId])
+}
+
+// A conversation only exists once a match is ACCEPTED — it's the transaction
+// room, not a general chat. One per match (unique matchId), created lazily
+// the first time either side opens it.
+model Conversation {
+  id        String   @id @default(cuid())
+  matchId   String   @unique
+  match     Match    @relation(fields: [matchId], references: [id])
+  createdAt DateTime @default(now())
+
+  messages Message[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  authorId       String
+  author         Party        @relation(fields: [authorId], references: [id])
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

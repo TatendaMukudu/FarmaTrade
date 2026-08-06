@@ -1,8 +1,13 @@
+import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
-import type { Post, Party } from "@/generated/prisma/client";
+import type { Post, Party, Reputation } from "@/generated/prisma/client";
+
+const MIN_RATINGS_FOR_AVERAGE = 3;
+
+type PartyWithReputation = Party & { reputation: Reputation | null };
 
 export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
@@ -15,8 +20,8 @@ export default async function OpportunitiesPage() {
         OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
       },
       include: {
-        postA: { include: { party: true } },
-        postB: { include: { party: true } },
+        postA: { include: { party: { include: { reputation: true } } } },
+        postB: { include: { party: { include: { reputation: true } } } },
         confirmations: true,
       },
       orderBy: { score: "desc" },
@@ -79,34 +84,50 @@ export default async function OpportunitiesPage() {
                     )}
                   </div>
                   <p className="mt-1 font-medium">Your post: {yours.title}</p>
-                  <MatchCounterpart post={theirs} />
+                  <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
                   {m.reasons.length > 0 && (
                     <p className="mt-1 text-xs text-gray-400">
                       Why: {m.reasons.join(" · ")}
                     </p>
                   )}
                 </div>
-                {m.status === "SUGGESTED" && (
-                  <form action={respondToMatch} className="flex gap-2">
-                    <input type="hidden" name="id" value={m.id} />
-                    <button
-                      type="submit"
-                      name="decision"
-                      value="ACCEPTED"
-                      className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="submit"
-                      name="decision"
-                      value="DECLINED"
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {m.status === "SUGGESTED" && (
+                    <form action={respondToMatch} className="flex gap-2">
+                      <input type="hidden" name="id" value={m.id} />
+                      <button
+                        type="submit"
+                        name="decision"
+                        value="ACCEPTED"
+                        className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="submit"
+                        name="decision"
+                        value="DECLINED"
+                        className="rounded border px-3 py-1.5 text-xs"
+                      >
+                        Decline
+                      </button>
+                    </form>
+                  )}
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/dashboard/conversations/${m.id}`}
                       className="rounded border px-3 py-1.5 text-xs"
                     >
-                      Decline
-                    </button>
-                  </form>
-                )}
+                      Message
+                    </Link>
+                    <Link
+                      href={`/dashboard/directory/${theirs.party.id}`}
+                      className="rounded border px-3 py-1.5 text-xs"
+                    >
+                      View profile
+                    </Link>
+                  </div>
+                </div>
               </div>
               {m.status === "ACCEPTED" && (
                 <div className="mt-4 border-t pt-4">
@@ -157,13 +178,50 @@ export default async function OpportunitiesPage() {
   );
 }
 
-function MatchCounterpart({ post }: { post: Post & { party: Party } }) {
+function distanceLabel(theirDistrict: string, theirProvince: string, myDistrict: string, myProvince: string) {
+  if (theirDistrict === myDistrict) return "Same district";
+  if (theirProvince === myProvince) return "Same province";
+  return theirProvince;
+}
+
+function reputationLabel(reputation: Reputation | null) {
+  if (!reputation || reputation.completedCount === 0) return "New · no history yet";
+  const hasEnoughRatings =
+    reputation.averageRating !== null && reputation.ratingCount >= MIN_RATINGS_FOR_AVERAGE;
+  const ratingPart = hasEnoughRatings
+    ? `★ ${reputation.averageRating!.toFixed(1)}`
+    : reputation.ratingCount > 0
+      ? `Building history (${reputation.ratingCount})`
+      : "Not yet rated";
+  return `${ratingPart} · ${reputation.completedCount} completed`;
+}
+
+function MatchCounterpart({
+  post,
+  myDistrict,
+  myProvince,
+}: {
+  post: Post & { party: PartyWithReputation };
+  myDistrict: string;
+  myProvince: string;
+}) {
+  const estimatedValue =
+    post.askingPrice != null && post.quantity != null
+      ? Number(post.askingPrice) * post.quantity
+      : post.askingPrice != null
+        ? Number(post.askingPrice)
+        : null;
+
   return (
-    <p className="text-sm text-gray-600">
-      {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}{" "}
-      <span className="text-gray-400">
-        ({post.district}, {post.province})
-      </span>
-    </p>
+    <div className="mt-1">
+      <p className="text-sm text-gray-600">
+        {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
+      </p>
+      <p className="text-xs text-gray-400">
+        {reputationLabel(post.party.reputation)} ·{" "}
+        {distanceLabel(post.district, post.province, myDistrict, myProvince)}
+        {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
+      </p>
+    </div>
   );
 }

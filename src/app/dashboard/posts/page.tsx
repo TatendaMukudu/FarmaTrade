@@ -3,9 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { PostForm } from "./form";
 import { closePost } from "./actions";
 
-export default async function PostsPage() {
+const VALID_TYPES = new Set(["HAVE", "NEED"]);
+const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
+
+export default async function PostsPage({
+  searchParams,
+}: PageProps<"/dashboard/posts">) {
   const party = await getCurrentParty();
   if (!party) return null;
+
+  const params = await searchParams;
+  const typeParam = Array.isArray(params.type) ? params.type[0] : params.type;
+  const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
+  const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
+  const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
+    ? (categoryParam as "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT")
+    : undefined;
 
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
@@ -26,6 +39,8 @@ export default async function PostsPage() {
       <PostForm
         defaultProvince={party.province}
         defaultDistrict={party.district}
+        defaultType={defaultType}
+        defaultCategory={defaultCategory}
       />
 
       <ul className="flex flex-col gap-3">
