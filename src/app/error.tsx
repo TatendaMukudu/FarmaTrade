@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "./report-client-error";
 
 // Catches any render error thrown below the root layout (a Server
@@ -17,6 +18,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
+    Sentry.captureException(error);
     reportClientError(error.message, error.digest).catch(() => {});
   }, [error]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "./report-client-error";
 
 // error.tsx only catches errors below the root layout — if RootLayout
@@ -18,6 +19,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    Sentry.captureException(error);
     reportClientError(error.message, error.digest).catch(() => {});
   }, [error]);
 
