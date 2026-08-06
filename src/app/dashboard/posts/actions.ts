@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { postSchema } from "@/lib/validation";
 import { generateMatchesForPost } from "@/lib/matching";
+import { uploadPhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
 
 export type PostActionState = { error?: string };
@@ -85,11 +87,12 @@ export async function createPost(
   if (photoFiles.length > 0) {
     await prisma.photo.createMany({
       data: await Promise.all(
-        photoFiles.map(async (file) => ({
-          postId: post.id,
-          mimeType: file.type,
-          data: Buffer.from(await file.arrayBuffer()),
-        })),
+        photoFiles.map(async (file) => {
+          const storageKey = `posts/${post.id}/${randomUUID()}`;
+          const bytes = Buffer.from(await file.arrayBuffer());
+          await uploadPhoto(storageKey, bytes, file.type);
+          return { postId: post.id, mimeType: file.type, storageKey };
+        }),
       ),
     });
   }

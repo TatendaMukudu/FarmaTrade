@@ -35,6 +35,17 @@ services:
         value: production
       - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
         value: production
+      # R2 credentials genuinely are secret (unlike the Sentry DSN above) —
+      # sync:false, set by hand in Render's dashboard from the values in
+      # Cloudflare's R2 > Manage R2 API Tokens.
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
 
   # Staging: same build, deployed from a separate branch against a separate
   # database, so a migration or a bad deploy shows up here before it ever
@@ -70,3 +81,14 @@ services:
         value: staging
       - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
         value: staging
+      # Point at a separate bucket if you create one for staging — worth
+      # doing eventually so a staging test upload never lands next to real
+      # user photos, but reusing the production bucket for now is fine too.
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
