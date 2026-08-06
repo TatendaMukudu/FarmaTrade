@@ -6,6 +6,12 @@ services:
     region: oregon
     branch: main
     buildCommand: npm ci && npm run build
+    # preDeployCommand only actually runs if this service is synced from this
+    # Blueprint (render.yaml) rather than configured by hand in the dashboard
+    # — Render silently ignores it otherwise, which is exactly how migrations
+    # stopped applying reliably before. `npm start` now runs
+    # `prisma migrate deploy` itself (idempotent, safe to repeat) as the
+    # guarantee that doesn't depend on how the service was originally set up.
     preDeployCommand: npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /

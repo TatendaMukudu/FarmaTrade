@@ -6,6 +6,7 @@ import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
 import { recomputeRelation } from "@/lib/relations";
+import { logger } from "@/lib/logger";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
 export type ConfirmActionState = { error?: string };
@@ -89,6 +90,11 @@ export async function confirmMatch(
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { error: "You've already logged this transaction" };
     }
+    logger.error("confirmMatch.transaction_confirmation_failed", {
+      matchId,
+      partyId: party.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
 
@@ -99,6 +105,11 @@ export async function confirmMatch(
       });
     } catch (err) {
       if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) {
+        logger.error("confirmMatch.rating_failed", {
+          matchId,
+          partyId: party.id,
+          message: err instanceof Error ? err.message : String(err),
+        });
         throw err;
       }
     }
