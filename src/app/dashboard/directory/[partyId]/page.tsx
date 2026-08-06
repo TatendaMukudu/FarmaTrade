@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-const MIN_RATINGS_FOR_AVERAGE = 3;
+import { summarizeReputation } from "@/lib/reputation";
+import { Badge } from "@/components/badge";
 
 export default async function PartyProfilePage({
   params,
@@ -38,9 +38,7 @@ export default async function PartyProfilePage({
 
   if (!party) notFound();
 
-  const reputation = party.reputation;
-  const hasEnoughRatings =
-    reputation && reputation.averageRating !== null && reputation.ratingCount >= MIN_RATINGS_FOR_AVERAGE;
+  const reputation = summarizeReputation(party.reputation);
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,14 +51,12 @@ export default async function PartyProfilePage({
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">{party.name}</h1>
             {party.verifiedBy && (
-              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+              <Badge tone="green">
                 {party.verifiedBy === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}
-              </span>
+              </Badge>
             )}
             {relation && relation.strength >= 2 && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                Preferred partner · {relation.strength} completed
-              </span>
+              <Badge tone="blue">Preferred partner · {relation.strength} completed</Badge>
             )}
           </div>
           <p className="text-sm text-gray-500">
@@ -68,23 +64,21 @@ export default async function PartyProfilePage({
           </p>
         </div>
 
-        {reputation && reputation.completedCount > 0 ? (
+        {reputation.hasHistory ? (
           <div className="text-right">
-            {hasEnoughRatings ? (
-              <p className="text-3xl leading-none font-semibold text-amber-500">
-                ★ {reputation.averageRating!.toFixed(1)}
-              </p>
-            ) : (
-              <p className="text-sm font-medium text-gray-600">
-                Building history ({reputation.ratingCount})
-              </p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {reputation.completedCount} completed trade{reputation.completedCount === 1 ? "" : "s"}
+            <p
+              className={
+                reputation.hasStars
+                  ? "text-3xl leading-none font-semibold text-amber-500"
+                  : "text-sm font-medium text-gray-600"
+              }
+            >
+              {reputation.headline}
             </p>
+            <p className="mt-1 text-xs text-gray-500">{reputation.completedLine}</p>
           </div>
         ) : (
-          <p className="text-xs text-gray-400">New · no history yet</p>
+          <p className="text-xs text-gray-400">{reputation.headline}</p>
         )}
       </div>
 
