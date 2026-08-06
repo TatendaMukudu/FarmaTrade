@@ -312,17 +312,19 @@ model Post {
   @@index([produceId])
 }
 
-// Stored inline in Postgres (bytea) rather than an object-storage bucket —
-// deliberate for pilot scale (a handful of photos per post, capped size at
-// upload time). Swapping to a bucket later is a change to how `data` is
-// populated/served, not to the Post/Photo shape or the upload UI.
+// Was stored inline in Postgres (bytea) at pilot scale; now uploaded to R2.
+// `data` stays on existing rows (nullable rather than backfilled/dropped —
+// no reason to touch bytes that already work) and `storageKey` is set on
+// everything new. The serving route checks storageKey first, falls back to
+// `data` — exactly the seam this model was built to allow.
 model Photo {
-  id        String   @id @default(cuid())
-  postId    String
-  post      Post     @relation(fields: [postId], references: [id])
-  data      Bytes
-  mimeType  String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id])
+  data       Bytes?
+  storageKey String?
+  mimeType   String
+  createdAt  DateTime @default(now())
 
   @@index([postId])
 }
