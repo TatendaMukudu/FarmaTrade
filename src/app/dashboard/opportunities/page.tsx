@@ -3,11 +3,13 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
+import { summarizeReputation } from "@/lib/reputation";
+import { resolveMatchSides, distanceLabel, estimatedPostValue } from "@/lib/match-view";
+import { Badge } from "@/components/badge";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
-const MIN_RATINGS_FOR_AVERAGE = 3;
-
 type PartyWithReputation = Party & { reputation: Reputation | null };
+type CounterpartPost = Post & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
 
 export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
@@ -64,8 +66,7 @@ export default async function OpportunitiesPage() {
 
       <ul className="flex flex-col gap-3">
         {active.map((m) => {
-          const yours = m.postA.partyId === party.id ? m.postA : m.postB;
-          const theirs = m.postA.partyId === party.id ? m.postB : m.postA;
+          const { yours, theirs } = resolveMatchSides<CounterpartPost>(m, party.id);
           const myConfirmation = m.confirmations.find(
             (c) => c.partyId === party.id,
           );
@@ -76,15 +77,9 @@ export default async function OpportunitiesPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                     <span>{m.status}</span>
-                    {(yours.urgent || theirs.urgent) && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
-                        Time-sensitive
-                      </span>
-                    )}
+                    {(yours.urgent || theirs.urgent) && <Badge tone="amber">Time-sensitive</Badge>}
                     {strength && strength >= 2 && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800">
-                        Preferred partner · {strength} completed
-                      </span>
+                      <Badge tone="blue">Preferred partner · {strength} completed</Badge>
                     )}
                   </div>
                   <p className="mt-1 font-medium">Your post: {yours.title}</p>
@@ -160,8 +155,7 @@ export default async function OpportunitiesPage() {
           <h2 className="text-lg font-medium">History</h2>
           <ul className="flex flex-col gap-2">
             {history.map((m) => {
-              const yours = m.postA.partyId === party.id ? m.postA : m.postB;
-              const theirs = m.postA.partyId === party.id ? m.postB : m.postA;
+              const { yours, theirs } = resolveMatchSides(m, party.id);
               const myConfirmation = m.confirmations.find(
                 (c) => c.partyId === party.id,
               );
@@ -182,52 +176,31 @@ export default async function OpportunitiesPage() {
   );
 }
 
-function distanceLabel(theirDistrict: string, theirProvince: string, myDistrict: string, myProvince: string) {
-  if (theirDistrict === myDistrict) return "Same district";
-  if (theirProvince === myProvince) return "Same province";
-  return theirProvince;
-}
-
-function reputationLabel(reputation: Reputation | null) {
-  if (!reputation || reputation.completedCount === 0) return "New · no history yet";
-  const hasEnoughRatings =
-    reputation.averageRating !== null && reputation.ratingCount >= MIN_RATINGS_FOR_AVERAGE;
-  const ratingPart = hasEnoughRatings
-    ? `★ ${reputation.averageRating!.toFixed(1)}`
-    : reputation.ratingCount > 0
-      ? `Building history (${reputation.ratingCount})`
-      : "Not yet rated";
-  return `${ratingPart} · ${reputation.completedCount} completed`;
-}
-
 function MatchCounterpart({
   post,
   myDistrict,
   myProvince,
 }: {
-  post: Post & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
+  post: CounterpartPost;
   myDistrict: string;
   myProvince: string;
 }) {
-  const estimatedValue =
-    post.askingPrice != null && post.quantity != null
-      ? Number(post.askingPrice) * post.quantity
-      : post.askingPrice != null
-        ? Number(post.askingPrice)
-        : null;
+  const reputation = summarizeReputation(post.party.reputation);
+  const estimatedValue = estimatedPostValue(post);
 
   return (
     <div className="mt-1">
       <p className="text-sm text-gray-600">
         {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
         {post.recurring && (
-          <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+          <Badge tone="blue" className="ml-2">
             Standing order
-          </span>
+          </Badge>
         )}
       </p>
       <p className="text-xs text-gray-400">
-        {reputationLabel(post.party.reputation)} ·{" "}
+        {reputation.headline}
+        {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
         {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
       </p>

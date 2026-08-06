@@ -2,6 +2,10 @@ import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
+import { summarizeReputation } from "@/lib/reputation";
+import { resolveMatchSides } from "@/lib/match-view";
+import { categoryEmoji } from "@/lib/categories";
+import { Badge } from "@/components/badge";
 import type { Post, Party } from "@/generated/prisma/client";
 
 function greeting() {
@@ -16,13 +20,6 @@ function greeting() {
   if (hour < 18) return "Good afternoon";
   return "Good evening";
 }
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  LIVESTOCK: "🐄",
-  PRODUCE: "🍊",
-  EQUIPMENT: "🚜",
-  TRANSPORT: "🚛",
-};
 
 export default async function DashboardPage() {
   const party = await getCurrentParty();
@@ -80,8 +77,7 @@ export default async function DashboardPage() {
     data: { opportunitiesLastSeenAt: new Date() },
   });
 
-  const reputation = party.reputation;
-  const hasRating = reputation && reputation.ratingCount > 0;
+  const reputation = summarizeReputation(party.reputation);
 
   return (
     <div className="flex flex-col gap-8">
@@ -107,7 +103,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {topProduce && (
           <StatLine
-            emoji={CATEGORY_EMOJI.PRODUCE}
+            emoji={categoryEmoji("PRODUCE")}
             text={`${topProduce.quantity} ${topProduce.unit.toLowerCase()} of ${topProduce.cropType}${
               topProduce.perishable ? " ready" : ""
             }`}
@@ -130,8 +126,8 @@ export default async function DashboardPage() {
         <StatLine
           emoji="⭐"
           text={
-            hasRating
-              ? `Reputation ${reputation!.averageRating!.toFixed(1)} · ${reputation!.completedCount} completed`
+            reputation.hasHistory
+              ? `Reputation ${reputation.headline} · ${reputation.completedLine}`
               : "No trade history yet"
           }
         />
@@ -146,7 +142,7 @@ export default async function DashboardPage() {
         </div>
         <ul className="flex flex-col gap-2">
           {topMatches.map((m) => {
-            const theirs = m.postA.partyId === party.id ? m.postB : m.postA;
+            const { theirs } = resolveMatchSides(m, party.id);
             const isNew = since ? m.createdAt > since : true;
             return (
               <li key={m.id} className="rounded border p-3 text-sm">
@@ -165,9 +161,21 @@ export default async function DashboardPage() {
       <div>
         <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
-          <QuickAction href="/dashboard/posts?type=HAVE&category=PRODUCE" emoji="🍊" label="Sell produce" />
-          <QuickAction href="/dashboard/posts?type=NEED&category=TRANSPORT" emoji="🚛" label="Need transport" />
-          <QuickAction href="/dashboard/posts?type=NEED&category=EQUIPMENT" emoji="🚜" label="Borrow equipment" />
+          <QuickAction
+            href="/dashboard/posts?type=HAVE&category=PRODUCE"
+            emoji={categoryEmoji("PRODUCE")}
+            label="Sell produce"
+          />
+          <QuickAction
+            href="/dashboard/posts?type=NEED&category=TRANSPORT"
+            emoji={categoryEmoji("TRANSPORT")}
+            label="Need transport"
+          />
+          <QuickAction
+            href="/dashboard/posts?type=NEED&category=EQUIPMENT"
+            emoji={categoryEmoji("EQUIPMENT")}
+            label="Borrow equipment"
+          />
         </div>
       </div>
     </div>
@@ -184,14 +192,14 @@ function StatLine({ emoji, text }: { emoji: string; text: string }) {
 }
 
 function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew: boolean }) {
-  const emoji = CATEGORY_EMOJI[post.category] ?? "📌";
   return (
     <span>
-      {emoji} {post.party.name} {post.type === "HAVE" ? "has" : "wants"}: {post.title}
+      {categoryEmoji(post.category)} {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
+      {post.title}
       {isNew && (
-        <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+        <Badge tone="green" className="ml-2">
           New
-        </span>
+        </Badge>
       )}
     </span>
   );

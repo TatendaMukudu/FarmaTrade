@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "../../opportunities/actions";
 import { ConfirmForm } from "../../opportunities/confirm-form";
 import { MessageForm } from "../message-form";
+import { resolveMatchSides, isPartyInMatch } from "@/lib/match-view";
 
 export default async function ConversationPage({
   params,
@@ -26,11 +27,9 @@ export default async function ConversationPage({
   });
   if (!match) notFound();
 
-  const ownsMatch = match.postA.partyId === party.id || match.postB.partyId === party.id;
-  if (!ownsMatch) notFound();
+  if (!isPartyInMatch(match, party.id)) notFound();
 
-  const yours = match.postA.partyId === party.id ? match.postA : match.postB;
-  const theirs = match.postA.partyId === party.id ? match.postB : match.postA;
+  const { yours, theirs } = resolveMatchSides(match, party.id);
   const messages = match.conversation?.messages ?? [];
   const myConfirmation = match.confirmations.find((c) => c.partyId === party.id);
 

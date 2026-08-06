@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
-import type { PartyRole } from "@/generated/prisma/client";
+import { summarizeReputation } from "@/lib/reputation";
+import { Badge } from "@/components/badge";
+import type { PartyRole, Reputation } from "@/generated/prisma/client";
 
 const ROLE_FILTERS: { label: string; value: PartyRole | "ALL" }[] = [
   { label: "All", value: "ALL" },
@@ -9,11 +11,6 @@ const ROLE_FILTERS: { label: string; value: PartyRole | "ALL" }[] = [
   { label: "Traders", value: "TRADER" },
   { label: "Transporters", value: "TRANSPORTER" },
 ];
-
-// A star average needs enough samples to mean anything — below this, a
-// single 5★ rating would display with false precision. Show the raw count
-// instead until there's a real signal.
-const MIN_RATINGS_FOR_AVERAGE = 3;
 
 export default async function DirectoryPage({
   searchParams,
@@ -87,11 +84,7 @@ export default async function DirectoryPage({
                       {p.name}
                     </Link>
                     {p.verifiedBy && <VerifiedBadge source={p.verifiedBy} />}
-                    {strength && strength >= 2 && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                        Preferred partner
-                      </span>
-                    )}
+                    {strength && strength >= 2 && <Badge tone="blue">Preferred partner</Badge>}
                   </div>
                   <p className="text-sm text-gray-500">
                     {p.district}, {p.province} · {p.roles.join(", ")}
@@ -122,52 +115,26 @@ export default async function DirectoryPage({
 }
 
 function VerifiedBadge({ source }: { source: "FOUNDER" | "NETWORK" }) {
-  return (
-    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-      {source === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}
-    </span>
-  );
+  return <Badge tone="green">{source === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}</Badge>;
 }
 
-function ReputationBadge({
-  reputation,
-}: {
-  reputation: {
-    completedCount: number;
-    averageRating: number | null;
-    ratingCount: number;
-  } | null;
-}) {
-  if (!reputation || reputation.completedCount === 0) {
-    return <span className="text-xs text-gray-400">New · no history yet</span>;
+function ReputationBadge({ reputation }: { reputation: Reputation | null }) {
+  const summary = summarizeReputation(reputation);
+  if (!summary.hasHistory) {
+    return <span className="text-xs text-gray-400">{summary.headline}</span>;
   }
-  const hasEnoughRatings =
-    reputation.averageRating !== null && reputation.ratingCount >= MIN_RATINGS_FOR_AVERAGE;
   return (
     <div className="text-right">
-      {hasEnoughRatings ? (
-        <>
-          <p className="text-2xl leading-none font-semibold text-amber-500">
-            ★ {reputation.averageRating!.toFixed(1)}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {reputation.completedCount} completed trade
-            {reputation.completedCount === 1 ? "" : "s"}
-          </p>
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-medium text-gray-600">
-            {reputation.ratingCount > 0
-              ? `Building history (${reputation.ratingCount})`
-              : "Not yet rated"}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {reputation.completedCount} completed trade
-            {reputation.completedCount === 1 ? "" : "s"}
-          </p>
-        </>
-      )}
+      <p
+        className={
+          summary.hasStars
+            ? "text-2xl leading-none font-semibold text-amber-500"
+            : "text-sm font-medium text-gray-600"
+        }
+      >
+        {summary.headline}
+      </p>
+      <p className="mt-1 text-xs text-gray-500">{summary.completedLine}</p>
     </div>
   );
 }

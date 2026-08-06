@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PostForm } from "./form";
 import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
+import { Badge } from "@/components/badge";
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
 const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
@@ -109,14 +110,14 @@ export default async function PostsPage({
                   <p className="text-sm text-gray-500">
                     {p.category} · {p.district}, {p.province} · {p.status}
                     {p.urgent && (
-                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      <Badge tone="amber" className="ml-2">
                         Time-sensitive
-                      </span>
+                      </Badge>
                     )}
                     {p.recurring && (
-                      <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                      <Badge tone="blue" className="ml-2">
                         Standing order
-                      </span>
+                      </Badge>
                     )}
                     {p.neededBy && ` · needed by ${p.neededBy.toLocaleDateString()}`}
                   </p>
