@@ -49,6 +49,7 @@ export async function createPost(
     askingPrice: formData.get("askingPrice") || undefined,
     urgent: formData.get("urgent") === "on",
     neededBy: formData.get("neededBy") || undefined,
+    recurring: formData.get("recurring") === "on",
   });
 
   if (!parsed.success) {
@@ -71,6 +72,7 @@ export async function createPost(
       askingPrice: data.askingPrice,
       urgent: data.urgent ?? false,
       neededBy: data.neededBy,
+      recurring: data.recurring ?? false,
     },
   });
 
@@ -105,4 +107,31 @@ export async function closePost(formData: FormData) {
 
   revalidatePath("/dashboard/posts");
   revalidatePath("/dashboard/opportunities");
+}
+
+export async function confirmDraftPost(formData: FormData) {
+  const party = await getCurrentParty();
+  if (!party) return;
+
+  const id = String(formData.get("id"));
+  const post = await prisma.post.findFirst({ where: { id, partyId: party.id, status: "DRAFT" } });
+  if (!post) return;
+
+  await prisma.post.update({ where: { id }, data: { status: "OPEN" } });
+  await generateMatchesForPost(id);
+
+  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard/opportunities");
+  revalidatePath("/dashboard");
+}
+
+export async function discardDraftPost(formData: FormData) {
+  const party = await getCurrentParty();
+  if (!party) return;
+
+  const id = String(formData.get("id"));
+  await prisma.post.deleteMany({ where: { id, partyId: party.id, status: "DRAFT" } });
+
+  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard");
 }

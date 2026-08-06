@@ -7,7 +7,8 @@ const initialState: ImportActionState = {};
 
 const TEMPLATES: Record<string, string> = {
   LIVESTOCK: "species,breed,sex,quantity,notes\nCATTLE,Brahman,MALE,5,Breeding stock",
-  PRODUCE: "cropType,quantity,unit,perishable,notes\nOranges,3,TONNE,yes,Ready for harvest",
+  PRODUCE:
+    "cropType,quantity,unit,perishable,expectedHarvestDate,notes\nOranges,3,TONNE,yes,2026-09-01,Ready for harvest",
   EQUIPMENT: "name,category,condition,available,notes\nJohn Deere 5075E,TRACTOR,Good,yes,",
 };
 

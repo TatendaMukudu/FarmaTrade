@@ -68,6 +68,11 @@ model Party {
   verifiedBy VerificationSource?
   createdAt  DateTime            @default(now())
 
+  // Last time this party looked at Opportunities — lets the Overview page
+  // show what's new *since then* instead of just "top matches right now."
+  // Null means "never visited," so everything currently open counts as new.
+  opportunitiesLastSeenAt DateTime?
+
   farm             Farm?
   transportProfile TransportProfile?
   posts            Post[]
@@ -228,6 +233,9 @@ enum PostCategory {
 }
 
 enum PostStatus {
+  // Auto-drafted (currently: from an approaching harvest date) and waiting
+  // on the owner to confirm — never matched against while in this state.
+  DRAFT
   OPEN
   MATCHED
   CLOSED
@@ -252,6 +260,11 @@ model Post {
   // behind a uniform notification cap the way a routine listing can.
   urgent      Boolean      @default(false)
   neededBy    DateTime?
+  // A standing order ("I buy 20 tonnes a month") rather than a one-off ask.
+  // Purely a declared-intent label today — an open Post already keeps
+  // matching against new opposite-type posts for as long as it stays open,
+  // so this doesn't change matching behavior, only how it's surfaced.
+  recurring   Boolean      @default(false)
 
   // Optional link to the specific inventory item this post refers to.
   livestockId String?

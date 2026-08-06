@@ -82,6 +82,7 @@ export async function upsertProduce(
     quantity: formData.get("quantity"),
     unit: formData.get("unit"),
     perishable: formData.get("perishable") === "on",
+    expectedHarvestDate: formData.get("expectedHarvestDate") || undefined,
     notes: formData.get("notes") || undefined,
   });
   if (!parsed.success) {
@@ -94,6 +95,7 @@ export async function upsertProduce(
     quantity: data.quantity,
     unit: data.unit as ProduceUnit,
     perishable: data.perishable ?? true,
+    expectedHarvestDate: data.expectedHarvestDate,
     notes: data.notes,
   };
 
@@ -166,7 +168,7 @@ export type ImportActionState = {
 
 const IMPORT_FIELDS = {
   LIVESTOCK: ["species", "breed", "sex", "quantity", "notes"],
-  PRODUCE: ["cropType", "quantity", "unit", "perishable", "notes"],
+  PRODUCE: ["cropType", "quantity", "unit", "perishable", "expectedHarvestDate", "notes"],
   EQUIPMENT: ["name", "category", "condition", "available", "notes"],
 } as const;
 
@@ -230,7 +232,14 @@ export async function importInventory(
   }
 
   if (category === "PRODUCE") {
-    const values: { cropType: string; quantity: number; unit: ProduceUnit; perishable?: boolean; notes?: string }[] = [];
+    const values: {
+      cropType: string;
+      quantity: number;
+      unit: ProduceUnit;
+      perishable?: boolean;
+      expectedHarvestDate?: Date;
+      notes?: string;
+    }[] = [];
     rows.forEach((row, i) => {
       const parsed = produceSchema.safeParse(prepareRow(row, IMPORT_FIELDS.PRODUCE));
       if (!parsed.success) {

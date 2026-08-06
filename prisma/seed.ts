@@ -133,7 +133,10 @@ async function main() {
   await prisma.relation.deleteMany();
   await prisma.rating.deleteMany();
   await prisma.transactionConfirmation.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
+  await prisma.photo.deleteMany();
   await prisma.post.deleteMany();
   await prisma.reputation.deleteMany();
   await prisma.equipment.deleteMany();
