@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { LivestockForm, ProduceForm, EquipmentForm } from "./forms";
+import { LivestockForm } from "./livestock-form";
+import { ProduceForm } from "./produce-form";
+import { EquipmentForm } from "./equipment-form";
 import { LivestockRow, ProduceRow, EquipmentRow } from "./rows";
 import { ImportForm } from "./import-form";
 import { AddToggle } from "@/components/add-toggle";

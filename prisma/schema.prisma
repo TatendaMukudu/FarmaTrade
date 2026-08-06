@@ -145,6 +145,8 @@ model Livestock {
   updatedAt DateTime         @updatedAt
 
   posts Post[]
+
+  @@index([farmId])
 }
 
 enum ProduceUnit {
@@ -171,6 +173,8 @@ model ProduceStock {
   updatedAt           DateTime    @updatedAt
 
   posts Post[]
+
+  @@index([farmId])
 }
 
 enum EquipmentCategory {
@@ -194,6 +198,8 @@ model Equipment {
   updatedAt DateTime          @updatedAt
 
   posts Post[]
+
+  @@index([farmId])
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +308,8 @@ model Post {
   photos     Photo[]
 
   @@index([category, status, province, district])
+  @@index([partyId])
+  @@index([produceId])
 }
 
 // Stored inline in Postgres (bytea) rather than an object-storage bucket —
@@ -352,6 +360,7 @@ model Match {
   conversation  Conversation?
 
   @@unique([postAId, postBId])
+  @@index([postBId])
 }
 
 // A conversation only exists once a match is ACCEPTED — it's the transaction
@@ -399,6 +408,7 @@ model TransactionConfirmation {
   createdAt DateTime            @default(now())
 
   @@unique([matchId, partyId])
+  @@index([partyId])
 }
 
 model Rating {
@@ -414,6 +424,7 @@ model Rating {
   createdAt DateTime @default(now())
 
   @@unique([matchId, authorId, subjectId])
+  @@index([subjectId])
 }
 
 // Denormalized aggregate, recomputed from TransactionConfirmation + Rating
@@ -459,4 +470,5 @@ model Relation {
   updatedAt DateTime     @updatedAt
 
   @@unique([partyAId, partyBId, kind])
+  @@index([partyBId])
 }
