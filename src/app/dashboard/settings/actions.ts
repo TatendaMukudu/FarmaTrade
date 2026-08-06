@@ -18,6 +18,7 @@ export async function updateProfile(
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
     phone: formData.get("phone") || undefined,
+    contactDetails: formData.get("contactDetails") || undefined,
     province: formData.get("province"),
     district: formData.get("district"),
     farmName: formData.get("farmName") || undefined,
@@ -36,6 +37,7 @@ export async function updateProfile(
     data: {
       name: data.name,
       phone: data.phone,
+      contactDetails: data.contactDetails,
       province: data.province,
       district: data.district,
     },

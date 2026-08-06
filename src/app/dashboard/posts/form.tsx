@@ -11,17 +11,22 @@ export function PostForm({
   defaultDistrict,
   defaultType = "HAVE",
   defaultCategory = "PRODUCE",
+  onDone,
 }: {
   defaultProvince: string;
   defaultDistrict: string;
   defaultType?: "HAVE" | "NEED";
   defaultCategory?: "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT";
+  onDone?: () => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: PostActionState, formData: FormData) => {
       const result = await createPost(prev, formData);
-      if (!result.error) formRef.current?.reset();
+      if (!result.error) {
+        formRef.current?.reset();
+        onDone?.();
+      }
       return result;
     },
     initialState,

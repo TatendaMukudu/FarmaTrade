@@ -61,6 +61,11 @@ model Party {
   name       String
   roles      PartyRole[]
   phone      String?
+  // Freeform, deliberately: a solo farmer writes a WhatsApp number, a large
+  // exporter writes an office line, a sales email, and who to ask for.
+  // Modeling every business's contact structure as separate fields would
+  // fit neither end of that range.
+  contactDetails String?
   province   String
   district   String
   latitude   Float?
