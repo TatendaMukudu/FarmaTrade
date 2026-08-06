@@ -11,6 +11,11 @@ import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 type PartyWithReputation = Party & { reputation: Reputation | null };
 type CounterpartPost = Post & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
 
+const SOLID_BUTTON =
+  "rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover";
+const OUTLINE_BUTTON =
+  "rounded-lg border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-accent-foreground";
+
 export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
   if (!party) return null;
@@ -72,21 +77,21 @@ export default async function OpportunitiesPage() {
           );
           const strength = strengthByCounterparty.get(theirs.party.id);
           return (
-            <li key={m.id} className="rounded border p-4">
+            <li key={m.id} className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                     <span>{m.status}</span>
-                    {(yours.urgent || theirs.urgent) && <Badge tone="amber">Time-sensitive</Badge>}
+                    {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
                     {strength && strength >= 2 && (
-                      <Badge tone="blue">Preferred partner · {strength} completed</Badge>
+                      <Badge tone="info">Preferred partner · {strength} completed</Badge>
                     )}
                   </div>
                   <p className="mt-1 font-medium">Your post: {yours.title}</p>
                   <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
                   {m.reasons.length > 0 && (
-                    <p className="mt-1 text-xs text-gray-400">
-                      Why: {m.reasons.join(" · ")}
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
                     </p>
                   )}
                 </div>
@@ -94,42 +99,26 @@ export default async function OpportunitiesPage() {
                   {m.status === "SUGGESTED" && (
                     <form action={respondToMatch} className="flex gap-2">
                       <input type="hidden" name="id" value={m.id} />
-                      <button
-                        type="submit"
-                        name="decision"
-                        value="ACCEPTED"
-                        className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white"
-                      >
+                      <button type="submit" name="decision" value="ACCEPTED" className={SOLID_BUTTON}>
                         Accept
                       </button>
-                      <button
-                        type="submit"
-                        name="decision"
-                        value="DECLINED"
-                        className="rounded border px-3 py-1.5 text-xs"
-                      >
+                      <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>
                         Decline
                       </button>
                     </form>
                   )}
                   <div className="flex gap-2">
-                    <Link
-                      href={`/dashboard/conversations/${m.id}`}
-                      className="rounded border px-3 py-1.5 text-xs"
-                    >
+                    <Link href={`/dashboard/conversations/${m.id}`} className={OUTLINE_BUTTON}>
                       Message
                     </Link>
-                    <Link
-                      href={`/dashboard/directory/${theirs.party.id}`}
-                      className="rounded border px-3 py-1.5 text-xs"
-                    >
+                    <Link href={`/dashboard/directory/${theirs.party.id}`} className={OUTLINE_BUTTON}>
                       View profile
                     </Link>
                   </div>
                 </div>
               </div>
               {m.status === "ACCEPTED" && (
-                <div className="mt-4 border-t pt-4">
+                <div className="mt-4 border-t border-border pt-4">
                   {myConfirmation ? (
                     <p className="text-sm text-gray-500">
                       You reported: {myConfirmation.outcome.replace(/_/g, " ")}.
@@ -162,7 +151,7 @@ export default async function OpportunitiesPage() {
               return (
                 <li
                   key={m.id}
-                  className="rounded border px-4 py-2 text-sm text-gray-600"
+                  className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-gray-600"
                 >
                   {yours.title} ↔ {theirs.party.name} ({theirs.title}) ·{" "}
                   {myConfirmation?.outcome.replace(/_/g, " ") ?? "—"}
@@ -193,7 +182,7 @@ function MatchCounterpart({
       <p className="text-sm text-gray-600">
         {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
         {post.recurring && (
-          <Badge tone="blue" className="ml-2">
+          <Badge tone="info" className="ml-2">
             Standing order
           </Badge>
         )}

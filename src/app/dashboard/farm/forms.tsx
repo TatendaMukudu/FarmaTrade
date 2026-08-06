@@ -35,7 +35,7 @@ export function LivestockForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <SelectField
@@ -92,7 +92,7 @@ export function ProduceForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <TextField label="Crop type" name="cropType" defaultValue={initial?.cropType} />
@@ -124,7 +124,7 @@ export function ProduceForm({
           name="expectedHarvestDate"
           type="date"
           defaultValue={initial?.expectedHarvestDate ? toDateInputValue(initial.expectedHarvestDate) : undefined}
-          className="rounded border px-2 py-1 text-sm"
+          className="rounded-lg border border-border px-2 py-1 text-sm"
         />
       </div>
       <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
@@ -163,7 +163,7 @@ export function EquipmentForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-wrap items-end gap-3 rounded border border-dashed p-4"
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <TextField label="Name" name="name" defaultValue={initial?.name} />
@@ -217,7 +217,7 @@ function TextField({
         name={name}
         type="text"
         defaultValue={defaultValue}
-        className="rounded border px-2 py-1 text-sm"
+        className="rounded-lg border border-border px-2 py-1 text-sm"
       />
     </div>
   );
@@ -244,7 +244,7 @@ function NumberField({
         step="any"
         defaultValue={defaultValue}
         required
-        className="w-24 rounded border px-2 py-1 text-sm"
+        className="w-24 rounded-lg border border-border px-2 py-1 text-sm"
       />
     </div>
   );
@@ -270,7 +270,7 @@ function SelectField({
         id={name}
         name={name}
         defaultValue={defaultValue}
-        className="rounded border px-2 py-1 text-sm"
+        className="rounded-lg border border-border px-2 py-1 text-sm"
       >
         {options.map((o) => (
           <option key={o} value={o}>
@@ -287,7 +287,7 @@ function SubmitButton({ pending, label }: { pending: boolean; label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-black px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+      className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
     >
       {pending ? "Saving…" : label}
     </button>

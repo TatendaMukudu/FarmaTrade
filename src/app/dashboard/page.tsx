@@ -93,7 +93,7 @@ export default async function DashboardPage() {
       {draftCount > 0 && (
         <Link
           href="/dashboard/posts"
-          className="rounded border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900 hover:bg-amber-100"
+          className="rounded-lg border border-border bg-warning-bg p-3 text-sm font-medium text-warning-fg hover:opacity-90"
         >
           🌾 {draftCount} listing{draftCount === 1 ? "" : "s"} drafted from your upcoming
           harvest — confirm to publish →
@@ -184,9 +184,11 @@ export default async function DashboardPage() {
 
 function StatLine({ emoji, text }: { emoji: string; text: string }) {
   return (
-    <div className="flex items-center gap-3 rounded border p-3">
-      <span className="text-xl">{emoji}</span>
-      <span className="text-sm">{text}</span>
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-new-bg text-lg">
+        {emoji}
+      </span>
+      <span className="text-right text-sm">{text}</span>
     </div>
   );
 }
@@ -197,7 +199,7 @@ function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew
       {categoryEmoji(post.category)} {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
       {post.title}
       {isNew && (
-        <Badge tone="green" className="ml-2">
+        <Badge tone="success" className="ml-2">
           New
         </Badge>
       )}

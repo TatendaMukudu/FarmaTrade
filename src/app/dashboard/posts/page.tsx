@@ -49,30 +49,34 @@ export default async function PostsPage({
       </div>
 
       {drafts.length > 0 && (
-        <div className="flex flex-col gap-3 rounded border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-900">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-warning-bg p-4">
+          <p className="text-sm font-medium text-warning-fg">
             Drafted from your upcoming harvest — confirm to publish
           </p>
           <ul className="flex flex-col gap-2">
             {drafts.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-4 rounded border border-amber-200 bg-white px-3 py-2"
+                className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-3 py-2"
               >
                 <span className="text-sm">{p.title}</span>
                 <div className="flex gap-2">
                   <form action={confirmDraftPost}>
-                    <input type="hidden" name="id" value={p.id} />
+                    <input
+                      type="hidden"
+                      name="id"
+                      value={p.id}
+                    />
                     <button
                       type="submit"
-                      className="rounded bg-black px-3 py-1 text-xs font-medium text-white"
+                      className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
                     >
                       Confirm &amp; publish
                     </button>
                   </form>
                   <form action={discardDraftPost}>
                     <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className="rounded border px-3 py-1 text-xs">
+                    <button type="submit" className="rounded-lg border border-border px-3 py-1 text-xs">
                       Discard
                     </button>
                   </form>
@@ -94,9 +98,9 @@ export default async function PostsPage({
         {rest.map((p) => {
           const matchCount = p._count.matchesAsA + p._count.matchesAsB;
           return (
-            <li key={p.id} className="rounded border p-4">
+            <li key={p.id} className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">
                     <span
                       className={
@@ -110,12 +114,12 @@ export default async function PostsPage({
                   <p className="text-sm text-gray-500">
                     {p.category} · {p.district}, {p.province} · {p.status}
                     {p.urgent && (
-                      <Badge tone="amber" className="ml-2">
+                      <Badge tone="warning" className="ml-2">
                         Time-sensitive
                       </Badge>
                     )}
                     {p.recurring && (
-                      <Badge tone="blue" className="ml-2">
+                      <Badge tone="info" className="ml-2">
                         Standing order
                       </Badge>
                     )}
@@ -138,8 +142,8 @@ export default async function PostsPage({
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className="text-xs text-gray-400">
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="text-xs whitespace-nowrap text-gray-400">
                     {matchCount} match{matchCount === 1 ? "" : "es"}
                   </span>
                   {p.status === "OPEN" && (

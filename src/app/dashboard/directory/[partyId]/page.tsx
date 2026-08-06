@@ -47,16 +47,16 @@ export default async function PartyProfilePage({
       </Link>
 
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">{party.name}</h1>
             {party.verifiedBy && (
-              <Badge tone="green">
+              <Badge tone="success">
                 {party.verifiedBy === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}
               </Badge>
             )}
             {relation && relation.strength >= 2 && (
-              <Badge tone="blue">Preferred partner · {relation.strength} completed</Badge>
+              <Badge tone="info">Preferred partner · {relation.strength} completed</Badge>
             )}
           </div>
           <p className="text-sm text-gray-500">
@@ -64,26 +64,20 @@ export default async function PartyProfilePage({
           </p>
         </div>
 
-        {reputation.hasHistory ? (
-          <div className="text-right">
-            <p
-              className={
-                reputation.hasStars
-                  ? "text-3xl leading-none font-semibold text-amber-500"
-                  : "text-sm font-medium text-gray-600"
-              }
-            >
-              {reputation.headline}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">{reputation.completedLine}</p>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400">{reputation.headline}</p>
-        )}
+        <div className="shrink-0 text-right">
+          <p
+            className={`inline-block rounded-full whitespace-nowrap font-semibold ${
+              reputation.tone === "success" ? "bg-success-bg text-success-fg" : "bg-new-bg text-new-fg"
+            } ${reputation.hasStars ? "px-3 py-1 text-xl" : "px-2 py-0.5 text-xs font-medium"}`}
+          >
+            {reputation.headline}
+          </p>
+          {reputation.hasHistory && <p className="mt-1 text-xs text-gray-500">{reputation.completedLine}</p>}
+        </div>
       </div>
 
       {party.farm && (
-        <div className="rounded border p-4">
+        <div className="rounded-lg border border-border bg-card p-4">
           <p className="font-medium">{party.farm.farmName}</p>
           {party.farm.sizeHectares && (
             <p className="text-sm text-gray-500">{party.farm.sizeHectares} ha</p>
@@ -97,7 +91,7 @@ export default async function PartyProfilePage({
       )}
 
       {party.transportProfile && (
-        <div className="rounded border p-4 text-sm text-gray-600">
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-gray-600">
           {party.transportProfile.vehicleType}
           {party.transportProfile.capacityKg ? ` · ${party.transportProfile.capacityKg}kg capacity` : ""}
           {party.transportProfile.serviceRegion ? ` · serves ${party.transportProfile.serviceRegion}` : ""}
@@ -105,7 +99,7 @@ export default async function PartyProfilePage({
       )}
 
       {party.phone && (
-        <div className="rounded border p-4">
+        <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-gray-500">Contact</p>
           <p className="font-medium">{party.phone}</p>
         </div>
