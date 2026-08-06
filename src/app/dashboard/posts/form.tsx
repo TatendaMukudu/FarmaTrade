@@ -1,10 +1,13 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
 import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { CATEGORY_LABEL } from "@/lib/categories";
 
 const initialState: PostActionState = {};
+
+type Category = "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
 
 export function PostForm({
   defaultProvince,
@@ -16,15 +19,17 @@ export function PostForm({
   defaultProvince: string;
   defaultDistrict: string;
   defaultType?: "HAVE" | "NEED";
-  defaultCategory?: "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT";
+  defaultCategory?: Category;
   onDone?: () => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const [category, setCategory] = useState<Category>(defaultCategory);
   const [state, formAction, pending] = useActionState(
     async (prev: PostActionState, formData: FormData) => {
       const result = await createPost(prev, formData);
       if (!result.error) {
         formRef.current?.reset();
+        setCategory(defaultCategory);
         onDone?.();
       }
       return result;
@@ -52,13 +57,15 @@ export function PostForm({
         <Field label="Category">
           <select
             name="category"
-            defaultValue={defaultCategory}
+            value={category}
+            onChange={(e) => setCategory(e.target.value as Category)}
             className="rounded-lg border border-border px-2 py-1 text-sm"
           >
-            <option value="LIVESTOCK">Livestock</option>
-            <option value="PRODUCE">Produce</option>
-            <option value="EQUIPMENT">Equipment</option>
-            <option value="TRANSPORT">Transport</option>
+            {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
+              </option>
+            ))}
           </select>
         </Field>
       </div>
@@ -104,6 +111,39 @@ export function PostForm({
         </Field>
       </div>
 
+      {category === "TRANSPORT" && (
+        <div className="flex flex-wrap gap-3 rounded-lg bg-new-bg p-3">
+          <Field label="Destination province (optional)">
+            <select
+              name="destinationProvince"
+              defaultValue=""
+              className="rounded-lg border border-border px-2 py-1 text-sm"
+            >
+              <option value="">Not sure yet</option>
+              {ZIMBABWE_PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Destination district (optional)">
+            <input
+              name="destinationDistrict"
+              placeholder="e.g. Harare"
+              className="rounded-lg border border-border px-2 py-1 text-sm"
+            />
+          </Field>
+          <Field label="Travel date (optional)">
+            <input
+              name="travelDate"
+              type="date"
+              className="rounded-lg border border-border px-2 py-1 text-sm"
+            />
+          </Field>
+        </div>
+      )}
+
       <details className="rounded-lg border border-border px-3 py-2 text-sm">
         <summary className="cursor-pointer select-none text-gray-600">
           More details (description, location, timing)
@@ -118,7 +158,7 @@ export function PostForm({
           </Field>
 
           <div className="flex flex-wrap gap-3">
-            <Field label="Province">
+            <Field label={category === "TRANSPORT" ? "Starting province" : "Province"}>
               <select
                 name="province"
                 defaultValue={defaultProvince}
@@ -131,7 +171,7 @@ export function PostForm({
                 ))}
               </select>
             </Field>
-            <Field label="District">
+            <Field label={category === "TRANSPORT" ? "Starting district" : "District"}>
               <input
                 name="district"
                 defaultValue={defaultDistrict}

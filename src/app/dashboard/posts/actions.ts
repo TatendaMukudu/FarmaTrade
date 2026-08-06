@@ -50,6 +50,9 @@ export async function createPost(
     urgent: formData.get("urgent") === "on",
     neededBy: formData.get("neededBy") || undefined,
     recurring: formData.get("recurring") === "on",
+    destinationProvince: formData.get("destinationProvince") || undefined,
+    destinationDistrict: formData.get("destinationDistrict") || undefined,
+    travelDate: formData.get("travelDate") || undefined,
   });
 
   if (!parsed.success) {
@@ -73,6 +76,9 @@ export async function createPost(
       urgent: data.urgent ?? false,
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,
+      destinationProvince: data.destinationProvince,
+      destinationDistrict: data.destinationDistrict,
+      travelDate: data.travelDate,
     },
   });
 

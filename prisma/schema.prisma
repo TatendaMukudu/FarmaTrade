@@ -235,6 +235,12 @@ enum PostCategory {
   PRODUCE
   EQUIPMENT
   TRANSPORT
+  // Seed, fertilizer, veterinary supplies — what an input shop sells TO
+  // farmers rather than trades WITH them. Structurally no different from
+  // any other category: a shop is a TRADER-role Party (already meant to
+  // cover "a buyer/seller with no farm of their own") posting HAVE, a
+  // farmer posts NEED, the existing matching engine does the rest.
+  INPUTS
 }
 
 enum PostStatus {
@@ -270,6 +276,15 @@ model Post {
   // matching against new opposite-type posts for as long as it stays open,
   // so this doesn't change matching behavior, only how it's surfaced.
   recurring   Boolean      @default(false)
+
+  // TRANSPORT-category only: province/district are the origin (reused,
+  // rather than duplicated as originProvince/originDistrict). A HAVE post
+  // is a transporter's route; a NEED post's destination is where the goods
+  // need to end up. Matching then isn't just "same place" — it's "does
+  // this route pass through where you are."
+  destinationProvince String?
+  destinationDistrict  String?
+  travelDate           DateTime?
 
   // Optional link to the specific inventory item this post refers to.
   livestockId String?
