@@ -22,6 +22,19 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      # Not a secret (a DSN can only submit events, not read account data)
+      # — committed directly rather than sync:false so there's no manual
+      # dashboard step for this one. Both names point at the same DSN:
+      # server/edge code reads the bare name, the browser bundle only
+      # inlines NEXT_PUBLIC_-prefixed vars.
+      - key: SENTRY_DSN
+        value: https://6f622575b528452d79c1de9698c4565a@o4511862355656704.ingest.us.sentry.io/4511862363717632
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        value: https://6f622575b528452d79c1de9698c4565a@o4511862355656704.ingest.us.sentry.io/4511862363717632
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+        value: production
 
   # Staging: same build, deployed from a separate branch against a separate
   # database, so a migration or a bad deploy shows up here before it ever
@@ -49,3 +62,11 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: SENTRY_DSN
+        value: https://6f622575b528452d79c1de9698c4565a@o4511862355656704.ingest.us.sentry.io/4511862363717632
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        value: https://6f622575b528452d79c1de9698c4565a@o4511862355656704.ingest.us.sentry.io/4511862363717632
+      - key: SENTRY_ENVIRONMENT
+        value: staging
+      - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+        value: staging
