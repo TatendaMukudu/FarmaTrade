@@ -3,11 +3,52 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* One consistent accent — green, echoing the product (produce, growth),
+     already the informal color of "I have"/positive states in the UI. Used
+     for primary actions (solid fill) and as the hover/focus color for
+     secondary actions (outline). */
+  --color-accent: #15803d;
+  --color-accent-hover: #166534;
+  --color-accent-foreground: #ffffff;
+
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+
+  /* Semantic status colors — light pill background + readable foreground,
+     one pair per meaning. Not decorative: each name is a status a farmer
+     actually needs to recognize at a glance. */
+  --color-warning-bg: #fef3c7;
+  --color-warning-fg: #92400e;
+
+  --color-success-bg: #dcfce7;
+  --color-success-fg: #166534;
+
+  --color-info-bg: #dbeafe;
+  --color-info-fg: #1e40af;
+
+  /* "No signal yet" — deliberately neutral, not a trust color, so an empty
+     history never reads as good or bad, just unknown. */
+  --color-new-bg: #f1f5f9;
+  --color-new-fg: #475569;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-card: var(--color-card);
+  --color-border: var(--color-border);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-warning-fg: var(--color-warning-fg);
+  --color-success-bg: var(--color-success-bg);
+  --color-success-fg: var(--color-success-fg);
+  --color-info-bg: var(--color-info-bg);
+  --color-info-fg: var(--color-info-fg);
+  --color-new-bg: var(--color-new-bg);
+  --color-new-fg: var(--color-new-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,6 +57,25 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --color-accent: #22c55e;
+    --color-accent-hover: #4ade80;
+    --color-accent-foreground: #052e16;
+
+    --color-card: #171717;
+    --color-border: #2e2e2e;
+
+    --color-warning-bg: #451a03;
+    --color-warning-fg: #fcd34d;
+
+    --color-success-bg: #052e16;
+    --color-success-fg: #86efac;
+
+    --color-info-bg: #172554;
+    --color-info-fg: #93c5fd;
+
+    --color-new-bg: #1e293b;
+    --color-new-fg: #94a3b8;
   }
 }
 

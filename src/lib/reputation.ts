@@ -12,6 +12,13 @@ export type ReputationSummary = {
   hasStars: boolean;
   headline: string; // "★ 4.7" | "Building history (2)" | "Not yet rated" | "New · no history yet"
   completedLine: string; // "12 completed trades"
+  // A rated party is the same category of signal as a verified one — both
+  // say "this is a positive, trust-worthy party" — so it shares the success
+  // pill rather than getting its own color just because stars look gold.
+  // Anything short of that (no history, not enough ratings yet) is
+  // deliberately the neutral "new" tone: absence of data isn't bad, so it
+  // shouldn't borrow a warning or success color it hasn't earned.
+  tone: "success" | "new";
 };
 
 // The single place "what does this party's track record mean, in words"
@@ -25,7 +32,13 @@ export function summarizeReputation(
   const completedLine = `${completedCount} completed trade${completedCount === 1 ? "" : "s"}`;
 
   if (!reputation || completedCount === 0) {
-    return { hasHistory: false, hasStars: false, headline: "New · no history yet", completedLine };
+    return {
+      hasHistory: false,
+      hasStars: false,
+      headline: "New · no history yet",
+      completedLine,
+      tone: "new",
+    };
   }
 
   const hasStars =
@@ -37,6 +50,7 @@ export function summarizeReputation(
       hasStars: true,
       headline: `★ ${reputation.averageRating!.toFixed(1)}`,
       completedLine,
+      tone: "success",
     };
   }
 
@@ -46,6 +60,7 @@ export function summarizeReputation(
     headline:
       reputation.ratingCount > 0 ? `Building history (${reputation.ratingCount})` : "Not yet rated",
     completedLine,
+    tone: "new",
   };
 }
 

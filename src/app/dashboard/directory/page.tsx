@@ -63,8 +63,8 @@ export default async function DirectoryPage({
             href={f.value === "ALL" ? "/dashboard/directory" : `/dashboard/directory?role=${f.value}`}
             className={`rounded-full border px-3 py-1 text-sm ${
               (f.value === "ALL" && !role) || f.value === role
-                ? "bg-black text-white"
-                : ""
+                ? "bg-accent text-accent-foreground border-accent"
+                : "border-border"
             }`}
           >
             {f.label}
@@ -76,15 +76,15 @@ export default async function DirectoryPage({
         {parties.map((p) => {
           const strength = strengthByCounterparty.get(p.id);
           return (
-            <li key={p.id} className="rounded border p-4">
-              <div className="flex items-center justify-between">
-                <div>
+            <li key={p.id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={`/dashboard/directory/${p.id}`} className="font-medium hover:underline">
                       {p.name}
                     </Link>
                     {p.verifiedBy && <VerifiedBadge source={p.verifiedBy} />}
-                    {strength && strength >= 2 && <Badge tone="blue">Preferred partner</Badge>}
+                    {strength && strength >= 2 && <Badge tone="info">Preferred partner</Badge>}
                   </div>
                   <p className="text-sm text-gray-500">
                     {p.district}, {p.province} · {p.roles.join(", ")}
@@ -115,26 +115,22 @@ export default async function DirectoryPage({
 }
 
 function VerifiedBadge({ source }: { source: "FOUNDER" | "NETWORK" }) {
-  return <Badge tone="green">{source === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}</Badge>;
+  return <Badge tone="success">{source === "FOUNDER" ? "✓ Founder-vouched" : "✓ Network-referred"}</Badge>;
 }
 
 function ReputationBadge({ reputation }: { reputation: Reputation | null }) {
   const summary = summarizeReputation(reputation);
-  if (!summary.hasHistory) {
-    return <span className="text-xs text-gray-400">{summary.headline}</span>;
-  }
+  const toneClasses = summary.tone === "success" ? "bg-success-bg text-success-fg" : "bg-new-bg text-new-fg";
   return (
-    <div className="text-right">
+    <div className="shrink-0 text-right">
       <p
-        className={
-          summary.hasStars
-            ? "text-2xl leading-none font-semibold text-amber-500"
-            : "text-sm font-medium text-gray-600"
-        }
+        className={`inline-block rounded-full whitespace-nowrap font-semibold ${toneClasses} ${
+          summary.hasStars ? "px-3 py-1 text-lg" : "px-2 py-0.5 text-xs font-medium"
+        }`}
       >
         {summary.headline}
       </p>
-      <p className="mt-1 text-xs text-gray-500">{summary.completedLine}</p>
+      {summary.hasHistory && <p className="mt-1 text-xs text-gray-500">{summary.completedLine}</p>}
     </div>
   );
 }

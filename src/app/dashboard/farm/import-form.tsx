@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { importInventory, type ImportActionState } from "./actions";
 
 const initialState: ImportActionState = {};
@@ -14,49 +14,69 @@ const TEMPLATES: Record<string, string> = {
 
 export function ImportForm() {
   const formRef = useRef<HTMLFormElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: ImportActionState, formData: FormData) => {
       const result = await importInventory(prev, formData);
-      if (!result.error) formRef.current?.reset();
+      if (!result.error) {
+        formRef.current?.reset();
+        setFileName(null);
+      }
       return result;
     },
     initialState,
   );
 
   return (
-    <details className="rounded border px-4 py-3">
+    <details className="rounded-lg border border-border bg-card px-4 py-3">
       <summary className="cursor-pointer select-none text-sm font-medium">
         Import from a spreadsheet (CSV)
       </summary>
-      <form ref={formRef} action={formAction} className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500" htmlFor="import-category">
-            Type
-          </label>
-          <select
-            id="import-category"
-            name="category"
-            className="rounded border px-2 py-1 text-sm"
-            defaultValue="PRODUCE"
+      <form ref={formRef} action={formAction} className="mt-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500" htmlFor="import-category">
+              Type
+            </label>
+            <select
+              id="import-category"
+              name="category"
+              className="rounded-lg border border-border px-2 py-1 text-sm"
+              defaultValue="PRODUCE"
+            >
+              <option value="LIVESTOCK">Livestock</option>
+              <option value="PRODUCE">Produce</option>
+              <option value="EQUIPMENT">Equipment</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
           >
-            <option value="LIVESTOCK">Livestock</option>
-            <option value="PRODUCE">Produce</option>
-            <option value="EQUIPMENT">Equipment</option>
-          </select>
+            {pending ? "Importing…" : "Import"}
+          </button>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500" htmlFor="import-file">
-            CSV file
-          </label>
-          <input id="import-file" name="file" type="file" accept=".csv,text/csv" className="text-sm" />
-        </div>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-black px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+
+        {/* Dashed border reserved for this one spot in the app — the only
+            place "drop a file here" is actually the right convention. */}
+        <label
+          htmlFor="import-file"
+          className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-border bg-new-bg px-4 py-6 text-center hover:border-accent"
         >
-          {pending ? "Importing…" : "Import"}
-        </button>
+          <span className="text-sm font-medium text-new-fg">
+            {fileName ?? "Choose a CSV file"}
+          </span>
+          <span className="text-xs text-gray-500">{fileName ? "Tap to change" : "or drop it here"}</span>
+          <input
+            id="import-file"
+            name="file"
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          />
+        </label>
       </form>
 
       <p className="mt-3 text-xs text-gray-500">
