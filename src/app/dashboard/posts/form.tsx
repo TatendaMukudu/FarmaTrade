@@ -4,10 +4,9 @@ import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
 import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
 import { CATEGORY_LABEL } from "@/lib/categories";
+import type { PostCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
-
-type Category = "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
 
 export function PostForm({
   defaultProvince,
@@ -191,7 +190,7 @@ export function PostForm({
 
           <label className="flex w-fit items-center gap-2 text-sm">
             <input type="checkbox" name="recurring" />
-            Standing order (e.g. "I buy this every month") — stays open and keeps matching
+            Standing order (e.g. &ldquo;I buy this every month&rdquo;) — stays open and keeps matching
           </label>
         </div>
       </details>

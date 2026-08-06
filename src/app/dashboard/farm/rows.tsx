@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { LivestockForm, ProduceForm, EquipmentForm } from "./forms";
+import { LivestockForm } from "./livestock-form";
+import { ProduceForm } from "./produce-form";
+import { EquipmentForm } from "./equipment-form";
 import { deleteLivestock, deleteProduce, deleteEquipment } from "./actions";
 import type { Livestock, ProduceStock, Equipment } from "@/generated/prisma/client";
 

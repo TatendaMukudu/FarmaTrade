@@ -1,4 +1,10 @@
-import type { PostCategory } from "@/generated/prisma/client";
+import { PostCategory } from "@/generated/prisma/enums";
+
+// The one place the list of post categories exists. Everywhere else that
+// needs "all categories" (a Zod enum, a <select>, a Set for validating a
+// query param) reads this instead of re-typing the literal list — adding a
+// category is a schema change plus one new line here, not five files.
+export const POST_CATEGORIES = Object.values(PostCategory);
 
 export const CATEGORY_EMOJI: Record<PostCategory, string> = {
   LIVESTOCK: "🐄",

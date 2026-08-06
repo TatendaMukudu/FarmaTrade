@@ -1,4 +1,13 @@
 import { z } from "zod";
+import { POST_CATEGORIES } from "@/lib/categories";
+import {
+  PARTY_ROLES,
+  LIVESTOCK_SPECIES,
+  LIVESTOCK_SEX,
+  PRODUCE_UNIT,
+  EQUIPMENT_CATEGORY,
+  VEHICLE_TYPE,
+} from "@/lib/enums";
 
 export const signupSchema = z
   .object({
@@ -9,14 +18,10 @@ export const signupSchema = z
     contactDetails: z.string().trim().optional(),
     province: z.string().trim().min(1, "Province is required"),
     district: z.string().trim().min(1, "District is required"),
-    roles: z
-      .array(z.enum(["FARM", "TRADER", "TRANSPORTER"]))
-      .min(1, "Pick at least one role"),
+    roles: z.array(z.enum(PARTY_ROLES)).min(1, "Pick at least one role"),
     farmName: z.string().trim().optional(),
     sizeHectares: z.coerce.number().positive().optional(),
-    vehicleType: z
-      .enum(["TRUCK", "REFRIGERATED_TRUCK", "PICKUP", "TRAILER", "OTHER"])
-      .optional(),
+    vehicleType: z.enum(VEHICLE_TYPE).optional(),
     capacityKg: z.coerce.number().positive().optional(),
     serviceRegion: z.string().trim().optional(),
   })
@@ -45,9 +50,7 @@ export const profileSchema = z.object({
   district: z.string().trim().min(1, "District is required"),
   farmName: z.string().trim().optional(),
   sizeHectares: z.coerce.number().positive().optional(),
-  vehicleType: z
-    .enum(["TRUCK", "REFRIGERATED_TRUCK", "PICKUP", "TRAILER", "OTHER"])
-    .optional(),
+  vehicleType: z.enum(VEHICLE_TYPE).optional(),
   capacityKg: z.coerce.number().positive().optional(),
   serviceRegion: z.string().trim().optional(),
 });
@@ -61,9 +64,9 @@ export const confirmationSchema = z.object({
 
 export const livestockSchema = z.object({
   id: z.string().optional(),
-  species: z.enum(["CATTLE", "GOAT", "SHEEP", "PIG", "POULTRY", "OTHER"]),
+  species: z.enum(LIVESTOCK_SPECIES),
   breed: z.string().trim().optional(),
-  sex: z.enum(["MALE", "FEMALE", "MIXED"]),
+  sex: z.enum(LIVESTOCK_SEX),
   quantity: z.coerce.number().int().positive(),
   notes: z.string().trim().optional(),
 });
@@ -72,7 +75,7 @@ export const produceSchema = z.object({
   id: z.string().optional(),
   cropType: z.string().trim().min(1, "Crop type is required"),
   quantity: z.coerce.number().positive(),
-  unit: z.enum(["KG", "TONNE", "BAG", "CRATE", "LITRE", "HEAD"]),
+  unit: z.enum(PRODUCE_UNIT),
   perishable: z.coerce.boolean().optional(),
   expectedHarvestDate: z.coerce.date().optional(),
   notes: z.string().trim().optional(),
@@ -80,7 +83,7 @@ export const produceSchema = z.object({
 
 export const postSchema = z.object({
   type: z.enum(["HAVE", "NEED"]),
-  category: z.enum(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT", "INPUTS"]),
+  category: z.enum(POST_CATEGORIES),
   title: z.string().trim().min(1, "Title is required"),
   description: z.string().trim().optional(),
   quantity: z.coerce.number().positive().optional(),
@@ -99,7 +102,7 @@ export const postSchema = z.object({
 export const equipmentSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1, "Name is required"),
-  category: z.enum(["TRACTOR", "PLOUGH", "IRRIGATION", "TRAILER", "OTHER"]),
+  category: z.enum(EQUIPMENT_CATEGORY),
   condition: z.string().trim().optional(),
   available: z.coerce.boolean().optional(),
   notes: z.string().trim().optional(),

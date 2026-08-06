@@ -5,10 +5,11 @@ import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
-import { CATEGORY_LABEL } from "@/lib/categories";
+import { CATEGORY_LABEL, POST_CATEGORIES } from "@/lib/categories";
+import type { PostCategory } from "@/generated/prisma/enums";
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
-const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT", "INPUTS"]);
+const VALID_CATEGORIES = new Set<string>(POST_CATEGORIES);
 
 export default async function PostsPage({
   searchParams,
@@ -25,7 +26,7 @@ export default async function PostsPage({
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
   const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
-    ? (categoryParam as "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT" | "INPUTS")
+    ? (categoryParam as PostCategory)
     : undefined;
 
   const posts = await prisma.post.findMany({
