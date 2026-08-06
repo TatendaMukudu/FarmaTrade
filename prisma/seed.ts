@@ -2,6 +2,10 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+// Safe to import here (unlike the read helpers in signals.ts, which are
+// `server-only`): signals-compute.ts is the job entrypoint, built to run
+// outside Next exactly like this seed does.
+import { recomputeMarketSignals } from "../src/lib/signals-compute";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -11,7 +15,7 @@ const prisma = new PrismaClient({ adapter });
 // only ever be relied on for a local dev database.
 const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? "FarmaTrade2026!";
 
-type Role = "FARM" | "TRADER" | "TRANSPORTER";
+type Capability = "FARMER" | "BUYER" | "SUPPLIER" | "TRANSPORTER";
 
 async function createAccount(opts: {
   email: string;
@@ -19,7 +23,7 @@ async function createAccount(opts: {
   phone: string;
   province: string;
   district: string;
-  roles: Role[];
+  capabilities: Capability[];
   passwordHash: string;
   verifiedBy?: "FOUNDER" | "NETWORK";
   farm?: { farmName: string; sizeHectares?: number };
@@ -45,7 +49,7 @@ async function createAccount(opts: {
       phone: opts.phone,
       province: opts.province,
       district: opts.district,
-      roles: opts.roles,
+      capabilities: opts.capabilities,
       verifiedBy: opts.verifiedBy,
     },
   });
@@ -130,6 +134,11 @@ async function main() {
   }
 
   console.log("Wiping existing data...");
+  // Listed explicitly even though Party's cascade would take MemoryEvent
+  // with it — this block is the readable inventory of what a reseed
+  // destroys, and a table missing from it reads as a table that survives.
+  await prisma.memoryEvent.deleteMany();
+  await prisma.marketSignal.deleteMany();
   await prisma.relation.deleteMany();
   await prisma.rating.deleteMany();
   await prisma.transactionConfirmation.deleteMany();
@@ -158,7 +167,7 @@ async function main() {
     phone: "+263771234001",
     province: "Mashonaland West",
     district: "Chinhoyi",
-    roles: ["FARM"],
+    capabilities: ["FARMER"],
     passwordHash,
     verifiedBy: "FOUNDER",
     farm: { farmName: "Moyo Family Farm", sizeHectares: 45 },
@@ -198,7 +207,7 @@ async function main() {
     phone: "+263771234002",
     province: "Mashonaland West",
     district: "Chinhoyi",
-    roles: ["TRANSPORTER"],
+    capabilities: ["TRANSPORTER"],
     passwordHash,
     transport: { vehicleType: "TRUCK", capacityKg: 7000, serviceRegion: "Mashonaland West" },
   });
@@ -209,7 +218,7 @@ async function main() {
     phone: "+263771234003",
     province: "Mashonaland West",
     district: "Chinhoyi",
-    roles: ["TRADER"],
+    capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
     verifiedBy: "FOUNDER",
   });
@@ -221,7 +230,7 @@ async function main() {
     phone: "+263771234004",
     province: "Midlands",
     district: "Gweru",
-    roles: ["FARM"],
+    capabilities: ["FARMER"],
     passwordHash,
     verifiedBy: "NETWORK",
     farm: { farmName: "Chikafu Ranch", sizeHectares: 120 },
@@ -251,7 +260,7 @@ async function main() {
     phone: "+263771234005",
     province: "Midlands",
     district: "Gweru",
-    roles: ["TRADER"],
+    capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
   });
 
@@ -262,7 +271,7 @@ async function main() {
     phone: "+263771234006",
     province: "Manicaland",
     district: "Mutare",
-    roles: ["FARM"],
+    capabilities: ["FARMER"],
     passwordHash,
     farm: { farmName: "Sithole Orchards", sizeHectares: 18 },
   });
@@ -293,7 +302,7 @@ async function main() {
     phone: "+263771234007",
     province: "Manicaland",
     district: "Mutare",
-    roles: ["TRADER"],
+    capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
   });
 
@@ -303,7 +312,7 @@ async function main() {
     phone: "+263771234008",
     province: "Manicaland",
     district: "Mutare",
-    roles: ["TRANSPORTER"],
+    capabilities: ["TRANSPORTER"],
     passwordHash,
     transport: {
       vehicleType: "REFRIGERATED_TRUCK",
@@ -319,7 +328,7 @@ async function main() {
     phone: "+263771234009",
     province: "Matabeleland South",
     district: "Gwanda",
-    roles: ["FARM"],
+    capabilities: ["FARMER"],
     passwordHash,
     farm: { farmName: "Ncube Farms", sizeHectares: 30 },
   });
@@ -347,6 +356,7 @@ async function main() {
   const orangesHave = await prisma.post.create({
     data: {
       partyId: rudo.party.id,
+      objective: "SELL",
       type: "HAVE",
       category: "PRODUCE",
       title: "3 tonnes of oranges, need to move before they spoil",
@@ -360,6 +370,7 @@ async function main() {
   const orangesNeed = await prisma.post.create({
     data: {
       partyId: patricia.party.id,
+      objective: "BUY",
       type: "NEED",
       category: "PRODUCE",
       title: "Oranges for export, any quantity",
@@ -381,6 +392,7 @@ async function main() {
   const transportNeed = await prisma.post.create({
     data: {
       partyId: rudo.party.id,
+      objective: "TRANSPORT_NEED",
       type: "NEED",
       category: "TRANSPORT",
       title: "Refrigerated truck needed this week",
@@ -392,6 +404,7 @@ async function main() {
   const transportHave = await prisma.post.create({
     data: {
       partyId: nyasha.party.id,
+      objective: "TRANSPORT_OFFER",
       type: "HAVE",
       category: "TRANSPORT",
       title: "Refrigerated truck, based in Mutare",
@@ -413,6 +426,7 @@ async function main() {
   await prisma.post.create({
     data: {
       partyId: tendai.party.id,
+      objective: "RENT_OUT",
       type: "HAVE",
       category: "EQUIPMENT",
       title: "Idle tractor, available most of the season",
@@ -423,6 +437,7 @@ async function main() {
   await prisma.post.create({
     data: {
       partyId: tapiwa.party.id,
+      objective: "TRANSPORT_OFFER",
       type: "HAVE",
       category: "TRANSPORT",
       title: "7-tonne truck available for local hauls",
@@ -433,6 +448,7 @@ async function main() {
   await prisma.post.create({
     data: {
       partyId: blessing.party.id,
+      objective: "RENT_OUT",
       type: "HAVE",
       category: "EQUIPMENT",
       title: "Plough available to borrow after planting season",
@@ -443,6 +459,7 @@ async function main() {
   await prisma.post.create({
     data: {
       partyId: isaac.party.id,
+      objective: "BUY",
       type: "NEED",
       category: "PRODUCE",
       title: "50 bags of maize, monthly",
@@ -456,6 +473,7 @@ async function main() {
   await prisma.post.create({
     data: {
       partyId: farai.party.id,
+      objective: "SELL",
       type: "HAVE",
       category: "LIVESTOCK",
       title: "Goats available, various ages",
@@ -483,6 +501,7 @@ async function main() {
     const have = await prisma.post.create({
       data: {
         partyId: tendai.party.id,
+        objective: "SELL",
         type: "HAVE",
         category: "LIVESTOCK",
         title: opts.title,
@@ -495,6 +514,7 @@ async function main() {
     const need = await prisma.post.create({
       data: {
         partyId: grace.party.id,
+        objective: "BUY",
         type: "NEED",
         category: "LIVESTOCK",
         title: `Need: ${opts.title}`,
@@ -568,6 +588,219 @@ async function main() {
   await recomputeReputation(tendai.party.id);
   await recomputeReputation(grace.party.id);
   await recomputeRelation(tendai.party.id, grace.party.id);
+
+  console.log("Backfilling operational history (so anticipations have something to see)...");
+
+  // Operational memory can only anticipate what it has already watched
+  // happen at least twice. Real accounts build this up by trading; a fresh
+  // demo database has no past at all, so the seed gives a couple of parties
+  // a plausible two-year history — anchored to *today's* date so the
+  // anticipations are live whenever the seed happens to be run, rather than
+  // hard-coded to a month that may be six months away.
+  const today = new Date();
+  function yearsAgo(years: number, dayOffset = 0) {
+    const d = new Date(today);
+    d.setFullYear(d.getFullYear() - years);
+    d.setDate(d.getDate() + dayOffset);
+    return d;
+  }
+
+  await prisma.memoryEvent.createMany({
+    data: [
+      // Rudo sells oranges and hires a refrigerated truck every year at
+      // this point in the season — two years running, same partner for the
+      // haul. This is the pattern that produces the flagship anticipation:
+      // "last year you hired a refrigerated truck around now."
+      {
+        partyId: rudo.party.id,
+        kind: "SOLD",
+        subject: "oranges",
+        category: "PRODUCE",
+        counterpartyId: patricia.party.id,
+        quantity: 3,
+        unit: "TONNE",
+        occurredAt: yearsAgo(1, 2),
+      },
+      {
+        partyId: rudo.party.id,
+        kind: "SOLD",
+        subject: "oranges",
+        category: "PRODUCE",
+        counterpartyId: patricia.party.id,
+        quantity: 2.5,
+        unit: "TONNE",
+        occurredAt: yearsAgo(2, -4),
+      },
+      {
+        partyId: rudo.party.id,
+        kind: "TRANSPORT_HIRED",
+        subject: "refrigerated truck",
+        category: "TRANSPORT",
+        counterpartyId: nyasha.party.id,
+        occurredAt: yearsAgo(1, 3),
+      },
+      {
+        partyId: rudo.party.id,
+        kind: "TRANSPORT_HIRED",
+        subject: "refrigerated truck",
+        category: "TRANSPORT",
+        counterpartyId: nyasha.party.id,
+        occurredAt: yearsAgo(2, -2),
+      },
+      // Tendai services the same irrigation kit on a roughly 8-month
+      // cadence, and it's now past due — the maintenance anticipation.
+      {
+        partyId: tendai.party.id,
+        kind: "MAINTENANCE",
+        subject: "drip irrigation kit",
+        category: "EQUIPMENT",
+        occurredAt: new Date(today.getTime() - 730 * 86_400_000),
+      },
+      {
+        partyId: tendai.party.id,
+        kind: "MAINTENANCE",
+        subject: "drip irrigation kit",
+        category: "EQUIPMENT",
+        occurredAt: new Date(today.getTime() - 480 * 86_400_000),
+      },
+      {
+        partyId: tendai.party.id,
+        kind: "MAINTENANCE",
+        subject: "drip irrigation kit",
+        category: "EQUIPMENT",
+        occurredAt: new Date(today.getTime() - 250 * 86_400_000),
+      },
+    ],
+  });
+
+  console.log("Backfilling market activity (so signals have a sample to measure)...");
+
+  // Market signals are computed from two 14-day windows of real posting
+  // activity, and deliberately refuse to say anything below a minimum sample
+  // (see MIN_SAMPLE in signals-core). A nine-account demo has nowhere near
+  // that, so the Market page would correctly — but unhelpfully — read "not
+  // enough activity" forever.
+  //
+  // These are ordinary CLOSED posts backdated across both windows, i.e. the
+  // same input a real month of trading produces. Nothing here writes a
+  // signal directly: the signals that appear are whatever the real
+  // derivation makes of this activity, so the page stays honest.
+  const marketParties = [tendai, grace, blessing, isaac, rudo, patricia, farai, nyasha, tapiwa];
+  const activity: {
+    daysAgo: number;
+    objective: "SELL" | "BUY" | "TRANSPORT_OFFER" | "TRANSPORT_NEED";
+    category: "PRODUCE" | "LIVESTOCK" | "TRANSPORT";
+    province: string;
+    district: string;
+    title: string;
+    quantity?: number;
+    askingPrice?: number;
+  }[] = [];
+
+  function push(
+    count: number,
+    daysAgoFrom: number,
+    daysAgoTo: number,
+    spec: Omit<(typeof activity)[number], "daysAgo">,
+  ) {
+    for (let i = 0; i < count; i++) {
+      const spread = daysAgoTo - daysAgoFrom;
+      activity.push({
+        ...spec,
+        daysAgo: daysAgoFrom + Math.round((spread * i) / Math.max(1, count - 1)),
+      });
+    }
+  }
+
+  // Manicaland citrus season: buyers pile in this window against thin
+  // supply -> demand rising + a seller's market.
+  push(3, 16, 27, {
+    objective: "BUY",
+    category: "PRODUCE",
+    province: "Manicaland",
+    district: "Mutare",
+    title: "Oranges wanted",
+    quantity: 2,
+    askingPrice: 400,
+  });
+  push(9, 1, 13, {
+    objective: "BUY",
+    category: "PRODUCE",
+    province: "Manicaland",
+    district: "Mutare",
+    title: "Oranges wanted for export",
+    quantity: 2,
+    askingPrice: 520,
+  });
+  push(3, 1, 13, {
+    objective: "SELL",
+    category: "PRODUCE",
+    province: "Manicaland",
+    district: "Mutare",
+    title: "Oranges, graded",
+    quantity: 2,
+    askingPrice: 520,
+  });
+
+  // Manicaland transport crunch in the same window — the practical
+  // consequence of everyone harvesting at once.
+  push(8, 1, 13, {
+    objective: "TRANSPORT_NEED",
+    category: "TRANSPORT",
+    province: "Manicaland",
+    district: "Mutare",
+    title: "Load needs moving to Harare",
+  });
+  push(2, 1, 13, {
+    objective: "TRANSPORT_OFFER",
+    category: "TRANSPORT",
+    province: "Manicaland",
+    district: "Mutare",
+    title: "Truck available",
+  });
+
+  // Midlands maize: plenty of sellers, few buyers -> a glut, the opposite
+  // signal, so the page isn't uniformly optimistic.
+  push(10, 1, 13, {
+    objective: "SELL",
+    category: "PRODUCE",
+    province: "Midlands",
+    district: "Gweru",
+    title: "Maize, bagged",
+    quantity: 50,
+    askingPrice: 300,
+  });
+  push(2, 1, 13, {
+    objective: "BUY",
+    category: "PRODUCE",
+    province: "Midlands",
+    district: "Gweru",
+    title: "Maize wanted",
+    quantity: 50,
+    askingPrice: 300,
+  });
+
+  await prisma.post.createMany({
+    data: activity.map((a, i) => ({
+      partyId: marketParties[i % marketParties.length].party.id,
+      objective: a.objective,
+      type: a.objective === "SELL" || a.objective === "TRANSPORT_OFFER" ? "HAVE" : "NEED",
+      category: a.category,
+      title: a.title,
+      province: a.province,
+      district: a.district,
+      quantity: a.quantity,
+      askingPrice: a.askingPrice,
+      // CLOSED so this backdated volume feeds the market picture without
+      // flooding every demo account's Opportunities page with matches.
+      status: "CLOSED",
+      createdAt: new Date(today.getTime() - a.daysAgo * 86_400_000),
+    })),
+  });
+
+  console.log("Computing market signals...");
+  const signalCount = await recomputeMarketSignals();
+  console.log(`  ${signalCount} signal(s) currently hold.`);
 
   console.log("\nSeed complete. Demo accounts (all share one password):\n");
   console.log(`  Password: ${DEMO_PASSWORD}\n`);

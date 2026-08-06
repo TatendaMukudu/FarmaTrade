@@ -4,31 +4,36 @@ import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
 import { ZIMBABWE_PROVINCES, CURRENCIES } from "@/lib/zimbabwe";
 import { CATEGORY_LABEL } from "@/lib/categories";
-import type { PostCategory as Category } from "@/generated/prisma/enums";
+import { OBJECTIVES, COMMON_OBJECTIVES, categoriesForObjective } from "@/lib/objectives";
+import type { Objective } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
 
+// The composer asks "what are you trying to accomplish?" and derives
+// everything it can from the answer. Picking an objective sets the
+// direction (HAVE/NEED) and the vertical, so the two questions that used to
+// come first — "I have / I need" and "which category" — are gone: they were
+// asking the user to describe the platform's data model rather than their
+// own business.
 export function PostForm({
   defaultProvince,
   defaultDistrict,
-  defaultType = "HAVE",
-  defaultCategory = "PRODUCE",
+  defaultObjective,
   onDone,
 }: {
   defaultProvince: string;
   defaultDistrict: string;
-  defaultType?: "HAVE" | "NEED";
-  defaultCategory?: Category;
+  defaultObjective?: Objective;
   onDone?: () => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [category, setCategory] = useState<Category>(defaultCategory);
+  const [objective, setObjective] = useState<Objective | null>(defaultObjective ?? null);
   const [state, formAction, pending] = useActionState(
     async (prev: PostActionState, formData: FormData) => {
       const result = await createPost(prev, formData);
       if (!result.error) {
         formRef.current?.reset();
-        setCategory(defaultCategory);
+        setObjective(null);
         onDone?.();
       }
       return result;
@@ -36,40 +41,81 @@ export function PostForm({
     initialState,
   );
 
+  // Step one is the only question on screen until it's answered. A farmer
+  // who opens this to sell oranges shouldn't have to look at destination
+  // provinces and travel dates to find the field they need.
+  if (!objective) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h2 className="text-lg font-medium">What are you trying to do?</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Pick the closest one — FarmaTrade works out the rest.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {COMMON_OBJECTIVES.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setObjective(o)}
+              className="flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-left text-sm hover:border-accent hover:bg-new-bg"
+            >
+              <span className="text-xl">{OBJECTIVES[o].emoji}</span>
+              <span>{OBJECTIVES[o].prompt}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const spec = OBJECTIVES[objective];
+  const categories = categoriesForObjective(objective);
+  const isTransport = spec.category === "TRANSPORT";
+
   return (
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
+      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
     >
-      <div className="flex flex-wrap gap-3">
-        <Field label="What?">
-          <select
-            name="type"
-            defaultValue={defaultType}
-            className="rounded-lg border border-border px-2 py-1 text-sm"
-          >
-            <option value="HAVE">I have</option>
-            <option value="NEED">I need</option>
-          </select>
-        </Field>
-        <Field label="Category">
+      <input type="hidden" name="objective" value={objective} />
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 font-medium">
+          <span className="text-xl">{spec.emoji}</span>
+          {spec.prompt}
+        </p>
+        <button
+          type="button"
+          onClick={() => setObjective(null)}
+          className="shrink-0 text-xs text-gray-500 underline"
+        >
+          Change
+        </button>
+      </div>
+
+      {/* Only shown when the objective genuinely spans verticals (SELL/BUY).
+          For everything else the category is implied and asking would be
+          busywork. */}
+      {categories.length > 1 ? (
+        <Field label="What kind?">
           <select
             name="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as Category)}
+            defaultValue={categories[0]}
             className="rounded-lg border border-border px-2 py-1 text-sm"
           >
-            {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => (
+            {categories.map((c) => (
               <option key={c} value={c}>
                 {CATEGORY_LABEL[c]}
               </option>
             ))}
           </select>
         </Field>
-      </div>
+      ) : (
+        <input type="hidden" name="category" value={categories[0]} />
+      )}
 
-      <Field label="Title">
+      <Field label="Describe it in a few words">
         <input
           name="title"
           required
@@ -79,13 +125,7 @@ export function PostForm({
       </Field>
 
       <Field label="Photos (optional, up to 4 — quality sells)">
-        <input
-          name="photos"
-          type="file"
-          accept="image/*"
-          multiple
-          className="w-full text-sm"
-        />
+        <input name="photos" type="file" accept="image/*" multiple className="w-full text-sm" />
       </Field>
 
       <div className="flex flex-wrap gap-3">
@@ -123,7 +163,7 @@ export function PostForm({
         </Field>
       </div>
 
-      {category === "TRANSPORT" && (
+      {isTransport && (
         <div className="flex flex-wrap gap-3 rounded-lg bg-new-bg p-3">
           <Field label="Destination province (optional)">
             <select
@@ -170,7 +210,7 @@ export function PostForm({
           </Field>
 
           <div className="flex flex-wrap gap-3">
-            <Field label={category === "TRANSPORT" ? "Starting province" : "Province"}>
+            <Field label={isTransport ? "Starting province" : "Province"}>
               <select
                 name="province"
                 defaultValue={defaultProvince}
@@ -183,7 +223,7 @@ export function PostForm({
                 ))}
               </select>
             </Field>
-            <Field label={category === "TRANSPORT" ? "Starting district" : "District"}>
+            <Field label={isTransport ? "Starting district" : "District"}>
               <input
                 name="district"
                 defaultValue={defaultDistrict}
@@ -192,7 +232,11 @@ export function PostForm({
               />
             </Field>
             <Field label="Needed by (optional)">
-              <input name="neededBy" type="date" className="rounded-lg border border-border px-2 py-1 text-sm" />
+              <input
+                name="neededBy"
+                type="date"
+                className="rounded-lg border border-border px-2 py-1 text-sm"
+              />
             </Field>
           </div>
 
@@ -219,7 +263,7 @@ export function PostForm({
         disabled={pending}
         className="w-fit rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
-        {pending ? "Posting…" : "Post"}
+        {pending ? "Posting…" : "Post it"}
       </button>
     </form>
   );

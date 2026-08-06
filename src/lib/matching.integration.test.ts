@@ -20,8 +20,8 @@ describe("generateMatchesForPost", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestPost(seller.party.id, { objective: "SELL", category: "PRODUCE" });
+    const need = await createTestPost(buyer.party.id, { objective: "BUY", category: "PRODUCE" });
 
     await generateMatchesForPost(need.id);
 
@@ -36,13 +36,13 @@ describe("generateMatchesForPost", () => {
     partyIds.push(seller.party.id, buyer.party.id);
 
     const have = await createTestPost(seller.party.id, {
-      type: "HAVE",
+      objective: "SELL",
       category: "PRODUCE",
       province: "Manicaland",
       district: "Mutare",
     });
     const need = await createTestPost(buyer.party.id, {
-      type: "NEED",
+      objective: "BUY",
       category: "PRODUCE",
       province: "Harare",
       district: "Harare",
@@ -58,8 +58,8 @@ describe("generateMatchesForPost", () => {
     const party = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(party.party.id);
 
-    const have = await createTestPost(party.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(party.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestPost(party.party.id, { objective: "SELL", category: "PRODUCE" });
+    const need = await createTestPost(party.party.id, { objective: "BUY", category: "PRODUCE" });
 
     await generateMatchesForPost(need.id);
 
@@ -72,8 +72,8 @@ describe("generateMatchesForPost", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE", status: "CLOSED" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestPost(seller.party.id, { objective: "SELL", category: "PRODUCE", status: "CLOSED" });
+    const need = await createTestPost(buyer.party.id, { objective: "BUY", category: "PRODUCE" });
 
     await generateMatchesForPost(need.id);
 
@@ -89,6 +89,7 @@ describe("generateMatchesForPost", () => {
     const have = await prisma.post.create({
       data: {
         partyId: transporter.party.id,
+        objective: "TRANSPORT_OFFER",
         type: "HAVE",
         category: "TRANSPORT",
         title: "Truck available",
@@ -99,7 +100,7 @@ describe("generateMatchesForPost", () => {
       },
     });
     const need = await createTestPost(shipper.party.id, {
-      type: "NEED",
+      objective: "TRANSPORT_NEED",
       category: "TRANSPORT",
       province: "Manicaland",
       district: "Mutare",
@@ -112,13 +113,62 @@ describe("generateMatchesForPost", () => {
     expect(match!.reasons).toContain("on your route");
   });
 
+  it("does not pair a tractor for sale with someone looking to rent one", async () => {
+    // The bug the objective layer exists to fix: under the old
+    // opposite-PostType + same-category rule these two were a confident,
+    // cited match, because SELL and RENT are both EQUIPMENT pointing in
+    // opposite directions.
+    const seller = await createTestParty({ province: "Harare", district: "Harare" });
+    const renter = await createTestParty({ province: "Harare", district: "Harare" });
+    partyIds.push(seller.party.id, renter.party.id);
+
+    const forSale = await createTestPost(seller.party.id, {
+      objective: "SELL",
+      category: "EQUIPMENT",
+    });
+    const wantsToRent = await createTestPost(renter.party.id, {
+      objective: "RENT",
+      category: "EQUIPMENT",
+    });
+
+    await generateMatchesForPost(wantsToRent.id);
+
+    const match = await prisma.match.findFirst({
+      where: { postAId: forSale.id, postBId: wantsToRent.id },
+    });
+    expect(match).toBeNull();
+  });
+
+  it("pairs RENT_OUT with RENT, and cites the objective pairing as the first reason", async () => {
+    const owner = await createTestParty({ province: "Harare", district: "Harare" });
+    const renter = await createTestParty({ province: "Harare", district: "Harare" });
+    partyIds.push(owner.party.id, renter.party.id);
+
+    const forRent = await createTestPost(owner.party.id, {
+      objective: "RENT_OUT",
+      category: "EQUIPMENT",
+    });
+    const wantsToRent = await createTestPost(renter.party.id, {
+      objective: "RENT",
+      category: "EQUIPMENT",
+    });
+
+    await generateMatchesForPost(wantsToRent.id);
+
+    const match = await prisma.match.findFirst({
+      where: { postAId: forRent.id, postBId: wantsToRent.id },
+    });
+    expect(match).not.toBeNull();
+    expect(match!.reasons[0]).toBe("they're renting out, you're renting");
+  });
+
   it("is idempotent: re-running against the same pair doesn't create a duplicate Match", async () => {
     const seller = await createTestParty({ province: "Harare", district: "Harare" });
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    await createTestPost(seller.party.id, { objective: "SELL", category: "PRODUCE" });
+    const need = await createTestPost(buyer.party.id, { objective: "BUY", category: "PRODUCE" });
 
     await generateMatchesForPost(need.id);
     await generateMatchesForPost(need.id);

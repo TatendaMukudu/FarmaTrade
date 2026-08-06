@@ -75,14 +75,14 @@ describe("signupAction", () => {
       password: "password123",
       province: "Mashonaland East",
       district: "Marondera",
-      roles: ["TRADER"],
+      capabilities: ["BUYER"],
     });
 
     await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
 
     const user = await prisma.user.findUnique({ where: { email }, include: { party: { include: { reputation: true } } } });
     expect(user).not.toBeNull();
-    expect(user!.party?.roles).toEqual(["TRADER"]);
+    expect(user!.party?.capabilities).toEqual(["BUYER"]);
     expect(user!.party?.reputation).not.toBeNull();
   });
 
@@ -96,7 +96,7 @@ describe("signupAction", () => {
       password: "password123",
       province: "Mashonaland East",
       district: "Marondera",
-      roles: ["FARM"],
+      capabilities: ["FARMER"],
       farmName: "Green Acres",
     });
 
@@ -116,7 +116,7 @@ describe("signupAction", () => {
       password: "password123",
       province: "Harare",
       district: "Harare",
-      roles: ["TRADER"],
+      capabilities: ["BUYER"],
     });
 
     await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
@@ -134,7 +134,7 @@ describe("signupAction", () => {
         password: "password123",
         province: "Harare",
         district: "Harare",
-        roles: ["TRADER"],
+        capabilities: ["BUYER"],
       });
 
     await expect(signupAction({}, fd())).rejects.toThrow(RedirectSignal);
@@ -154,7 +154,7 @@ describe("signupAction", () => {
       password: "short",
       province: "Harare",
       district: "Harare",
-      roles: ["TRADER"],
+      capabilities: ["BUYER"],
     });
 
     const result = await signupAction({}, fd);
@@ -176,7 +176,7 @@ describe("signupAction", () => {
         password: "password123",
         province: "Harare",
         district: "Harare",
-        roles: ["TRADER"],
+        capabilities: ["BUYER"],
       });
       await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
     }
@@ -188,7 +188,7 @@ describe("signupAction", () => {
       password: "password123",
       province: "Harare",
       district: "Harare",
-      roles: ["TRADER"],
+      capabilities: ["BUYER"],
     });
     const result = await signupAction({}, fd);
     expect(result.error).toMatch(/too many signups/i);

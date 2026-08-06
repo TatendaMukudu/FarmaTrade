@@ -7,7 +7,8 @@ import { getCurrentParty } from "@/lib/auth";
 import { postSchema } from "@/lib/validation";
 import { generateMatchesForPost } from "@/lib/matching";
 import { uploadPhoto, deletePhoto } from "@/lib/storage";
-import type { PostType, PostCategory } from "@/generated/prisma/client";
+import { objectiveSpec } from "@/lib/objectives";
+import type { Objective, PostCategory } from "@/generated/prisma/client";
 
 export type PostActionState = { error?: string };
 
@@ -40,7 +41,7 @@ export async function createPost(
   }
 
   const parsed = postSchema.safeParse({
-    type: formData.get("type"),
+    objective: formData.get("objective"),
     category: formData.get("category"),
     title: formData.get("title"),
     description: formData.get("description") || undefined,
@@ -63,11 +64,17 @@ export async function createPost(
   }
 
   const data = parsed.data;
+  // Derived, never asked for separately: the objective already determines
+  // which way round the matching engine pairs this, and a form that let a
+  // user set both could produce a "selling" post filed as a need.
+  const objective = data.objective as Objective;
+  const spec = objectiveSpec(objective);
 
   const post = await prisma.post.create({
     data: {
       partyId: party.id,
-      type: data.type as PostType,
+      objective,
+      type: spec.type,
       category: data.category as PostCategory,
       title: data.title,
       description: data.description,

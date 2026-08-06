@@ -7,7 +7,7 @@ import { hashPassword, createSession } from "@/lib/auth";
 import { signupSchema } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import type { PartyRole, VehicleType } from "@/generated/prisma/client";
+import type { Capability, VehicleType } from "@/generated/prisma/client";
 
 export type SignupState = { error?: string };
 
@@ -51,7 +51,7 @@ export async function signupAction(
     phone: formData.get("phone") || undefined,
     province: formData.get("province"),
     district: formData.get("district"),
-    roles: formData.getAll("roles"),
+    capabilities: formData.getAll("capabilities"),
     farmName: formData.get("farmName") || undefined,
     sizeHectares: formData.get("sizeHectares") || undefined,
     vehicleType: formData.get("vehicleType") || undefined,
@@ -88,14 +88,14 @@ export async function signupAction(
       data: {
         userId: createdUser.id,
         name: data.name,
-        roles: data.roles as PartyRole[],
+        capabilities: data.capabilities as Capability[],
         phone: data.phone,
         province: data.province,
         district: data.district,
       },
     });
 
-    if (data.roles.includes("FARM") && data.farmName) {
+    if (data.capabilities.includes("FARMER") && data.farmName) {
       await tx.farm.create({
         data: {
           partyId: party.id,
@@ -105,7 +105,7 @@ export async function signupAction(
       });
     }
 
-    if (data.roles.includes("TRANSPORTER") && data.vehicleType) {
+    if (data.capabilities.includes("TRANSPORTER") && data.vehicleType) {
       await tx.transportProfile.create({
         data: {
           partyId: party.id,

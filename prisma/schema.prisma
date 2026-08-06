@@ -42,10 +42,34 @@ model User {
   party Party?
 }
 
-enum PartyRole {
-  FARM
-  TRADER
+// What a participant can *do* in the agricultural economy, not what they
+// "are". Replaces the original three-role model (FARM/TRADER/TRANSPORTER),
+// which forced every mechanic, vet, exporter and cold-store operator to
+// misfile themselves as a "TRADER" to get an account at all.
+//
+// One person routinely holds several of these at once — a farmer who also
+// hauls for neighbours in the dry season and repairs their own pumps is
+// FARMER + TRANSPORTER + MECHANIC, and should receive work matching all
+// three. Capabilities are additive and self-declared; VerificationSource
+// and Reputation are what make a claim mean something.
+enum Capability {
+  FARMER
+  BUYER
+  SUPPLIER
   TRANSPORTER
+  MECHANIC
+  VETERINARIAN
+  AGRONOMIST
+  LABOR_PROVIDER
+  COLD_STORAGE
+  PROCESSOR
+  EXPORTER
+  CONTRACTOR
+  FINANCIER
+  INSURER
+  DRONE_OPERATOR
+  INSPECTOR
+  GOVERNMENT
 }
 
 // A second, honest trust signal for cold start — kept structurally separate
@@ -57,16 +81,36 @@ enum VerificationSource {
   NETWORK
 }
 
-// A Party is any actor in the network: a farm owner, a buyer/seller with no
-// farm of their own (e.g. a produce trader or a grocery store), or a
-// transport provider. Roles aren't exclusive — a farm can also haul.
+// A Party is any economic participant in agriculture — a farm, a buyer, a
+// mechanic, a cold store, a bank. Capabilities aren't exclusive and aren't
+// a "type": the same node can supply, buy, haul and repair, and the
+// Opportunity engine reads all of them when deciding what work to surface.
 model Party {
-  id         String              @id @default(cuid())
-  userId     String?             @unique
-  user       User?               @relation(fields: [userId], references: [id])
-  name       String
-  roles      PartyRole[]
-  phone      String?
+  id           String       @id @default(cuid())
+  userId       String?      @unique
+  user         User?        @relation(fields: [userId], references: [id])
+  name         String
+  capabilities Capability[]
+  phone        String?
+
+  // How far this party will actually travel to do business. The single
+  // most load-bearing number for matching quality that the original model
+  // had no way to express: a Harare cold store serving the whole province
+  // and a smallholder who won't go past the next district were treated
+  // identically, because both were just "in Harare province".
+  operatingRadiusKm Int?
+  // Real constraint on who can trade with whom in Zimbabwe — a listing
+  // only reachable in English excludes a large share of the market.
+  languages         String[]
+  // Free-text, one per line: "Class 2 driver's licence", "ZIMRA export
+  // permit", "Veterinary Council reg. 4471". Not an enum, because the set
+  // is set by regulators and changes on their schedule, not ours.
+  licenses          String[]
+  yearsExperience   Int?
+  // Freeform ("Mon-Sat 6am-6pm", "harvest season only") for the same
+  // reason contactDetails is freeform — real availability doesn't fit a
+  // structured weekly grid across this range of businesses.
+  availabilityNote  String?
   // Freeform, deliberately: a solo farmer writes a WhatsApp number, a large
   // exporter writes an office line, a sales email, and who to ask for.
   // Modeling every business's contact structure as separate fields would
@@ -99,7 +143,11 @@ model Party {
 
   messages Message[]
 
+  memoryEvents          MemoryEvent[] @relation("MemorySubject")
+  memoryCounterpartOf   MemoryEvent[] @relation("MemoryCounterparty")
+
   @@index([province, district])
+  @@index([capabilities])
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +287,36 @@ enum PostType {
   NEED
 }
 
+// What the participant is actually trying to *accomplish*. HAVE/NEED is the
+// mechanical side of that (which way round the matching engine pairs it),
+// and stays — but "HAVE, EQUIPMENT" can't distinguish "I'm selling my
+// tractor" from "I'll rent you my tractor" from "I'll plough your field
+// with my tractor", which are three different businesses.
+//
+// Every objective maps to exactly one PostType (see objectives.ts), so the
+// existing matching engine keeps working unchanged: this narrows *what
+// kind* of pairing is meant, it doesn't replace the pairing rule.
+enum Objective {
+  SELL
+  BUY
+  RENT_OUT
+  RENT
+  HIRE_LABOR
+  FIND_WORK
+  REPAIR_SERVICE
+  NEED_REPAIR
+  TRANSPORT_OFFER
+  TRANSPORT_NEED
+  STORAGE_OFFER
+  STORAGE_NEED
+  FINANCE_OFFER
+  FINANCE_NEED
+  INSPECT_OFFER
+  INSPECT_NEED
+  EXPORT_OFFER
+  EXPORT_NEED
+}
+
 // Extensible on purpose: v1 ships four categories, but new verticals
 // (mechanics, vets, inputs, storage, ...) are future enum values, not new
 // subsystems — the Post/Match/Reputation graph doesn't change shape.
@@ -249,10 +327,22 @@ enum PostCategory {
   TRANSPORT
   // Seed, fertilizer, veterinary supplies — what an input shop sells TO
   // farmers rather than trades WITH them. Structurally no different from
-  // any other category: a shop is a TRADER-role Party (already meant to
-  // cover "a buyer/seller with no farm of their own") posting HAVE, a
-  // farmer posts NEED, the existing matching engine does the rest.
+  // any other category: a shop is a SUPPLIER-capability Party posting HAVE,
+  // a farmer posts NEED, the existing matching engine does the rest.
   INPUTS
+  // The four verticals the Objective layer needs in order to cover the
+  // whole of agricultural commerce rather than just goods. Exactly what
+  // this enum's design note promised: new verticals arrive as enum values,
+  // and the Post/Match/Reputation graph doesn't change shape.
+  LABOR
+  STORAGE
+  FINANCE
+  // Repair, veterinary, agronomy, inspection, certification, spraying,
+  // export brokerage — work performed on someone else's assets. One
+  // category rather than six, because they share a shape (a skilled party
+  // travels to a farm and does a job) and the Objective already carries
+  // which kind of job it is.
+  SERVICES
 }
 
 enum PostStatus {
@@ -269,6 +359,9 @@ model Post {
   partyId     String
   party       Party        @relation(fields: [partyId], references: [id])
   type        PostType
+  // Backfilled from `type` on existing rows (HAVE -> SELL, NEED -> BUY),
+  // which is what every pre-objective post actually meant.
+  objective   Objective    @default(SELL)
   category    PostCategory
   title       String
   description String?
@@ -431,6 +524,38 @@ model TransactionConfirmation {
   @@index([partyId])
 }
 
+// One star is not a trust model. "Good produce but pays 60 days late" and
+// "pays cash on collection but the maize was damp" both land on 3★, and a
+// counterparty deciding whether to extend credit vs. whether to accept a
+// delivery window needs to tell those apart.
+//
+// Deliberately six dimensions and no more: each one has to be something a
+// trading party can answer from a single completed trade without guessing.
+enum TrustDimension {
+  COMMUNICATION
+  RELIABILITY
+  QUALITY
+  PAYMENT
+  TIMELINESS
+  FAIRNESS
+}
+
+// Optional per-dimension detail hanging off a Rating. A rater who only
+// moves the overall slider still produces a valid Rating with no
+// RatingDimension rows — the dimension averages simply stay null until
+// enough people answer them, rather than being back-filled from the
+// overall score and inventing a precision nobody supplied.
+model RatingDimension {
+  id        String         @id @default(cuid())
+  ratingId  String
+  rating    Rating         @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+  dimension TrustDimension
+  score     Int
+
+  @@unique([ratingId, dimension])
+  @@index([ratingId])
+}
+
 model Rating {
   id        String   @id @default(cuid())
   matchId   String?
@@ -446,6 +571,8 @@ model Rating {
   score     Int
   comment   String?
   createdAt DateTime @default(now())
+
+  dimensions RatingDimension[]
 
   @@unique([matchId, authorId, subjectId])
   @@index([subjectId])
@@ -465,6 +592,28 @@ model Reputation {
   averageRating       Float?
   ratingCount         Int      @default(0)
   updatedAt           DateTime @updatedAt
+
+  // Per-dimension averages, each null until at least one rater answered
+  // that dimension. Stored as columns rather than a JSON blob so the
+  // directory can order and filter on them ("who pays best in Manicaland")
+  // without deserializing every row.
+  communicationAvg Float?
+  reliabilityAvg   Float?
+  qualityAvg       Float?
+  paymentAvg       Float?
+  timelinessAvg    Float?
+  fairnessAvg      Float?
+  dimensionCount   Int    @default(0)
+
+  // How many distinct counterparties came back for a second completed
+  // trade. The strongest trust signal in the whole model and the hardest
+  // to fake: anyone can collect one good rating, but repeat business is a
+  // counterparty voting with their own money a second time.
+  repeatPartnerCount Int @default(0)
+  // Median minutes to first reply in a conversation, over completed
+  // matches. "Responds within the hour" is often what actually decides
+  // who gets the work when produce is spoiling.
+  medianResponseMinutes Int?
 }
 
 // ---------------------------------------------------------------------------
@@ -479,6 +628,113 @@ enum RelationKind {
   // transaction volume to infer from. The primitive is modeled now so
   // adding it later is a new enum value, not a new subsystem.
   RECURRING_BUYER
+}
+
+// ---------------------------------------------------------------------------
+// Operational memory: what this participant actually did, over time
+// ---------------------------------------------------------------------------
+
+// The platform's long-term recollection of a participant's operations —
+// separate from Post (an intent, which closes) and Match (a pairing, which
+// completes). Neither of those can answer "what does this farm normally do
+// in August", because both get filtered and closed out of the working set.
+//
+// Append-only by design: an event is something that happened, so it's never
+// updated in place, only recorded. Pattern inference (memory-core.ts) reads
+// the log; nothing writes derived conclusions back into it, so a bad
+// inference is always one deploy away from being fixed rather than being
+// baked permanently into the data.
+enum MemoryKind {
+  HARVEST
+  SOLD
+  BOUGHT
+  TRANSPORT_HIRED
+  TRANSPORT_PROVIDED
+  EQUIPMENT_RENTED_OUT
+  EQUIPMENT_RENTED_IN
+  MAINTENANCE
+  INPUTS_PURCHASED
+  LABOR_HIRED
+  STORAGE_USED
+}
+
+model MemoryEvent {
+  id      String     @id @default(cuid())
+  partyId String
+  party   Party      @relation("MemorySubject", fields: [partyId], references: [id], onDelete: Cascade)
+  kind    MemoryKind
+
+  // What it was about, in the domain's own words — "oranges", "refrigerated
+  // truck", "drip irrigation kit". Freeform because the useful granularity
+  // is whatever the farmer actually calls the thing; an enum here would
+  // collapse exactly the distinctions that make an anticipation specific
+  // enough to be worth showing ("oranges" vs. "citrus" vs. "PRODUCE").
+  subject  String
+  category PostCategory?
+
+  counterpartyId String?
+  counterparty   Party?  @relation("MemoryCounterparty", fields: [counterpartyId], references: [id], onDelete: SetNull)
+
+  quantity Float?
+  unit     String?
+
+  // When it happened, which is not when it was recorded — a harvest logged
+  // late still belongs in its real month for seasonality to work.
+  occurredAt DateTime
+  matchId    String?
+  createdAt  DateTime @default(now())
+
+  @@index([partyId, kind, occurredAt])
+  @@index([partyId, subject])
+  @@index([category, occurredAt])
+}
+
+// ---------------------------------------------------------------------------
+// Market intelligence: what the economy is doing, derived from the graph
+// ---------------------------------------------------------------------------
+
+enum SignalKind {
+  DEMAND_RISING
+  DEMAND_FALLING
+  SUPPLY_TIGHT
+  SUPPLY_GLUT
+  TRANSPORT_SCARCE
+  TRANSPORT_AVAILABLE
+  PRICE_RISING
+  PRICE_FALLING
+}
+
+// Computed from platform activity on a schedule, not written by hand and
+// not fetched from an external price feed (there isn't a reliable public
+// one for Zimbabwe's informal agricultural market — the platform's own
+// order flow is the better signal, and becomes more so with volume).
+//
+// Every signal carries the sample size it was computed from, because a
+// "demand rising" derived from four posts is a rumour and the UI has to be
+// able to say so rather than presenting it with the same confidence as one
+// derived from four hundred.
+model MarketSignal {
+  id       String       @id @default(cuid())
+  kind     SignalKind
+  category PostCategory
+  // Crop/commodity when the signal is specific enough to name one.
+  subject  String?
+  province String?
+
+  headline String
+  detail   String
+  // 0..1 — how much weight the UI should give this, driven by sample size
+  // and effect magnitude together.
+  strength Float
+  // Number of underlying posts/matches the signal was computed from.
+  sampleSize Int
+
+  windowStart DateTime
+  windowEnd   DateTime
+  computedAt  DateTime @default(now())
+
+  @@index([province, category, computedAt])
+  @@index([computedAt])
 }
 
 // partyAId/partyBId are stored in sorted order (no canonical "direction"

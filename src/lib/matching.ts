@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "@/lib/matching-core";
+import { objectiveSpec } from "@/lib/objectives";
 
 export { scoreMatch };
 
@@ -12,15 +13,20 @@ export { scoreMatch };
 // the right end of the list to cut from.
 const MAX_MATCH_CANDIDATES = 200;
 
-// Called right after a Post is created. Finds OPEN posts of the opposite
-// type in the same category, and records a Match for each. postA is always
-// the pre-existing post, postB the one just created, so re-running this
-// never produces a duplicate pair.
+// Called right after a Post is created. Finds OPEN posts carrying the
+// *counterpart objective* in the same category and records a Match for
+// each. postA is always the pre-existing post, postB the one just created,
+// so re-running this never produces a duplicate pair.
+//
+// Objective, not just opposite PostType: under the old rule a tractor for
+// sale (HAVE/EQUIPMENT) matched someone looking to rent one
+// (NEED/EQUIPMENT), and both parties got a confident, cited, wrong
+// suggestion. SELL now pairs only with BUY, RENT_OUT only with RENT.
 export async function generateMatchesForPost(postId: string) {
   const post = await prisma.post.findUnique({ where: { id: postId } });
   if (!post || post.status !== "OPEN") return;
 
-  const oppositeType = post.type === "HAVE" ? "NEED" : "HAVE";
+  const counterpartObjective = objectiveSpec(post.objective).counterpart;
 
   // Every other category is local-first: a match is only ever suggested
   // within the same province. TRANSPORT is the one exception — a
@@ -39,7 +45,7 @@ export async function generateMatchesForPost(postId: string) {
 
   const candidates = await prisma.post.findMany({
     where: {
-      type: oppositeType,
+      objective: counterpartObjective,
       category: post.category,
       status: "OPEN",
       partyId: { not: post.partyId },

@@ -6,6 +6,8 @@ import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
 import { recomputeRelation } from "@/lib/relations";
+import { recordCompletedTrade } from "@/lib/memory";
+import type { TrustDimension } from "@/generated/prisma/enums";
 import { logger } from "@/lib/logger";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
@@ -66,11 +68,33 @@ export async function confirmMatch(
     outcome: formData.get("outcome"),
     score: formData.get("score") || undefined,
     comment: formData.get("comment") || undefined,
+    communication: formData.get("communication") || undefined,
+    reliability: formData.get("reliability") || undefined,
+    quality: formData.get("quality") || undefined,
+    payment: formData.get("payment") || undefined,
+    timeliness: formData.get("timeliness") || undefined,
+    fairness: formData.get("fairness") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { matchId, outcome, score, comment } = parsed.data;
+
+  // Only the dimensions this rater actually answered. An unanswered
+  // dimension stays absent rather than defaulting to the overall score,
+  // which would fabricate a signal nobody gave.
+  const dimensionScores: { dimension: TrustDimension; score: number }[] = (
+    [
+      ["COMMUNICATION", parsed.data.communication],
+      ["RELIABILITY", parsed.data.reliability],
+      ["QUALITY", parsed.data.quality],
+      ["PAYMENT", parsed.data.payment],
+      ["TIMELINESS", parsed.data.timeliness],
+      ["FAIRNESS", parsed.data.fairness],
+    ] as const
+  )
+    .filter((entry): entry is readonly [TrustDimension, number] => entry[1] != null)
+    .map(([dimension, value]) => ({ dimension, score: value }));
 
   const match = await prisma.match.findUnique({
     where: { id: matchId },
@@ -114,7 +138,16 @@ export async function confirmMatch(
       if (score) {
         try {
           await tx.rating.create({
-            data: { matchId, authorId: party.id, subjectId: counterpartyId, score, comment },
+            data: {
+              matchId,
+              authorId: party.id,
+              subjectId: counterpartyId,
+              score,
+              comment,
+              dimensions: dimensionScores.length
+                ? { create: dimensionScores }
+                : undefined,
+            },
           });
         } catch (err) {
           if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) {
@@ -141,6 +174,13 @@ export async function confirmMatch(
           data: { status: "COMPLETED" },
         });
         justCompleted = updated.count > 0;
+      }
+
+      // Memory is written before the reputation recompute so both see the
+      // same transaction — and only on the completing confirmation, so a
+      // trade is remembered once rather than once per party confirming.
+      if (justCompleted) {
+        await recordCompletedTrade(matchId, tx);
       }
 
       await Promise.all([

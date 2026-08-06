@@ -7,6 +7,7 @@ function post(overrides: Partial<Post> = {}): Post {
     id: "post-1",
     partyId: "party-1",
     type: "HAVE",
+    objective: "SELL",
     category: "PRODUCE",
     title: "Maize",
     description: null,
@@ -15,6 +16,7 @@ function post(overrides: Partial<Post> = {}): Post {
     province: "Mashonaland East",
     district: "Marondera",
     askingPrice: null,
+    currency: "USD",
     status: "OPEN",
     urgent: false,
     neededBy: null,
@@ -46,15 +48,21 @@ function reputation(overrides: Partial<Reputation> = {}): Reputation {
 }
 
 describe("scoreMatch", () => {
-  it("cites 'counterparty: new, no history yet' and no geo reason for a stranger in a different province", () => {
+  it("cites the objective pairing and 'no history yet', with no geo reason across provinces", () => {
+    // The two sides are always counterpart objectives — generateMatchesForPost
+    // only ever selects candidates that pair — so the fixture models a SELL
+    // against a BUY rather than two posts pointing the same way.
     const { score, reasons } = scoreMatch(
-      post({ province: "Manicaland", district: "Mutare" }),
-      post({ province: "Mashonaland East", district: "Marondera" }),
+      post({ objective: "SELL", type: "HAVE", province: "Manicaland", district: "Mutare" }),
+      post({ objective: "BUY", type: "NEED", province: "Mashonaland East", district: "Marondera" }),
       null,
       null,
     );
     expect(score).toBe(50);
-    expect(reasons).toEqual(["counterparty: new, no history yet"]);
+    expect(reasons).toEqual([
+      "they're selling, you're buying",
+      "counterparty: new, no history yet",
+    ]);
   });
 
   it("rewards same district over same province", () => {

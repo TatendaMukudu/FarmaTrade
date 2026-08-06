@@ -179,7 +179,11 @@ export default async function ConversationPage({
               {theirs.party.name} to confirm their side.
             </p>
           ) : (
-            <ConfirmForm matchId={match.id} counterpartyName={theirs.party.name} />
+            <ConfirmForm
+              matchId={match.id}
+              counterpartyName={theirs.party.name}
+              counterpartyWasSupplier={theirs.type === "HAVE"}
+            />
           )}
         </div>
       )}

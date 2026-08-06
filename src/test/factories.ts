@@ -5,7 +5,8 @@
 // these only to set up the surrounding state that action expects to exist.
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
-import type { PartyRole } from "@/generated/prisma/client";
+import { objectiveSpec } from "@/lib/objectives";
+import type { Capability, Objective, PostCategory, MemoryKind } from "@/generated/prisma/client";
 
 let counter = 0;
 function unique(prefix: string) {
@@ -15,7 +16,7 @@ function unique(prefix: string) {
 
 export async function createTestParty(
   opts: {
-    roles?: PartyRole[];
+    capabilities?: Capability[];
     province?: string;
     district?: string;
     password?: string;
@@ -34,7 +35,7 @@ export async function createTestParty(
     data: {
       userId: user.id,
       name: user.name,
-      roles: opts.roles ?? ["TRADER"],
+      capabilities: opts.capabilities ?? ["BUYER", "SUPPLIER"],
       province: opts.province ?? "Harare",
       district: opts.district ?? "Harare",
     },
@@ -43,26 +44,58 @@ export async function createTestParty(
   return { user, party, email, password };
 }
 
+// `objective` is the real input; `type` is derived from it so a fixture can
+// never declare a combination the app itself can't produce (a SELL post
+// that claims to be a NEED, say), which would make a matching test pass
+// against data the composer would never create.
 export async function createTestPost(
   partyId: string,
   overrides: Partial<{
-    type: "HAVE" | "NEED";
-    category: "PRODUCE" | "LIVESTOCK" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
+    objective: Objective;
+    category: PostCategory;
     title: string;
     province: string;
     district: string;
     status: "OPEN" | "DRAFT" | "CLOSED";
+    urgent: boolean;
+    quantity: number;
   }> = {},
 ) {
+  const objective = overrides.objective ?? "SELL";
   return prisma.post.create({
     data: {
       partyId,
-      type: overrides.type ?? "HAVE",
+      objective,
+      type: objectiveSpec(objective).type,
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
       province: overrides.province ?? "Harare",
       district: overrides.district ?? "Harare",
       status: overrides.status ?? "OPEN",
+      urgent: overrides.urgent ?? false,
+      quantity: overrides.quantity,
+    },
+  });
+}
+
+export async function createTestMemoryEvent(
+  partyId: string,
+  event: {
+    kind: MemoryKind;
+    subject: string;
+    occurredAt: Date;
+    counterpartyId?: string;
+    category?: PostCategory;
+  },
+) {
+  return prisma.memoryEvent.create({
+    data: {
+      partyId,
+      kind: event.kind,
+      subject: event.subject,
+      occurredAt: event.occurredAt,
+      counterpartyId: event.counterpartyId ?? null,
+      category: event.category ?? null,
     },
   });
 }

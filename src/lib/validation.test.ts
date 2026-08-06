@@ -15,12 +15,12 @@ const baseSignup = {
   password: "password123",
   province: "Mashonaland East",
   district: "Marondera",
-  roles: ["FARM"] as string[],
+  capabilities: ["FARMER"] as string[],
 };
 const validSignup = { ...baseSignup, farmName: "Tendai's Farm" };
 
 describe("signupSchema", () => {
-  it("accepts a minimal valid FARM signup", () => {
+  it("accepts a minimal valid farmer signup", () => {
     expect(signupSchema.safeParse(validSignup).success).toBe(true);
   });
 
@@ -35,27 +35,27 @@ describe("signupSchema", () => {
   });
 
   it("requires at least one role", () => {
-    const result = signupSchema.safeParse({ ...validSignup, roles: [] });
+    const result = signupSchema.safeParse({ ...validSignup, capabilities: [] });
     expect(result.success).toBe(false);
   });
 
-  it("requires farmName when the FARM role is selected", () => {
-    const result = signupSchema.safeParse({ ...baseSignup, roles: ["FARM"] });
+  it("requires farmName when the FARMER capability is selected", () => {
+    const result = signupSchema.safeParse({ ...baseSignup, capabilities: ["FARMER"] });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].path).toEqual(["farmName"]);
     }
   });
 
-  it("does not require farmName when FARM isn't selected", () => {
-    const result = signupSchema.safeParse({ ...baseSignup, roles: ["TRADER"] });
+  it("does not require farmName when FARMER isn't selected", () => {
+    const result = signupSchema.safeParse({ ...baseSignup, capabilities: ["BUYER"] });
     expect(result.success).toBe(true);
   });
 
-  it("requires vehicleType when the TRANSPORTER role is selected", () => {
+  it("requires vehicleType when the TRANSPORTER capability is selected", () => {
     const result = signupSchema.safeParse({
       ...validSignup,
-      roles: ["TRANSPORTER"],
+      capabilities: ["TRANSPORTER"],
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -66,7 +66,7 @@ describe("signupSchema", () => {
   it("accepts TRANSPORTER when vehicleType is present", () => {
     const result = signupSchema.safeParse({
       ...validSignup,
-      roles: ["TRANSPORTER"],
+      capabilities: ["TRANSPORTER"],
       vehicleType: "TRUCK",
     });
     expect(result.success).toBe(true);
@@ -85,7 +85,7 @@ describe("loginSchema", () => {
 
 describe("postSchema", () => {
   const base = {
-    type: "HAVE",
+    objective: "SELL",
     category: "PRODUCE",
     title: "10 tonnes of maize",
     province: "Mashonaland East",

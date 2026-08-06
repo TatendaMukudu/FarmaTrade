@@ -1,4 +1,5 @@
 import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
+import { objectiveSpec } from "@/lib/objectives";
 
 // Deterministic, rules-based scoring — no ML, no history to learn from yet.
 // Geography and category are the qualifying filters; reputation only ever
@@ -20,6 +21,14 @@ export function scoreMatch(
 ): { score: number; reasons: string[] } {
   let score = 50;
   const reasons: string[] = [];
+
+  // Lead with the objective pairing: it's the strongest evidence the match
+  // makes sense at all, and it's what the old model couldn't say. "They're
+  // selling, you're buying" is a better first line than "same province",
+  // which is true of thousands of irrelevant posts.
+  reasons.push(
+    `they're ${objectiveSpec(candidate.objective).gerund}, you're ${objectiveSpec(newPost.objective).gerund}`,
+  );
 
   const sameProvince = candidate.province === newPost.province;
   const sameDistrict = sameProvince && candidate.district === newPost.district;
