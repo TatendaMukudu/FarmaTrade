@@ -11,6 +11,15 @@ export default defineConfig(({ mode }) => ({
     environment: "node",
     include: ["src/**/*.test.ts"],
     env: loadEnv(mode, import.meta.dirname, ""),
+    // Integration tests share one real Postgres — vitest's default runs
+    // separate test *files* in parallel worker threads, so without this a
+    // stray row from one file's still-in-flight test is visible to
+    // generateMatchesForPost (or any other broad query) in another file's
+    // test running at the same moment, against the same database. Unit
+    // tests don't touch the DB so pay nothing for this; the handful of
+    // integration files are small enough that serial execution costs
+    // single-digit seconds, not worth trading for a flaky suite.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
