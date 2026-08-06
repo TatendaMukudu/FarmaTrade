@@ -8,7 +8,7 @@ import type { PartyRole, Reputation } from "@/generated/prisma/client";
 const ROLE_FILTERS: { label: string; value: PartyRole | "ALL" }[] = [
   { label: "All", value: "ALL" },
   { label: "Farms", value: "FARM" },
-  { label: "Traders", value: "TRADER" },
+  { label: "Traders & Suppliers", value: "TRADER" },
   { label: "Transporters", value: "TRANSPORTER" },
 ];
 

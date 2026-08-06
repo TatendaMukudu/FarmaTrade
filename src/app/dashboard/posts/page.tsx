@@ -5,9 +5,10 @@ import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
+import { CATEGORY_LABEL } from "@/lib/categories";
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
-const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
+const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT", "INPUTS"]);
 
 export default async function PostsPage({
   searchParams,
@@ -24,7 +25,7 @@ export default async function PostsPage({
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
   const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
-    ? (categoryParam as "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT")
+    ? (categoryParam as "LIVESTOCK" | "PRODUCE" | "EQUIPMENT" | "TRANSPORT" | "INPUTS")
     : undefined;
 
   const posts = await prisma.post.findMany({
@@ -115,7 +116,12 @@ export default async function PostsPage({
                     · {p.title}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {p.category} · {p.district}, {p.province} · {p.status}
+                    {CATEGORY_LABEL[p.category]} · {p.district}, {p.province}
+                    {p.destinationDistrict &&
+                      p.destinationProvince &&
+                      ` → ${p.destinationDistrict}, ${p.destinationProvince}`}
+                    {" · "}
+                    {p.status}
                     {p.urgent && (
                       <Badge tone="warning" className="ml-2">
                         Time-sensitive
@@ -127,6 +133,7 @@ export default async function PostsPage({
                       </Badge>
                     )}
                     {p.neededBy && ` · needed by ${p.neededBy.toLocaleDateString()}`}
+                    {p.travelDate && ` · travelling ${p.travelDate.toLocaleDateString()}`}
                   </p>
                   {p.description && (
                     <p className="mt-1 text-sm text-gray-600">{p.description}</p>

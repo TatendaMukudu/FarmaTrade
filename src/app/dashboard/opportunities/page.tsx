@@ -4,7 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
 import { summarizeReputation } from "@/lib/reputation";
-import { resolveMatchSides, distanceLabel, estimatedPostValue } from "@/lib/match-view";
+import {
+  resolveMatchSides,
+  groupMatchesByOwnPost,
+  combinedOfferedQuantity,
+  distanceLabel,
+  estimatedPostValue,
+} from "@/lib/match-view";
 import { Badge } from "@/components/badge";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
@@ -69,75 +75,104 @@ export default async function OpportunitiesPage() {
         </p>
       </div>
 
-      <ul className="flex flex-col gap-3">
-        {active.map((m) => {
-          const { yours, theirs } = resolveMatchSides<CounterpartPost>(m, party.id);
-          const myConfirmation = m.confirmations.find(
-            (c) => c.partyId === party.id,
-          );
-          const strength = strengthByCounterparty.get(theirs.party.id);
+      {active.length === 0 && (
+        <p className="text-sm text-gray-400">
+          No opportunities yet — post what you have or need to get matched.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-8">
+        {groupMatchesByOwnPost<CounterpartPost, (typeof active)[number]>(active, party.id).map((group) => {
+          const showAggregate =
+            group.yours.type === "NEED" && group.yours.quantity != null && group.matches.length >= 2;
+          const combined = showAggregate
+            ? combinedOfferedQuantity<CounterpartPost, (typeof active)[number]>(group.matches, party.id)
+            : 0;
+          const needed = group.yours.quantity ?? 0;
+
           return (
-            <li key={m.id} className="rounded-lg border border-border bg-card p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-                    <span>{m.status}</span>
-                    {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
-                    {strength && strength >= 2 && (
-                      <Badge tone="info">Preferred partner · {strength} completed</Badge>
-                    )}
+            <div key={group.yours.id} className="flex flex-col gap-3">
+              {showAggregate && (
+                <div className="rounded-lg border border-border bg-new-bg p-3">
+                  <p className="text-sm font-medium text-new-fg">
+                    Combined available for &ldquo;{group.yours.title}&rdquo;: {combined.toLocaleString()} /{" "}
+                    {needed.toLocaleString()} {group.yours.unit ?? ""} across {group.matches.length} matches
+                  </p>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
+                    <div
+                      className="h-full bg-accent"
+                      style={{ width: `${Math.min(100, (combined / needed) * 100)}%` }}
+                    />
                   </div>
-                  <p className="mt-1 font-medium">Your post: {yours.title}</p>
-                  <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
-                  {m.reasons.length > 0 && (
-                    <p className="mt-2 text-sm font-medium text-foreground">
-                      Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  {m.status === "SUGGESTED" && (
-                    <form action={respondToMatch} className="flex gap-2">
-                      <input type="hidden" name="id" value={m.id} />
-                      <button type="submit" name="decision" value="ACCEPTED" className={SOLID_BUTTON}>
-                        Accept
-                      </button>
-                      <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>
-                        Decline
-                      </button>
-                    </form>
-                  )}
-                  <div className="flex gap-2">
-                    <Link href={`/dashboard/conversations/${m.id}`} className={OUTLINE_BUTTON}>
-                      Message
-                    </Link>
-                    <Link href={`/dashboard/directory/${theirs.party.id}`} className={OUTLINE_BUTTON}>
-                      View profile
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              {m.status === "ACCEPTED" && (
-                <div className="mt-4 border-t border-border pt-4">
-                  {myConfirmation ? (
-                    <p className="text-sm text-gray-500">
-                      You reported: {myConfirmation.outcome.replace(/_/g, " ")}.
-                      Waiting on {theirs.party.name} to confirm their side.
-                    </p>
-                  ) : (
-                    <ConfirmForm matchId={m.id} counterpartyName={theirs.party.name} />
-                  )}
                 </div>
               )}
-            </li>
+
+              <ul className="flex flex-col gap-3">
+                {group.matches.map((m) => {
+                  const { yours, theirs } = resolveMatchSides<CounterpartPost>(m, party.id);
+                  const myConfirmation = m.confirmations.find((c) => c.partyId === party.id);
+                  const strength = strengthByCounterparty.get(theirs.party.id);
+                  return (
+                    <li key={m.id} className="rounded-lg border border-border bg-card p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                            <span>{m.status}</span>
+                            {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
+                            {strength && strength >= 2 && (
+                              <Badge tone="info">Preferred partner · {strength} completed</Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 font-medium">Your post: {yours.title}</p>
+                          <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
+                          {m.reasons.length > 0 && (
+                            <p className="mt-2 text-sm font-medium text-foreground">
+                              Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          {m.status === "SUGGESTED" && (
+                            <form action={respondToMatch} className="flex gap-2">
+                              <input type="hidden" name="id" value={m.id} />
+                              <button type="submit" name="decision" value="ACCEPTED" className={SOLID_BUTTON}>
+                                Accept
+                              </button>
+                              <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>
+                                Decline
+                              </button>
+                            </form>
+                          )}
+                          <div className="flex gap-2">
+                            <Link href={`/dashboard/conversations/${m.id}`} className={OUTLINE_BUTTON}>
+                              Message
+                            </Link>
+                            <Link href={`/dashboard/directory/${theirs.party.id}`} className={OUTLINE_BUTTON}>
+                              View profile
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                      {m.status === "ACCEPTED" && (
+                        <div className="mt-4 border-t border-border pt-4">
+                          {myConfirmation ? (
+                            <p className="text-sm text-gray-500">
+                              You reported: {myConfirmation.outcome.replace(/_/g, " ")}.
+                              Waiting on {theirs.party.name} to confirm their side.
+                            </p>
+                          ) : (
+                            <ConfirmForm matchId={m.id} counterpartyName={theirs.party.name} />
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           );
         })}
-        {active.length === 0 && (
-          <li className="text-sm text-gray-400">
-            No opportunities yet — post what you have or need to get matched.
-          </li>
-        )}
-      </ul>
+      </div>
 
       {history.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -192,6 +227,9 @@ function MatchCounterpart({
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
         {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
+        {post.destinationDistrict &&
+          post.destinationProvince &&
+          ` · Route: ${post.district} → ${post.destinationDistrict}`}
       </p>
       {post.photos.length > 0 && (
         <div className="mt-2 flex gap-2">

@@ -80,7 +80,7 @@ export const produceSchema = z.object({
 
 export const postSchema = z.object({
   type: z.enum(["HAVE", "NEED"]),
-  category: z.enum(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]),
+  category: z.enum(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT", "INPUTS"]),
   title: z.string().trim().min(1, "Title is required"),
   description: z.string().trim().optional(),
   quantity: z.coerce.number().positive().optional(),
@@ -91,6 +91,9 @@ export const postSchema = z.object({
   urgent: z.coerce.boolean().optional(),
   neededBy: z.coerce.date().optional(),
   recurring: z.coerce.boolean().optional(),
+  destinationProvince: z.string().trim().optional(),
+  destinationDistrict: z.string().trim().optional(),
+  travelDate: z.coerce.date().optional(),
 });
 
 export const equipmentSchema = z.object({

@@ -176,6 +176,11 @@ export default async function DashboardPage() {
             emoji={categoryEmoji("EQUIPMENT")}
             label="Borrow equipment"
           />
+          <QuickAction
+            href="/dashboard/posts?type=NEED&category=INPUTS"
+            emoji={categoryEmoji("INPUTS")}
+            label="Need supplies"
+          />
         </div>
       </div>
     </div>

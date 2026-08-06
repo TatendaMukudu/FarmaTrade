@@ -14,6 +14,40 @@ export function resolveMatchSides<P extends { partyId: string }>(
   return { yours: mine ? match.postA : match.postB, theirs: mine ? match.postB : match.postA };
 }
 
+// Groups matches by *your* post rather than listing every match flatly —
+// a buyer's single NEED post can have many small candidates, and seeing
+// them scattered across separate cards hides that they might, together,
+// actually cover the order. Order of first appearance is preserved, so
+// grouping doesn't fight the existing score-desc sort.
+export function groupMatchesByOwnPost<P extends { id: string; partyId: string }, M extends { postA: P; postB: P }>(
+  matches: M[],
+  partyId: string,
+): { yours: P; matches: M[] }[] {
+  const order: string[] = [];
+  const groups = new Map<string, { yours: P; matches: M[] }>();
+  for (const m of matches) {
+    const { yours } = resolveMatchSides<P>(m, partyId);
+    if (!groups.has(yours.id)) {
+      groups.set(yours.id, { yours, matches: [] });
+      order.push(yours.id);
+    }
+    groups.get(yours.id)!.matches.push(m);
+  }
+  return order.map((id) => groups.get(id)!);
+}
+
+// Sum of what the other side of each match is offering — only meaningful
+// once matches are grouped by your own NEED post (see above).
+export function combinedOfferedQuantity<
+  P extends { id: string; partyId: string; quantity: number | null },
+  M extends { postA: P; postB: P },
+>(matches: M[], partyId: string): number {
+  return matches.reduce((sum, m) => {
+    const { theirs } = resolveMatchSides<P>(m, partyId);
+    return sum + (theirs.quantity ?? 0);
+  }, 0);
+}
+
 export function isPartyInMatch(
   match: { postA: { partyId: string }; postB: { partyId: string } },
   partyId: string,
