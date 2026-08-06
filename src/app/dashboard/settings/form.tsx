@@ -18,7 +18,21 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <Field label="Name" name="name" defaultValue={party.name} required />
-      <Field label="Phone" name="phone" defaultValue={party.phone ?? ""} />
+      <Field label="Phone (optional)" name="phone" defaultValue={party.phone ?? ""} />
+
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium" htmlFor="contactDetails">
+          Other contact details (optional)
+        </label>
+        <textarea
+          id="contactDetails"
+          name="contactDetails"
+          rows={2}
+          defaultValue={party.contactDetails ?? ""}
+          placeholder="Office line, sales email, who to ask for — whatever's useful for a stranger to reach you"
+          className="rounded-lg border border-border px-3 py-2 text-sm"
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
@@ -30,7 +44,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
             name="province"
             required
             defaultValue={party.province}
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-lg border border-border px-3 py-2 text-sm"
           >
             {ZIMBABWE_PROVINCES.map((p) => (
               <option key={p} value={p}>
@@ -43,7 +57,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       </div>
 
       {party.farm && (
-        <div className="flex flex-col gap-4 rounded border border-dashed p-4">
+        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
           <p className="text-sm font-medium">Farm</p>
           <Field label="Farm name" name="farmName" defaultValue={party.farm.farmName} required />
           <Field
@@ -57,7 +71,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       )}
 
       {party.transportProfile && (
-        <div className="flex flex-col gap-4 rounded border border-dashed p-4">
+        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
           <p className="text-sm font-medium">Transport</p>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium" htmlFor="vehicleType">
@@ -68,7 +82,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
               name="vehicleType"
               required
               defaultValue={party.transportProfile.vehicleType}
-              className="rounded border px-3 py-2 text-sm"
+              className="rounded-lg border border-border px-3 py-2 text-sm"
             >
               <option value="TRUCK">Truck</option>
               <option value="REFRIGERATED_TRUCK">Refrigerated truck</option>
@@ -106,7 +120,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="w-fit rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? "Saving…" : "Save changes"}
       </button>
@@ -141,7 +155,7 @@ function Field({
         defaultValue={defaultValue}
         required={required}
         step={step}
-        className="rounded border px-3 py-2 text-sm"
+        className="rounded-lg border border-border px-3 py-2 text-sm"
       />
     </div>
   );

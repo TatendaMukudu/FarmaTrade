@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { LivestockForm, ProduceForm, EquipmentForm } from "./forms";
 import { LivestockRow, ProduceRow, EquipmentRow } from "./rows";
 import { ImportForm } from "./import-form";
+import { AddToggle } from "@/components/add-toggle";
 
 export default async function FarmPage() {
   const party = await getCurrentParty();
@@ -47,7 +48,9 @@ export default async function FarmPage() {
             <li className="text-sm text-gray-400">No livestock recorded yet.</li>
           )}
         </ul>
-        <LivestockForm />
+        <AddToggle label="Add livestock">
+          <LivestockForm />
+        </AddToggle>
       </Section>
 
       <Section title="Produce">
@@ -59,7 +62,9 @@ export default async function FarmPage() {
             <li className="text-sm text-gray-400">No produce recorded yet.</li>
           )}
         </ul>
-        <ProduceForm />
+        <AddToggle label="Add produce">
+          <ProduceForm />
+        </AddToggle>
       </Section>
 
       <Section title="Equipment">
@@ -71,7 +76,9 @@ export default async function FarmPage() {
             <li className="text-sm text-gray-400">No equipment recorded yet.</li>
           )}
         </ul>
-        <EquipmentForm />
+        <AddToggle label="Add equipment">
+          <EquipmentForm />
+        </AddToggle>
       </Section>
     </div>
   );

@@ -6,6 +6,7 @@ export const signupSchema = z
     email: z.string().trim().email("Enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     phone: z.string().trim().optional(),
+    contactDetails: z.string().trim().optional(),
     province: z.string().trim().min(1, "Province is required"),
     district: z.string().trim().min(1, "District is required"),
     roles: z
@@ -39,6 +40,7 @@ export const loginSchema = z.object({
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   phone: z.string().trim().optional(),
+  contactDetails: z.string().trim().optional(),
   province: z.string().trim().min(1, "Province is required"),
   district: z.string().trim().min(1, "District is required"),
   farmName: z.string().trim().optional(),

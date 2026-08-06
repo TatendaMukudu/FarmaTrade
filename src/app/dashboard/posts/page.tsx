@@ -4,6 +4,7 @@ import { PostForm } from "./form";
 import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
+import { AddToggle } from "@/components/add-toggle";
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
 const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
@@ -87,12 +88,14 @@ export default async function PostsPage({
         </div>
       )}
 
-      <PostForm
-        defaultProvince={party.province}
-        defaultDistrict={party.district}
-        defaultType={defaultType}
-        defaultCategory={defaultCategory}
-      />
+      <AddToggle label="New post" defaultOpen={!!(defaultType || defaultCategory)}>
+        <PostForm
+          defaultProvince={party.province}
+          defaultDistrict={party.district}
+          defaultType={defaultType}
+          defaultCategory={defaultCategory}
+        />
+      </AddToggle>
 
       <ul className="flex flex-col gap-3">
         {rest.map((p) => {

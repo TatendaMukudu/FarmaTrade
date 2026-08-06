@@ -98,10 +98,13 @@ export default async function PartyProfilePage({
         </div>
       )}
 
-      {party.phone && (
+      {(party.phone || party.contactDetails) && (
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-gray-500">Contact</p>
-          <p className="font-medium">{party.phone}</p>
+          {party.phone && <p className="font-medium">{party.phone}</p>}
+          {party.contactDetails && (
+            <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{party.contactDetails}</p>
+          )}
         </div>
       )}
     </div>
