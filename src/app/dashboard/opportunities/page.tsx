@@ -220,6 +220,11 @@ function MatchCounterpart({
     <div className="mt-1">
       <p className="text-sm text-gray-600">
         {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
+        {post.recurring && (
+          <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+            Standing order
+          </span>
+        )}
       </p>
       <p className="text-xs text-gray-400">
         {reputationLabel(post.party.reputation)} ·{" "}

@@ -37,6 +37,8 @@ export function ProduceRow({ item }: { item: ProduceStock }) {
         <>
           {item.quantity} {item.unit} {item.cropType}
           {item.perishable ? " · perishable" : ""}
+          {item.expectedHarvestDate &&
+            ` · harvest expected ${item.expectedHarvestDate.toLocaleDateString()}`}
           {item.notes ? ` · ${item.notes}` : ""}
         </>
       }

@@ -1,7 +1,8 @@
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PostForm } from "./form";
-import { closePost } from "./actions";
+import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
+import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
 const VALID_CATEGORIES = new Set(["LIVESTOCK", "PRODUCE", "EQUIPMENT", "TRANSPORT"]);
@@ -11,6 +12,10 @@ export default async function PostsPage({
 }: PageProps<"/dashboard/posts">) {
   const party = await getCurrentParty();
   if (!party) return null;
+
+  if (party.farm) {
+    await ensureHarvestDrafts(party.farm.id, party);
+  }
 
   const params = await searchParams;
   const typeParam = Array.isArray(params.type) ? params.type[0] : params.type;
@@ -29,6 +34,9 @@ export default async function PostsPage({
     },
   });
 
+  const drafts = posts.filter((p) => p.status === "DRAFT");
+  const rest = posts.filter((p) => p.status !== "DRAFT");
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -39,6 +47,41 @@ export default async function PostsPage({
         </p>
       </div>
 
+      {drafts.length > 0 && (
+        <div className="flex flex-col gap-3 rounded border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-900">
+            Drafted from your upcoming harvest — confirm to publish
+          </p>
+          <ul className="flex flex-col gap-2">
+            {drafts.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between gap-4 rounded border border-amber-200 bg-white px-3 py-2"
+              >
+                <span className="text-sm">{p.title}</span>
+                <div className="flex gap-2">
+                  <form action={confirmDraftPost}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button
+                      type="submit"
+                      className="rounded bg-black px-3 py-1 text-xs font-medium text-white"
+                    >
+                      Confirm &amp; publish
+                    </button>
+                  </form>
+                  <form action={discardDraftPost}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" className="rounded border px-3 py-1 text-xs">
+                      Discard
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <PostForm
         defaultProvince={party.province}
         defaultDistrict={party.district}
@@ -47,7 +90,7 @@ export default async function PostsPage({
       />
 
       <ul className="flex flex-col gap-3">
-        {posts.map((p) => {
+        {rest.map((p) => {
           const matchCount = p._count.matchesAsA + p._count.matchesAsB;
           return (
             <li key={p.id} className="rounded border p-4">
@@ -68,6 +111,11 @@ export default async function PostsPage({
                     {p.urgent && (
                       <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                         Time-sensitive
+                      </span>
+                    )}
+                    {p.recurring && (
+                      <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                        Standing order
                       </span>
                     )}
                     {p.neededBy && ` · needed by ${p.neededBy.toLocaleDateString()}`}
@@ -109,7 +157,7 @@ export default async function PostsPage({
             </li>
           );
         })}
-        {posts.length === 0 && (
+        {rest.length === 0 && drafts.length === 0 && (
           <li className="text-sm text-gray-400">No posts yet.</li>
         )}
       </ul>

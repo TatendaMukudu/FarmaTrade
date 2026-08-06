@@ -72,6 +72,7 @@ export const produceSchema = z.object({
   quantity: z.coerce.number().positive(),
   unit: z.enum(["KG", "TONNE", "BAG", "CRATE", "LITRE", "HEAD"]),
   perishable: z.coerce.boolean().optional(),
+  expectedHarvestDate: z.coerce.date().optional(),
   notes: z.string().trim().optional(),
 });
 
@@ -87,6 +88,7 @@ export const postSchema = z.object({
   askingPrice: z.coerce.number().positive().optional(),
   urgent: z.coerce.boolean().optional(),
   neededBy: z.coerce.date().optional(),
+  recurring: z.coerce.boolean().optional(),
 });
 
 export const equipmentSchema = z.object({

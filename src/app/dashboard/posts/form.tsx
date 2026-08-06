@@ -143,6 +143,11 @@ export function PostForm({
             <input type="checkbox" name="urgent" />
             Time-sensitive (e.g. spoiling, breaking down, needed immediately)
           </label>
+
+          <label className="flex w-fit items-center gap-2 text-sm">
+            <input type="checkbox" name="recurring" />
+            Standing order (e.g. "I buy this every month") — stays open and keeps matching
+          </label>
         </div>
       </details>
 

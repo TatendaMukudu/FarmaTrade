@@ -115,6 +115,18 @@ export function ProduceForm({
         />
         Perishable
       </label>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-gray-500" htmlFor="expectedHarvestDate">
+          Expected harvest (optional)
+        </label>
+        <input
+          id="expectedHarvestDate"
+          name="expectedHarvestDate"
+          type="date"
+          defaultValue={initial?.expectedHarvestDate ? toDateInputValue(initial.expectedHarvestDate) : undefined}
+          className="rounded border px-2 py-1 text-sm"
+        />
+      </div>
       <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
       <SubmitButton pending={pending} label={initial ? "Save" : "Add produce"} />
       {onDone && (
@@ -280,6 +292,10 @@ function SubmitButton({ pending, label }: { pending: boolean; label: string }) {
       {pending ? "Saving…" : label}
     </button>
   );
+}
+
+function toDateInputValue(date: Date) {
+  return new Date(date).toISOString().slice(0, 10);
 }
 
 function Error({ message }: { message: string }) {
