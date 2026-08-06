@@ -123,6 +123,6 @@ export async function signupAction(
     return createdUser;
   });
 
-  await createSession(user.id);
+  await createSession(user.id, user.sessionVersion);
   redirect("/dashboard");
 }

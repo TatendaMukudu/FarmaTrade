@@ -17,7 +17,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { loginAction } = await import("./actions");
+const { loginAction, logoutAction } = await import("./actions");
+const { getSessionUserId } = await import("@/lib/auth");
 
 function formData(fields: Record<string, string>) {
   const fd = new FormData();
@@ -91,5 +92,35 @@ describe("loginAction", () => {
 
     resetNextRuntime();
     await expect(loginAction({}, formData({ email, password }))).rejects.toThrow(RedirectSignal);
+  });
+});
+
+describe("logoutAction", () => {
+  const partyIds: string[] = [];
+
+  beforeEach(() => {
+    resetNextRuntime();
+  });
+
+  afterEach(async () => {
+    await cleanupParties(partyIds.splice(0));
+  });
+
+  it("invalidates a token issued before logout, not just the browser's cookie copy", async () => {
+    const { party, email, password } = await createTestParty();
+    partyIds.push(party.id);
+
+    await expect(loginAction({}, formData({ email, password }))).rejects.toThrow(RedirectSignal);
+    const tokenBeforeLogout = fakeCookies.get("farmatrade_session")!.value;
+    expect(await getSessionUserId()).toBe(party.userId);
+
+    await expect(logoutAction()).rejects.toThrow(RedirectSignal);
+    expect(fakeCookies.get("farmatrade_session")).toBeUndefined();
+
+    // Simulate a copy of the token taken before logout (e.g. exfiltrated, or
+    // just a second device that never saw the delete) — still
+    // well-formed and unexpired, but its sessionVersion claim is now stale.
+    fakeCookies.set("farmatrade_session", tokenBeforeLogout);
+    expect(await getSessionUserId()).toBeNull();
   });
 });

@@ -29,8 +29,10 @@ export default async function DashboardPage() {
     await ensureHarvestDrafts(party.farm.id, party);
   }
 
-  // Captured before we stamp "now" below, so this render still shows what's
-  // new since the *previous* visit rather than immediately zeroing itself out.
+  // Set only when the Opportunities page itself is actually visited (see
+  // opportunities/mark-seen.tsx) — Overview only ever reads this value,
+  // never writes it, so viewing Overview repeatedly can't silently zero
+  // out "new matches since last visit" before the user has looked.
   const since = party.opportunitiesLastSeenAt;
 
   const [openPostCount, opportunityCount, newSinceLastVisit, draftCount, topMatches, topProduce] =
@@ -71,11 +73,6 @@ export default async function DashboardPage() {
           })
         : Promise.resolve(null),
     ]);
-
-  await prisma.party.update({
-    where: { id: party.id },
-    data: { opportunitiesLastSeenAt: new Date() },
-  });
 
   const reputation = summarizeReputation(party.reputation);
 

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, createSession, destroySession } from "@/lib/auth";
+import { verifyPassword, createSession, destroySession, bumpSessionVersion, getSessionUserId } from "@/lib/auth";
 import { loginSchema } from "@/lib/validation";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -46,11 +46,13 @@ export async function loginAction(
   }
 
   resetRateLimit(rateLimitKey);
-  await createSession(user.id);
+  await createSession(user.id, user.sessionVersion);
   redirect("/dashboard");
 }
 
 export async function logoutAction() {
+  const userId = await getSessionUserId();
+  if (userId) await bumpSessionVersion(userId);
   await destroySession();
   redirect("/login");
 }

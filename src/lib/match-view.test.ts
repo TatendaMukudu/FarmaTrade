@@ -81,15 +81,29 @@ describe("distanceLabel", () => {
 
 describe("estimatedPostValue", () => {
   it("is null when there is no asking price", () => {
-    expect(estimatedPostValue({ askingPrice: null, quantity: 10 })).toBeNull();
+    expect(estimatedPostValue({ askingPrice: null, quantity: 10, currency: "USD" })).toBeNull();
   });
   it("multiplies price by quantity when both are present", () => {
-    expect(estimatedPostValue({ askingPrice: 5, quantity: 10 })).toBe(50);
+    expect(estimatedPostValue({ askingPrice: 5, quantity: 10, currency: "USD" })).toEqual({
+      amount: 50,
+      currency: "USD",
+    });
   });
   it("is just the price when quantity is absent", () => {
-    expect(estimatedPostValue({ askingPrice: 5, quantity: null })).toBe(5);
+    expect(estimatedPostValue({ askingPrice: 5, quantity: null, currency: "USD" })).toEqual({
+      amount: 5,
+      currency: "USD",
+    });
   });
   it("coerces a Prisma Decimal-like value via Number()", () => {
-    expect(estimatedPostValue({ askingPrice: { toString: () => "12.5" }, quantity: 2 })).toBe(25);
+    expect(
+      estimatedPostValue({ askingPrice: { toString: () => "12.5" }, quantity: 2, currency: "ZiG" }),
+    ).toEqual({ amount: 25, currency: "ZiG" });
+  });
+  it("carries the post's own currency through, not a hardcoded default", () => {
+    expect(estimatedPostValue({ askingPrice: 100, quantity: null, currency: "ZAR" })).toEqual({
+      amount: 100,
+      currency: "ZAR",
+    });
   });
 });

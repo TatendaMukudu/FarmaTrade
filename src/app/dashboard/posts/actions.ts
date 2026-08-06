@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { postSchema } from "@/lib/validation";
 import { generateMatchesForPost } from "@/lib/matching";
-import { uploadPhoto } from "@/lib/storage";
+import { uploadPhoto, deletePhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
 
 export type PostActionState = { error?: string };
@@ -49,6 +49,7 @@ export async function createPost(
     province: formData.get("province"),
     district: formData.get("district"),
     askingPrice: formData.get("askingPrice") || undefined,
+    currency: formData.get("currency") || undefined,
     urgent: formData.get("urgent") === "on",
     neededBy: formData.get("neededBy") || undefined,
     recurring: formData.get("recurring") === "on",
@@ -75,6 +76,7 @@ export async function createPost(
       province: data.province,
       district: data.district,
       askingPrice: data.askingPrice,
+      currency: data.currency,
       urgent: data.urgent ?? false,
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,
@@ -134,12 +136,31 @@ export async function confirmDraftPost(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+// Postgres cascade (Photo.post onDelete: Cascade) cleans up the Photo
+// rows automatically when a Post is deleted, but it can't reach out to
+// R2 — those objects have to be deleted in application code, before the
+// DB delete, or they leak forever, still billed, with nothing left in
+// Postgres pointing at them.
+async function deletePostPhotos(postId: string) {
+  const photos = await prisma.photo.findMany({
+    where: { postId, storageKey: { not: null } },
+    select: { storageKey: true },
+  });
+  await Promise.all(
+    photos.map((p) => deletePhoto(p.storageKey!)),
+  );
+}
+
 export async function discardDraftPost(formData: FormData) {
   const party = await getCurrentParty();
   if (!party) return;
 
   const id = String(formData.get("id"));
-  await prisma.post.deleteMany({ where: { id, partyId: party.id, status: "DRAFT" } });
+  const post = await prisma.post.findFirst({ where: { id, partyId: party.id, status: "DRAFT" } });
+  if (!post) return;
+
+  await deletePostPhotos(id);
+  await prisma.post.delete({ where: { id } });
 
   revalidatePath("/dashboard/posts");
   revalidatePath("/dashboard");

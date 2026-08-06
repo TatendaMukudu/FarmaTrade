@@ -1,8 +1,8 @@
 // Integration test: findTransportersForRoute against a real Postgres.
-// transportCoversRoute's own unit tests (transport-suggestions-core.test.ts)
-// cover the routing predicate in isolation; this covers the query around
-// it — type/category/status filtering and the result cap — which those
-// unit tests can't reach.
+// The route predicate is expressed directly as a Prisma WHERE clause (no
+// separate pure-function mirror to keep in sync), so this is the only
+// place it's verified — origin/destination matching, type/category/status
+// filtering, and the result cap.
 import { afterEach, describe, expect, it } from "vitest";
 import { findTransportersForRoute } from "@/lib/transport-suggestions";
 import { createTestParty, cleanupParties } from "@/test/factories";

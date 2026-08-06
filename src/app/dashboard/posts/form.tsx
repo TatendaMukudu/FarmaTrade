@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
-import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { ZIMBABWE_PROVINCES, CURRENCIES } from "@/lib/zimbabwe";
 import { CATEGORY_LABEL } from "@/lib/categories";
 import type { PostCategory as Category } from "@/generated/prisma/enums";
 
@@ -107,6 +107,19 @@ export function PostForm({
             step="any"
             className="w-32 rounded-lg border border-border px-2 py-1 text-sm"
           />
+        </Field>
+        <Field label="Currency">
+          <select
+            name="currency"
+            defaultValue="USD"
+            className="rounded-lg border border-border px-2 py-1 text-sm"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

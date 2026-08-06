@@ -3,6 +3,7 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
+import { MarkSeen } from "./mark-seen";
 import { summarizeReputation } from "@/lib/reputation";
 import {
   resolveMatchSides,
@@ -68,6 +69,7 @@ export default async function OpportunitiesPage() {
 
   return (
     <div className="flex flex-col gap-10">
+      <MarkSeen />
       <div>
         <h1 className="text-2xl font-semibold">Opportunities</h1>
         <p className="text-sm text-gray-500">
@@ -226,7 +228,8 @@ function MatchCounterpart({
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
-        {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
+        {estimatedValue != null &&
+          ` · Est. value ${estimatedValue.currency} ${estimatedValue.amount.toLocaleString()}`}
         {post.destinationDistrict &&
           post.destinationProvince &&
           ` · Route: ${post.district} → ${post.destinationDistrict}`}

@@ -26,7 +26,10 @@ function formData(fields: Record<string, string>) {
 }
 
 async function loginAs(userId: string) {
-  await createSession(userId);
+  // Freshly created test users always start at sessionVersion 0 (the
+  // schema default) and this suite never bumps it, so hardcoding 0 here
+  // rather than threading the real value through every call site is safe.
+  await createSession(userId, 0);
 }
 
 async function setUpMatchedPair(matchStatus: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {

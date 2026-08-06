@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchPhoto } from "@/lib/storage";
+import { getCurrentParty } from "@/lib/auth";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Route handlers aren't covered by proxy.ts's matcher (that only
+  // redirects HTML page requests to /login) — without this, anyone with a
+  // photo ID got the bytes back, signed in or not.
+  const party = await getCurrentParty();
+  if (!party) return new NextResponse(null, { status: 401 });
+
   const { id } = await params;
   const photo = await prisma.photo.findUnique({
     where: { id },

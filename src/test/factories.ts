@@ -73,6 +73,10 @@ export async function createTestMatch(postAId: string, postBId: string, status: 
   });
 }
 
+export async function createTestPhoto(postId: string, storageKey: string, mimeType = "image/jpeg") {
+  return prisma.photo.create({ data: { postId, storageKey, mimeType } });
+}
+
 // Deletes everything hanging off a set of test parties, in FK-safe order.
 // Integration tests call this in `afterEach` rather than leaving fixtures
 // in the shared dev/CI database indefinitely.

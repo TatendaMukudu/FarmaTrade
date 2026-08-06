@@ -38,11 +38,20 @@ jobs:
 
       - run: npm ci
 
+      - name: Audit dependencies
+        # high/critical only — low/moderate advisories in transitive deps
+        # are frequently unfixable without an upstream release and would
+        # just make this step permanently, unactionably red.
+        run: npm audit --audit-level=high
+
       - name: Apply migrations
         run: npx prisma migrate deploy
 
       - name: Lint
         run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Unit tests
         run: npm run test

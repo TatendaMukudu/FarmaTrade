@@ -91,6 +91,9 @@ export const postSchema = z.object({
   province: z.string().trim().min(1, "Province is required"),
   district: z.string().trim().min(1, "District is required"),
   askingPrice: z.coerce.number().positive().optional(),
+  // Freeform like `unit` — CURRENCIES in zimbabwe.ts is a suggested list
+  // for the form, not a constraint enforced here.
+  currency: z.string().trim().optional(),
   urgent: z.coerce.boolean().optional(),
   neededBy: z.coerce.date().optional(),
   recurring: z.coerce.boolean().optional(),

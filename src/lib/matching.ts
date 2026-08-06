@@ -4,6 +4,14 @@ import { scoreMatch } from "@/lib/matching-core";
 
 export { scoreMatch };
 
+// Without a cap, one new post in a busy province/category would write one
+// Match row per open opposite-type post that qualifies — unbounded fan-out
+// on the hot path a post-create request runs synchronously. Newest
+// candidates first: a listing posted yesterday is more likely to still be
+// live and relevant than one from months ago, so if there's a cut, this is
+// the right end of the list to cut from.
+const MAX_MATCH_CANDIDATES = 200;
+
 // Called right after a Post is created. Finds OPEN posts of the opposite
 // type in the same category, and records a Match for each. postA is always
 // the pre-existing post, postB the one just created, so re-running this
@@ -38,6 +46,8 @@ export async function generateMatchesForPost(postId: string) {
       ...geoFilter,
     },
     include: { party: { include: { reputation: true } } },
+    orderBy: { createdAt: "desc" },
+    take: MAX_MATCH_CANDIDATES,
   });
 
   if (candidates.length === 0) return;
