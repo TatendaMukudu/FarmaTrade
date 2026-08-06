@@ -6,6 +6,8 @@ import { respondToMatch } from "../../opportunities/actions";
 import { ConfirmForm } from "../../opportunities/confirm-form";
 import { MessageForm } from "../message-form";
 import { resolveMatchSides, isPartyInMatch } from "@/lib/match-view";
+import { findTransportersForRoute } from "@/lib/transport-suggestions";
+import { summarizeReputation } from "@/lib/reputation";
 
 export default async function ConversationPage({
   params,
@@ -32,6 +34,21 @@ export default async function ConversationPage({
   const { yours, theirs } = resolveMatchSides(match, party.id);
   const messages = match.conversation?.messages ?? [];
   const myConfirmation = match.confirmations.find((c) => c.partyId === party.id);
+
+  // A PRODUCE/LIVESTOCK/EQUIPMENT/INPUTS match and a TRANSPORT match are
+  // two separate graphs — once a trade like this is accepted, the two
+  // parties know they need to move goods from one place to the other but
+  // have no way to find a transporter without separately posting a
+  // TRANSPORT NEED. Surface it directly instead of leaving it as a gap.
+  let transporters: Awaited<ReturnType<typeof findTransportersForRoute>> = [];
+  const havePost = match.postA.type === "HAVE" ? match.postA : match.postB;
+  const needPost = match.postA.type === "NEED" ? match.postA : match.postB;
+  if (match.status === "ACCEPTED" && match.postA.category !== "TRANSPORT") {
+    transporters = await findTransportersForRoute(
+      { province: havePost.province, district: havePost.district },
+      { province: needPost.province, district: needPost.district },
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -107,6 +124,52 @@ export default async function ConversationPage({
       </div>
 
       <MessageForm matchId={match.id} />
+
+      {transporters.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+          <p className="text-sm font-medium">Need transport for this?</p>
+          <p className="text-xs text-gray-500">
+            These transporters&apos; routes cover{" "}
+            {havePost.district === needPost.district
+              ? havePost.district
+              : havePost.province === needPost.province
+                ? `${havePost.district} → ${needPost.district}`
+                : `${havePost.province} → ${needPost.province}`}
+            .
+          </p>
+          <ul className="flex flex-col gap-2">
+            {transporters.map((t) => {
+              const rep = summarizeReputation(t.party.reputation);
+              return (
+                <li
+                  key={t.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      href={`/dashboard/directory/${t.party.id}`}
+                      className="text-sm font-medium hover:underline"
+                    >
+                      {t.party.name}
+                    </Link>
+                    <p className="text-xs text-gray-500">
+                      {t.province}
+                      {t.destinationProvince ? ` → ${t.destinationProvince}` : ""}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+                      rep.tone === "success" ? "bg-success-bg text-success-fg" : "bg-new-bg text-new-fg"
+                    }`}
+                  >
+                    {rep.headline}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {match.status === "ACCEPTED" && (
         <div className="border-t pt-4">
