@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { summarizeReputation, buildTrustProfile } from "@/lib/reputation";
 import { CAPABILITY_LABEL, CAPABILITY_EMOJI, ALL_CAPABILITIES } from "@/lib/capabilities";
+import { visiblePartyFilter } from "@/lib/safety";
 import { Badge } from "@/components/badge";
 import type { Capability, Reputation } from "@/generated/prisma/client";
 
@@ -29,12 +30,18 @@ export default async function DirectoryPage({
     : undefined;
 
   const currentParty = await getCurrentParty();
+  // Blocked and suspended parties never appear here, for either side of a
+  // block — see safety.ts on why a one-way hide isn't a block.
+  const safetyFilter = currentParty
+    ? await visiblePartyFilter(currentParty.id)
+    : { suspendedAt: null };
 
   const [parties, relations] = await Promise.all([
     prisma.party.findMany({
       where: {
         id: { not: currentParty?.id },
         ...(capability ? { capabilities: { has: capability } } : {}),
+        ...safetyFilter,
       },
       include: { farm: true, transportProfile: true, reputation: true },
       orderBy: [

@@ -27,6 +27,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const { signupAction } = await import("./actions");
 const { prisma } = await import("@/lib/prisma");
+const { resetRateLimit } = await import("@/lib/rate-limit");
 
 function formData(fields: Record<string, string | string[]>) {
   const fd = new FormData();
@@ -165,7 +166,13 @@ describe("signupAction", () => {
   });
 
   it("rate-limits repeated signups from the same IP", async () => {
-    fakeRequestHeaders.set("x-forwarded-for", "203.0.113.7");
+    // The limiter now lives in Postgres and survives both restarts and
+    // test runs — which is the whole point of the change, but means this
+    // test has to start from a known count rather than assuming a fresh
+    // process gave it one. A unique IP per run keeps the runs independent.
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 20}`;
+    fakeRequestHeaders.set("x-forwarded-for", ip);
+    await resetRateLimit(`signup:${ip}`);
 
     for (let i = 0; i < 20; i++) {
       const email = uniqueEmail();

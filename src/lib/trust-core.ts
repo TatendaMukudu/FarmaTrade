@@ -64,6 +64,15 @@ export type TrustProfile = {
   headline: string | null;
   repeatPartnerLine: string | null;
   responseLine: string | null;
+  // Where the record came from, not just how big it is. Shown next to the
+  // star average because "★4.9 across 1 partner" and "★4.7 across 11" are
+  // very different claims, and only stating the number hides that (see
+  // trust-integrity.ts).
+  provenanceLine: string | null;
+  // True when the whole record rests on one or two relationships. Not an
+  // accusation — a smallholder with one loyal buyer is the common case —
+  // just a reason not to read the average as a market consensus.
+  narrowRecord: boolean;
   hasDimensions: boolean;
 };
 
@@ -75,6 +84,8 @@ export const MIN_RATINGS_FOR_DIMENSION = 3;
 const RELATIVE_WEAKNESS_GAP = 0.4;
 
 export type ReputationDimensions = {
+  distinctPartnerCount: number;
+  tradeBreadth: number;
   communicationAvg: number | null;
   reliabilityAvg: number | null;
   qualityAvg: number | null;
@@ -112,6 +123,8 @@ export function buildTrustProfile(rep: ReputationDimensions | null): TrustProfil
     headline: null,
     repeatPartnerLine: null,
     responseLine: null,
+    provenanceLine: null,
+    narrowRecord: false,
     hasDimensions: false,
   };
   if (!rep) return empty;
@@ -123,8 +136,17 @@ export function buildTrustProfile(rep: ReputationDimensions | null): TrustProfil
   const responseLine =
     rep.medianResponseMinutes != null ? formatResponse(rep.medianResponseMinutes) : null;
 
+  const partners = rep.distinctPartnerCount;
+  const provenanceLine =
+    partners === 0
+      ? null
+      : partners === 1
+        ? "Track record is with a single partner"
+        : `Traded with ${partners} different partners`;
+  const narrowRecord = partners > 0 && partners < 3;
+
   if (rep.dimensionCount < MIN_RATINGS_FOR_DIMENSION) {
-    return { ...empty, repeatPartnerLine, responseLine };
+    return { ...empty, repeatPartnerLine, responseLine, provenanceLine, narrowRecord };
   }
 
   const scored: DimensionScore[] = [];
@@ -135,7 +157,7 @@ export function buildTrustProfile(rep: ReputationDimensions | null): TrustProfil
   }
 
   if (scored.length === 0) {
-    return { ...empty, repeatPartnerLine, responseLine };
+    return { ...empty, repeatPartnerLine, responseLine, provenanceLine, narrowRecord };
   }
 
   const overall = scored.reduce((sum, s) => sum + s.average, 0) / scored.length;
@@ -159,6 +181,8 @@ export function buildTrustProfile(rep: ReputationDimensions | null): TrustProfil
     headline,
     repeatPartnerLine,
     responseLine,
+    provenanceLine,
+    narrowRecord,
     hasDimensions: true,
   };
 }

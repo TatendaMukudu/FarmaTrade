@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { summarizeReputation, MIN_RATINGS_FOR_AVERAGE } from "@/lib/reputation-core";
 import type { ReputationSummary } from "@/lib/reputation-core";
 import { buildTrustProfile } from "@/lib/trust-core";
+import { reputationProvenance } from "@/lib/trust-integrity";
 import type { TrustProfile } from "@/lib/trust-core";
 import type { TrustDimension } from "@/generated/prisma/enums";
 
@@ -19,11 +20,15 @@ const DIMENSION_FIELD: Record<TrustDimension, string> = {
   FAIRNESS: "fairnessAvg",
 };
 
-// How many distinct counterparties completed a *second* trade with this
-// party. The hardest signal on the platform to fake and the most predictive
-// one it has: a single good rating costs a counterparty nothing, but coming
-// back is them betting their own money a second time.
-async function countRepeatPartners(partyId: string, db: Prisma.TransactionClient) {
+// The shape of this party's completed-trade graph: who they traded with and
+// how often. Three separate signals come out of one scan.
+//
+// repeatPartnerCount is the hardest signal on the platform to fake — a
+// single good rating costs a counterparty nothing, but coming back is them
+// betting their own money a second time. distinctPartnerCount and
+// tradeBreadth are what make a two-account ring visible for what it is
+// (see trust-integrity.ts).
+async function summarizeTradeGraph(partyId: string, db: Prisma.TransactionClient) {
   const completed = await db.match.findMany({
     where: {
       status: "COMPLETED",
@@ -41,9 +46,21 @@ async function countRepeatPartners(partyId: string, db: Prisma.TransactionClient
     tradesPerCounterparty.set(counterpartyId, (tradesPerCounterparty.get(counterpartyId) ?? 0) + 1);
   }
 
-  let repeat = 0;
-  for (const count of tradesPerCounterparty.values()) if (count >= 2) repeat += 1;
-  return repeat;
+  let repeatPartnerCount = 0;
+  for (const count of tradesPerCounterparty.values()) if (count >= 2) repeatPartnerCount += 1;
+
+  const provenance = reputationProvenance(
+    [...tradesPerCounterparty].map(([counterpartyId, completedTrades]) => ({
+      counterpartyId,
+      completedTrades,
+    })),
+  );
+
+  return {
+    repeatPartnerCount,
+    distinctPartnerCount: provenance.distinctPartners,
+    tradeBreadth: provenance.breadth,
+  };
 }
 
 // Median minutes from a conversation's first message to this party's first
@@ -107,7 +124,7 @@ export async function recomputeReputation(partyId: string, db: Prisma.Transactio
     completedIssueCount,
     ratingAgg,
     dimensionAgg,
-    repeatPartnerCount,
+    tradeGraph,
     responseMinutes,
   ] = await Promise.all([
     db.transactionConfirmation.count({ where: { partyId, outcome: "COMPLETED_GOOD" } }),
@@ -123,7 +140,7 @@ export async function recomputeReputation(partyId: string, db: Prisma.Transactio
       _avg: { score: true },
       _count: { score: true },
     }),
-    countRepeatPartners(partyId, db),
+    summarizeTradeGraph(partyId, db),
     medianResponseMinutes(partyId, db),
   ]);
 
@@ -153,7 +170,7 @@ export async function recomputeReputation(partyId: string, db: Prisma.Transactio
     ratingCount: ratingAgg._count.score,
     ...dimensionValues,
     dimensionCount,
-    repeatPartnerCount,
+    ...tradeGraph,
     medianResponseMinutes: responseMinutes,
   };
 

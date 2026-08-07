@@ -35,7 +35,7 @@ export async function signupAction(
   // limiter entirely until it's fixed.
   const ip = await clientIp();
   if (ip) {
-    const { allowed, retryAfterMs } = checkRateLimit(`signup:${ip}`, SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
+    const { allowed, retryAfterMs } = await checkRateLimit(`signup:${ip}`, SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
     if (!allowed) {
       logger.warn("signup.rate_limited", { ip });
       return {

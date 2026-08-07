@@ -7,6 +7,8 @@ import { getCurrentParty } from "@/lib/auth";
 import { postSchema } from "@/lib/validation";
 import { generateMatchesForPost } from "@/lib/matching";
 import { uploadPhoto, deletePhoto } from "@/lib/storage";
+import { detectImageFormat, ACCEPTED_IMAGE_FORMATS } from "@/lib/image-validation";
+import { logger } from "@/lib/logger";
 import { objectiveSpec } from "@/lib/objectives";
 import type { Objective, PostCategory } from "@/generated/prisma/client";
 
@@ -31,13 +33,28 @@ export async function createPost(
   if (photoFiles.length > MAX_PHOTOS) {
     return { error: `Please attach at most ${MAX_PHOTOS} photos` };
   }
+
+  // Read each file once, up front, and decide its type from its own bytes.
+  // `file.type` is whatever the browser was told to send and is not
+  // evidence of anything — trusting it let an SVG through, which then came
+  // back out of the photo route as image/svg+xml and executed its own
+  // <script> on our origin.
+  const validatedPhotos: { bytes: Buffer; contentType: string }[] = [];
   for (const file of photoFiles) {
-    if (!file.type.startsWith("image/")) {
-      return { error: "Photos must be image files" };
-    }
     if (file.size > MAX_PHOTO_BYTES) {
       return { error: `Each photo must be under ${MAX_PHOTO_BYTES / (1024 * 1024)}MB` };
     }
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const format = detectImageFormat(bytes);
+    if (!format) {
+      logger.warn("createPost.rejected_upload", {
+        partyId: party.id,
+        claimedType: file.type,
+        size: file.size,
+      });
+      return { error: `Photos must be ${ACCEPTED_IMAGE_FORMATS} images` };
+    }
+    validatedPhotos.push({ bytes, contentType: format });
   }
 
   const parsed = postSchema.safeParse({
@@ -93,14 +110,14 @@ export async function createPost(
     },
   });
 
-  if (photoFiles.length > 0) {
+  if (validatedPhotos.length > 0) {
     await prisma.photo.createMany({
       data: await Promise.all(
-        photoFiles.map(async (file) => {
+        validatedPhotos.map(async (photo) => {
           const storageKey = `posts/${post.id}/${randomUUID()}`;
-          const bytes = Buffer.from(await file.arrayBuffer());
-          await uploadPhoto(storageKey, bytes, file.type);
-          return { postId: post.id, mimeType: file.type, storageKey };
+          // The sniffed type is stored and uploaded, never the claimed one.
+          await uploadPhoto(storageKey, photo.bytes, photo.contentType);
+          return { postId: post.id, mimeType: photo.contentType, storageKey };
         }),
       ),
     });

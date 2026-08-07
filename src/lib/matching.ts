@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "@/lib/matching-core";
 import { objectiveSpec } from "@/lib/objectives";
+import { visiblePostPartyFilter } from "@/lib/safety";
 
 export { scoreMatch };
 
@@ -43,6 +44,12 @@ export async function generateMatchesForPost(postId: string) {
         }
       : { province: post.province };
 
+  // Blocked and suspended parties are excluded at the point matches are
+  // *created*, not filtered out when they're displayed. A block that only
+  // hides rows at read time still writes them, still counts them, and
+  // starts leaking the moment any new surface forgets the filter.
+  const safetyFilter = await visiblePostPartyFilter(post.partyId);
+
   const candidates = await prisma.post.findMany({
     where: {
       objective: counterpartObjective,
@@ -50,6 +57,7 @@ export async function generateMatchesForPost(postId: string) {
       status: "OPEN",
       partyId: { not: post.partyId },
       ...geoFilter,
+      ...safetyFilter,
     },
     include: { party: { include: { reputation: true } } },
     orderBy: { createdAt: "desc" },

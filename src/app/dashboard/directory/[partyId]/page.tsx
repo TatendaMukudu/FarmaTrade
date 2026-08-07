@@ -4,6 +4,9 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { summarizeReputation, buildTrustProfile } from "@/lib/reputation";
 import { CAPABILITY_LABEL, CAPABILITY_EMOJI } from "@/lib/capabilities";
+import { visibleContactFor, type VisibleContact } from "@/lib/contact-visibility";
+import { isBlocked } from "@/lib/safety";
+import { SafetyPanel } from "./safety-panel";
 import { Badge } from "@/components/badge";
 import type { TrustProfile } from "@/lib/trust-core";
 
@@ -42,6 +45,10 @@ export default async function PartyProfilePage({
 
   const reputation = summarizeReputation(party.reputation);
   const trust = buildTrustProfile(party.reputation);
+  const contact = currentParty
+    ? await visibleContactFor(currentParty, party)
+    : ({ visible: false, hint: "Sign in to see contact details." } as const);
+  const blocked = currentParty ? await isBlocked(currentParty.id, party.id) : false;
 
   return (
     <div className="flex flex-col gap-6">
@@ -131,14 +138,36 @@ export default async function PartyProfilePage({
         </div>
       )}
 
-      {(party.phone || party.contactDetails) && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-gray-500">Contact</p>
-          {party.phone && <p className="font-medium">{party.phone}</p>}
-          {party.contactDetails && (
-            <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{party.contactDetails}</p>
-          )}
-        </div>
+      <ContactPanel contact={contact} />
+
+      {currentParty && currentParty.id !== party.id && (
+        <SafetyPanel targetId={party.id} targetName={party.name} isBlocked={blocked} />
+      )}
+    </div>
+  );
+}
+
+// Identity is public; reachability is earned. Withholding this until a
+// match is accepted is what stops one throwaway signup from harvesting
+// every phone number on the platform.
+function ContactPanel({ contact }: { contact: VisibleContact }) {
+  if (!contact.visible) {
+    return (
+      <div className="rounded-lg border border-dashed border-border p-4">
+        <p className="text-xs text-gray-500">Contact</p>
+        <p className="mt-1 text-sm text-gray-500">🔒 {contact.hint}</p>
+      </div>
+    );
+  }
+
+  if (!contact.phone && !contact.contactDetails) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs text-gray-500">Contact</p>
+      {contact.phone && <p className="font-medium">{contact.phone}</p>}
+      {contact.contactDetails && (
+        <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{contact.contactDetails}</p>
       )}
     </div>
   );
@@ -158,6 +187,7 @@ function TrustBreakdown({ trust }: { trust: TrustProfile }) {
       <div className="mt-2 flex flex-col gap-1 text-sm">
         {trust.repeatPartnerLine && <p>🔁 {trust.repeatPartnerLine}</p>}
         {trust.responseLine && <p>💬 {trust.responseLine}</p>}
+        {trust.provenanceLine && <p>🕸️ {trust.provenanceLine}</p>}
       </div>
 
       {trust.hasDimensions && (
@@ -174,6 +204,13 @@ function TrustBreakdown({ trust }: { trust: TrustProfile }) {
             </div>
           ))}
         </div>
+      )}
+
+      {trust.narrowRecord && (
+        <p className="mt-3 text-xs text-gray-500">
+          This record comes from very few relationships, so read the average as
+          one partner&rsquo;s experience rather than the market&rsquo;s.
+        </p>
       )}
 
       {trust.watchouts.length > 0 && (

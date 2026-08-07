@@ -16,6 +16,8 @@ function rep(overrides: Partial<ReputationDimensions> = {}): ReputationDimension
     fairnessAvg: null,
     dimensionCount: 0,
     repeatPartnerCount: 0,
+    distinctPartnerCount: 0,
+    tradeBreadth: 0,
     medianResponseMinutes: null,
     ...overrides,
   };
@@ -101,6 +103,32 @@ describe("buildTrustProfile", () => {
     expect(buildTrustProfile(rep({ medianResponseMinutes: 60 * 24 * 2 })).responseLine).toBe(
       "Usually replies within 2 days",
     );
+  });
+});
+
+describe("provenance", () => {
+  it("says plainly when a whole record rests on one partner", () => {
+    const p = buildTrustProfile(rep({ distinctPartnerCount: 1, tradeBreadth: 0 }));
+    expect(p.provenanceLine).toBe("Track record is with a single partner");
+    expect(p.narrowRecord).toBe(true);
+  });
+
+  it("does not call a broadly-sourced record narrow", () => {
+    const p = buildTrustProfile(rep({ distinctPartnerCount: 9, tradeBreadth: 0.85 }));
+    expect(p.provenanceLine).toBe("Traded with 9 different partners");
+    expect(p.narrowRecord).toBe(false);
+  });
+
+  it("stays silent for a party with no completed trades", () => {
+    expect(buildTrustProfile(rep()).provenanceLine).toBeNull();
+  });
+
+  it("reports provenance even when there aren't enough dimension ratings", () => {
+    // The two thresholds are independent: knowing who someone traded with
+    // doesn't depend on anyone having filled in the detailed sliders.
+    const p = buildTrustProfile(rep({ distinctPartnerCount: 7, dimensionCount: 1 }));
+    expect(p.hasDimensions).toBe(false);
+    expect(p.provenanceLine).toBe("Traded with 7 different partners");
   });
 });
 

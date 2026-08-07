@@ -146,8 +146,140 @@ model Party {
   memoryEvents          MemoryEvent[] @relation("MemorySubject")
   memoryCounterpartOf   MemoryEvent[] @relation("MemoryCounterparty")
 
+  blocksMade     PartyBlock[] @relation("BlockActor")
+  blocksReceived PartyBlock[] @relation("BlockTarget")
+  reportsMade     Report[] @relation("ReportReporter")
+  reportsReceived Report[] @relation("ReportSubject")
+  auditEvents     AuditEvent[]
+
+  // Set when a party is suspended for abuse. Suspended parties keep their
+  // history (it's evidence) but drop out of matching, the directory and
+  // every read path — see `activePartyFilter`.
+  suspendedAt     DateTime?
+  suspendedReason String?
+
   @@index([province, district])
   @@index([capabilities])
+}
+
+// ---------------------------------------------------------------------------
+// Trust & safety
+// ---------------------------------------------------------------------------
+
+// A one-way block. Mutual invisibility is deliberate: if A blocks B, neither
+// sees the other anywhere in the product, because a blocked party who can
+// still watch your listings and message you through a new match hasn't
+// really been blocked. Directional storage (not a sorted pair like Relation)
+// because who blocked whom matters for moderation review.
+model PartyBlock {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     Party    @relation("BlockActor", fields: [actorId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    Party    @relation("BlockTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([actorId, targetId])
+  @@index([actorId])
+  @@index([targetId])
+}
+
+enum ReportReason {
+  SCAM
+  MISREPRESENTED_GOODS
+  NO_SHOW
+  ABUSIVE
+  SPAM
+  FAKE_ACCOUNT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  ACTIONED
+  DISMISSED
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reporter   Party        @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Party        @relation("ReportSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  // Optional pointers to what the report is about, so a reviewer isn't
+  // reconstructing the incident from prose.
+  postId     String?
+  matchId    String?
+  reason     ReportReason
+  detail     String?
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  reviewedAt DateTime?
+
+  @@index([subjectId, status])
+  @@index([status, createdAt])
+}
+
+// Security-relevant actions, append-only. A marketplace runs on disputes —
+// "I never agreed to that", "someone else logged into my account" — and
+// without a record of who did what and when, every dispute is one person's
+// word against another's. Deliberately separate from MemoryEvent: that's
+// the farmer's own business history and is theirs to read; this is a
+// security record and exists for the operator.
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  SIGNUP
+  PASSWORD_CHANGED
+  SESSIONS_REVOKED
+  CONTACT_REVEALED
+  PARTY_BLOCKED
+  PARTY_UNBLOCKED
+  REPORT_FILED
+  POST_DELETED
+  PROFILE_UPDATED
+}
+
+model AuditEvent {
+  id      String      @id @default(cuid())
+  action  AuditAction
+  // Null for pre-auth events (a failed login on an email that doesn't
+  // exist still deserves a record — that's what credential stuffing looks
+  // like from the inside).
+  partyId String?
+  party   Party?      @relation(fields: [partyId], references: [id], onDelete: SetNull)
+  // The account an action was aimed at, when different from the actor.
+  subjectId String?
+  // Coarse request context. Deliberately not a full fingerprint: enough to
+  // spot "this account was accessed from three countries in an hour",
+  // not enough to build a tracking profile.
+  ip        String?
+  userAgent String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([partyId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+// Rate-limit state, in the database rather than process memory.
+//
+// The in-memory limiter it replaces had two holes that only look small
+// until someone leans on them: every deploy reset all counters (so an
+// attacker just waits for a release), and a second instance would give
+// each its own private view of "5 attempts" — the limit silently
+// multiplying by the instance count exactly when scale makes it matter.
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +742,13 @@ model Reputation {
   // to fake: anyone can collect one good rating, but repeat business is a
   // counterparty voting with their own money a second time.
   repeatPartnerCount Int @default(0)
+  // How many *different* counterparties this record is built from, and how
+  // evenly spread across them (0..1). Together these are what separates a
+  // genuine track record from a two-account ring that traded with itself:
+  // both can reach 14 completed trades and ★4.9, only one of them across
+  // eleven independent partners. See trust-integrity.ts.
+  distinctPartnerCount Int   @default(0)
+  tradeBreadth         Float @default(0)
   // Median minutes to first reply in a conversation, over completed
   // matches. "Responds within the hour" is often what actually decides
   // who gets the work when produce is spoiling.

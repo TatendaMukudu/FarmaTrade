@@ -6,6 +6,7 @@ import { verifyPassword, createSession, destroySession, bumpSessionVersion, getS
 import { loginSchema } from "@/lib/validation";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/lib/audit";
 
 export type LoginState = { error?: string };
 
@@ -29,7 +30,7 @@ export async function loginAction(
 
   const email = parsed.data.email.toLowerCase();
   const rateLimitKey = `login:${email}`;
-  const { allowed, retryAfterMs } = checkRateLimit(rateLimitKey, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+  const { allowed, retryAfterMs } = await checkRateLimit(rateLimitKey, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
   if (!allowed) {
     logger.warn("login.rate_limited", { email });
     return {
@@ -39,20 +40,38 @@ export async function loginAction(
 
   const user = await prisma.user.findUnique({
     where: { email: parsed.data.email },
+    include: { party: { select: { id: true } } },
   });
 
   if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+    // Recorded even when the email doesn't exist — a burst of failures
+    // against addresses that were never registered is exactly what
+    // credential stuffing looks like from the inside, and it's invisible
+    // if only real accounts are logged.
+    await recordAudit({
+      action: "LOGIN_FAILED",
+      partyId: user?.party?.id ?? null,
+      detail: user ? "bad_password" : "unknown_email",
+    });
     return { error: "Invalid email or password" };
   }
 
-  resetRateLimit(rateLimitKey);
+  await resetRateLimit(rateLimitKey);
+  await recordAudit({ action: "LOGIN_SUCCESS", partyId: user.party?.id ?? null });
   await createSession(user.id, user.sessionVersion);
   redirect("/dashboard");
 }
 
 export async function logoutAction() {
   const userId = await getSessionUserId();
-  if (userId) await bumpSessionVersion(userId);
+  if (userId) {
+    const party = await prisma.party.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    await recordAudit({ action: "LOGOUT", partyId: party?.id ?? null });
+    await bumpSessionVersion(userId);
+  }
   await destroySession();
   redirect("/login");
 }
