@@ -7,6 +7,7 @@ import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
 import { recomputeRelation } from "@/lib/relations";
 import { recordCompletedTrade } from "@/lib/memory";
+import { settleFulfilment } from "@/lib/fulfilment";
 import type { TrustDimension } from "@/generated/prisma/enums";
 import { logger } from "@/lib/logger";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
@@ -181,6 +182,11 @@ export async function confirmMatch(
       // trade is remembered once rather than once per party confirming.
       if (justCompleted) {
         await recordCompletedTrade(matchId, tx);
+        // The goods ledger, alongside the trust ledger below. Both move in
+        // this same transaction: a farmer whose reputation updated but
+        // whose stock didn't is exactly the inconsistency this whole block
+        // is transactional to prevent.
+        await settleFulfilment(matchId, tx);
       }
 
       await Promise.all([

@@ -138,6 +138,22 @@ export async function cleanupParties(partyIds: string[]) {
   await prisma.post.deleteMany({ where: { partyId: { in: partyIds } } });
   await prisma.relation.deleteMany({ where: { OR: [{ partyAId: { in: partyIds } }, { partyBId: { in: partyIds } }] } });
   await prisma.reputation.deleteMany({ where: { partyId: { in: partyIds } } });
+
+  // Farm and its inventory. Posts are already gone above, which matters:
+  // Post.produceId/livestockId/equipmentId reference these rows, so the
+  // farm can only be torn down once nothing points into it.
+  const farms = await prisma.farm.findMany({
+    where: { partyId: { in: partyIds } },
+    select: { id: true },
+  });
+  const farmIds = farms.map((f) => f.id);
+  if (farmIds.length) {
+    await prisma.produceStock.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.livestock.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.equipment.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.farm.deleteMany({ where: { id: { in: farmIds } } });
+  }
+  await prisma.transportProfile.deleteMany({ where: { partyId: { in: partyIds } } });
   const parties = await prisma.party.findMany({ where: { id: { in: partyIds } }, select: { id: true, userId: true } });
   const userIds = parties.map((p) => p.userId).filter((id): id is string => id !== null);
   await prisma.party.deleteMany({ where: { id: { in: partyIds } } });
