@@ -2,8 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { summarizeReputation } from "@/lib/reputation";
+import { summarizeReputation, buildTrustProfile } from "@/lib/reputation";
+import { CAPABILITY_LABEL, CAPABILITY_EMOJI } from "@/lib/capabilities";
+import { visibleContactFor, type VisibleContact } from "@/lib/contact-visibility";
+import { isBlocked } from "@/lib/safety";
+import { SafetyPanel } from "./safety-panel";
 import { Badge } from "@/components/badge";
+import type { TrustProfile } from "@/lib/trust-core";
 
 export default async function PartyProfilePage({
   params,
@@ -39,6 +44,11 @@ export default async function PartyProfilePage({
   if (!party) notFound();
 
   const reputation = summarizeReputation(party.reputation);
+  const trust = buildTrustProfile(party.reputation);
+  const contact = currentParty
+    ? await visibleContactFor(currentParty, party)
+    : ({ visible: false, hint: "Sign in to see contact details." } as const);
+  const blocked = currentParty ? await isBlocked(currentParty.id, party.id) : false;
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,8 +70,25 @@ export default async function PartyProfilePage({
             )}
           </div>
           <p className="text-sm text-gray-500">
-            {party.district}, {party.province} · {party.roles.join(", ")}
+            {party.locality}, {party.region}
+            {party.operatingRadiusKm ? ` · travels up to ${party.operatingRadiusKm}km` : ""}
+            {party.yearsExperience ? ` · ${party.yearsExperience} years in business` : ""}
           </p>
+          {party.capabilities.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {party.capabilities.map((c) => (
+                <span key={c} className="rounded-full bg-new-bg px-2 py-0.5 text-xs text-new-fg">
+                  {CAPABILITY_EMOJI[c]} {CAPABILITY_LABEL[c]}
+                </span>
+              ))}
+            </div>
+          )}
+          {party.languages.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500">Speaks {party.languages.join(", ")}</p>
+          )}
+          {party.availabilityNote && (
+            <p className="mt-1 text-xs text-gray-500">🕑 {party.availabilityNote}</p>
+          )}
         </div>
 
         <div className="shrink-0 text-right">
@@ -75,6 +102,19 @@ export default async function PartyProfilePage({
           {reputation.hasHistory && <p className="mt-1 text-xs text-gray-500">{reputation.completedLine}</p>}
         </div>
       </div>
+
+      <TrustBreakdown trust={trust} />
+
+      {party.licenses.length > 0 && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-gray-500">Licences & registrations</p>
+          <ul className="mt-1 flex flex-col gap-0.5 text-sm text-gray-600">
+            {party.licenses.map((l) => (
+              <li key={l}>📄 {l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {party.farm && (
         <div className="rounded-lg border border-border bg-card p-4">
@@ -98,14 +138,86 @@ export default async function PartyProfilePage({
         </div>
       )}
 
-      {(party.phone || party.contactDetails) && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-gray-500">Contact</p>
-          {party.phone && <p className="font-medium">{party.phone}</p>}
-          {party.contactDetails && (
-            <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{party.contactDetails}</p>
-          )}
+      <ContactPanel contact={contact} />
+
+      {currentParty && currentParty.id !== party.id && (
+        <SafetyPanel targetId={party.id} targetName={party.name} isBlocked={blocked} />
+      )}
+    </div>
+  );
+}
+
+// Identity is public; reachability is earned. Withholding this until a
+// match is accepted is what stops one throwaway signup from harvesting
+// every phone number on the platform.
+function ContactPanel({ contact }: { contact: VisibleContact }) {
+  if (!contact.visible) {
+    return (
+      <div className="rounded-lg border border-dashed border-border p-4">
+        <p className="text-xs text-gray-500">Contact</p>
+        <p className="mt-1 text-sm text-gray-500">🔒 {contact.hint}</p>
+      </div>
+    );
+  }
+
+  if (!contact.phone && !contact.contactDetails) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs text-gray-500">Contact</p>
+      {contact.phone && <p className="font-medium">{contact.phone}</p>}
+      {contact.contactDetails && (
+        <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{contact.contactDetails}</p>
+      )}
+    </div>
+  );
+}
+
+// The shape of someone's track record, not just its size. A bar per
+// dimension is the whole point of the multidimensional model: it lets a
+// reader see "excellent quality, slow to pay" at a glance, which a single
+// 4.1★ actively hides.
+function TrustBreakdown({ trust }: { trust: TrustProfile }) {
+  if (!trust.hasDimensions && !trust.repeatPartnerLine && !trust.responseLine) return null;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs text-gray-500">Track record</p>
+
+      <div className="mt-2 flex flex-col gap-1 text-sm">
+        {trust.repeatPartnerLine && <p>🔁 {trust.repeatPartnerLine}</p>}
+        {trust.responseLine && <p>💬 {trust.responseLine}</p>}
+        {trust.provenanceLine && <p>🕸️ {trust.provenanceLine}</p>}
+      </div>
+
+      {trust.hasDimensions && (
+        <div className="mt-4 flex flex-col gap-2">
+          {trust.strengths.map((d) => (
+            <div key={d.dimension} className="flex items-center gap-3">
+              <span className="w-28 shrink-0 text-xs text-gray-500">{d.label}</span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-border">
+                <div className="h-full bg-accent" style={{ width: `${(d.average / 5) * 100}%` }} />
+              </div>
+              <span className="w-8 shrink-0 text-right text-xs text-gray-500">
+                {d.average.toFixed(1)}
+              </span>
+            </div>
+          ))}
         </div>
+      )}
+
+      {trust.narrowRecord && (
+        <p className="mt-3 text-xs text-gray-500">
+          This record comes from very few relationships, so read the average as
+          one partner&rsquo;s experience rather than the market&rsquo;s.
+        </p>
+      )}
+
+      {trust.watchouts.length > 0 && (
+        <p className="mt-3 text-xs text-gray-500">
+          Relatively weaker on {trust.watchouts.map((w) => w.label.toLowerCase()).join(", ")} —
+          worth agreeing terms up front.
+        </p>
       )}
     </div>
   );

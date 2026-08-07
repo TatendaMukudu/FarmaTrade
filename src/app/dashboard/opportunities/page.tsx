@@ -3,7 +3,9 @@ import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
-import { summarizeReputation } from "@/lib/reputation";
+import { MarkSeen } from "./mark-seen";
+import { summarizeReputation, buildTrustProfile } from "@/lib/reputation";
+import { objectiveSpec } from "@/lib/objectives";
 import {
   resolveMatchSides,
   groupMatchesByOwnPost,
@@ -68,6 +70,7 @@ export default async function OpportunitiesPage() {
 
   return (
     <div className="flex flex-col gap-10">
+      <MarkSeen />
       <div>
         <h1 className="text-2xl font-semibold">Opportunities</h1>
         <p className="text-sm text-gray-500">
@@ -124,7 +127,7 @@ export default async function OpportunitiesPage() {
                             )}
                           </div>
                           <p className="mt-1 font-medium">Your post: {yours.title}</p>
-                          <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
+                          <MatchCounterpart post={theirs} myDistrict={party.locality} myProvince={party.region} />
                           {m.reasons.length > 0 && (
                             <p className="mt-2 text-sm font-medium text-foreground">
                               Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
@@ -161,7 +164,11 @@ export default async function OpportunitiesPage() {
                               Waiting on {theirs.party.name} to confirm their side.
                             </p>
                           ) : (
-                            <ConfirmForm matchId={m.id} counterpartyName={theirs.party.name} />
+                            <ConfirmForm
+                              matchId={m.id}
+                              counterpartyName={theirs.party.name}
+                              counterpartyWasSupplier={theirs.type === "HAVE"}
+                            />
                           )}
                         </div>
                       )}
@@ -210,12 +217,14 @@ function MatchCounterpart({
   myProvince: string;
 }) {
   const reputation = summarizeReputation(post.party.reputation);
+  const trust = buildTrustProfile(post.party.reputation);
   const estimatedValue = estimatedPostValue(post);
+  const spec = objectiveSpec(post.objective);
 
   return (
     <div className="mt-1">
       <p className="text-sm text-gray-600">
-        {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
+        {post.party.name} {spec.verb}: {post.title}
         {post.recurring && (
           <Badge tone="info" className="ml-2">
             Standing order
@@ -225,12 +234,24 @@ function MatchCounterpart({
       <p className="text-xs text-gray-400">
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
-        {distanceLabel(post.district, post.province, myDistrict, myProvince)}
-        {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
+        {distanceLabel(post.locality, post.region, myDistrict, myProvince)}
+        {estimatedValue != null &&
+          ` · Est. value ${estimatedValue.currency} ${estimatedValue.amount.toLocaleString()}`}
         {post.destinationDistrict &&
           post.destinationProvince &&
-          ` · Route: ${post.district} → ${post.destinationDistrict}`}
+          ` · Route: ${post.locality} → ${post.destinationDistrict}`}
       </p>
+      {/* The two trust facts most likely to decide whether this is worth a
+          phone call, surfaced on the card rather than one tap away on the
+          profile. */}
+      {(trust.headline || trust.repeatPartnerLine || trust.responseLine) && (
+        <p className="mt-1 text-xs text-gray-500">
+          {[trust.headline, trust.repeatPartnerLine, trust.responseLine]
+            .filter(Boolean)
+            .slice(0, 2)
+            .join(" · ")}
+        </p>
+      )}
       {post.photos.length > 0 && (
         <div className="mt-2 flex gap-2">
           {post.photos.map((photo) => (

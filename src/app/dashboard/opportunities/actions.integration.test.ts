@@ -26,14 +26,17 @@ function formData(fields: Record<string, string>) {
 }
 
 async function loginAs(userId: string) {
-  await createSession(userId);
+  // Freshly created test users always start at sessionVersion 0 (the
+  // schema default) and this suite never bumps it, so hardcoding 0 here
+  // rather than threading the real value through every call site is safe.
+  await createSession(userId, 0);
 }
 
 async function setUpMatchedPair(matchStatus: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
-  const seller = await createTestParty({ province: "Harare", district: "Harare" });
-  const buyer = await createTestParty({ province: "Harare", district: "Harare" });
-  const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-  const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+  const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+  const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
+  const have = await createTestPost(seller.party.id, { objective: "SELL", category: "PRODUCE" });
+  const need = await createTestPost(buyer.party.id, { objective: "BUY", category: "PRODUCE" });
   const match = await createTestMatch(have.id, need.id, matchStatus);
   return { seller, buyer, match };
 }

@@ -5,11 +5,9 @@ import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
-import { CATEGORY_LABEL, POST_CATEGORIES } from "@/lib/categories";
-import type { PostCategory } from "@/generated/prisma/enums";
-
-const VALID_TYPES = new Set(["HAVE", "NEED"]);
-const VALID_CATEGORIES = new Set<string>(POST_CATEGORIES);
+import { CATEGORY_LABEL } from "@/lib/categories";
+import { OBJECTIVES } from "@/lib/objectives";
+import type { Objective } from "@/generated/prisma/enums";
 
 export default async function PostsPage({
   searchParams,
@@ -21,13 +19,12 @@ export default async function PostsPage({
     await ensureHarvestDrafts(party.farm.id, party);
   }
 
+  // Deep-linked objective, so a briefing item like "your pump is due for a
+  // service" can open the composer already knowing what the user wants.
   const params = await searchParams;
-  const typeParam = Array.isArray(params.type) ? params.type[0] : params.type;
-  const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
-  const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
-  const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
-    ? (categoryParam as PostCategory)
-    : undefined;
+  const objectiveParam = Array.isArray(params.objective) ? params.objective[0] : params.objective;
+  const defaultObjective =
+    objectiveParam && objectiveParam in OBJECTIVES ? (objectiveParam as Objective) : undefined;
 
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
@@ -44,10 +41,10 @@ export default async function PostsPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-semibold">Your posts</h1>
+        <h1 className="text-2xl font-semibold">What you&rsquo;re working on</h1>
         <p className="text-sm text-gray-500">
-          Say what you have or what you need — FarmaTrade matches it against
-          the opposite side automatically.
+          Tell FarmaTrade what you&rsquo;re trying to accomplish and it finds the
+          people who can help.
         </p>
       </div>
 
@@ -90,12 +87,11 @@ export default async function PostsPage({
         </div>
       )}
 
-      <AddToggle label="New post" defaultOpen={!!(defaultType || defaultCategory)}>
+      <AddToggle label="Start something new" defaultOpen={!!defaultObjective}>
         <PostForm
-          defaultProvince={party.province}
-          defaultDistrict={party.district}
-          defaultType={defaultType}
-          defaultCategory={defaultCategory}
+          defaultProvince={party.region}
+          defaultDistrict={party.locality}
+          defaultObjective={defaultObjective}
         />
       </AddToggle>
 
@@ -107,17 +103,13 @@ export default async function PostsPage({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-medium">
-                    <span
-                      className={
-                        p.type === "HAVE" ? "text-green-700" : "text-blue-700"
-                      }
-                    >
-                      {p.type === "HAVE" ? "I have" : "I need"}
+                    <span className={p.type === "HAVE" ? "text-green-700" : "text-blue-700"}>
+                      {OBJECTIVES[p.objective].emoji} {OBJECTIVES[p.objective].label}
                     </span>{" "}
                     · {p.title}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {CATEGORY_LABEL[p.category]} · {p.district}, {p.province}
+                    {CATEGORY_LABEL[p.category]} · {p.locality}, {p.region}
                     {p.destinationDistrict &&
                       p.destinationProvince &&
                       ` → ${p.destinationDistrict}, ${p.destinationProvince}`}

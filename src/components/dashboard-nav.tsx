@@ -10,11 +10,11 @@ type NavItem = { href: string; label: string; icon: string };
 // category icons elsewhere in the app.
 function navItems(hasFarm: boolean): NavItem[] {
   return [
-    { href: "/dashboard", label: "Home", icon: "🏠" },
+    { href: "/dashboard", label: "Today", icon: "🏠" },
+    { href: "/dashboard/opportunities", label: "Work", icon: "🤝" },
     ...(hasFarm ? [{ href: "/dashboard/farm", label: "Farm", icon: "🌾" }] : []),
-    { href: "/dashboard/directory", label: "Directory", icon: "📇" },
-    { href: "/dashboard/posts", label: "Posts", icon: "📮" },
-    { href: "/dashboard/opportunities", label: "Opportunities", icon: "🤝" },
+    { href: "/dashboard/market", label: "Market", icon: "📈" },
+    { href: "/dashboard/directory", label: "Network", icon: "📇" },
   ];
 }
 

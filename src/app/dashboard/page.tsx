@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
-import { summarizeReputation } from "@/lib/reputation";
-import { resolveMatchSides } from "@/lib/match-view";
-import { categoryEmoji } from "@/lib/categories";
-import { Badge } from "@/components/badge";
-import type { Post, Party } from "@/generated/prisma/client";
+import { getBriefing } from "@/lib/briefing";
+import { briefingEmptyState, type BriefingItem } from "@/lib/briefing-core";
+import { OBJECTIVES } from "@/lib/objectives";
+import type { Objective } from "@/generated/prisma/enums";
 
 function greeting() {
   const hour = Number(
@@ -21,6 +19,11 @@ function greeting() {
   return "Good evening";
 }
 
+// Deliberately not a dashboard of counts. "3 active listings" is a number
+// the user has to interpret; a briefing is a ranked list of things that
+// need them, each already explaining why it's there. The question this page
+// answers is "how is my business doing today, and what should I do next" —
+// so everything on it is either an action or the reason for one.
 export default async function DashboardPage() {
   const party = await getCurrentParty();
   if (!party) return null;
@@ -29,197 +32,115 @@ export default async function DashboardPage() {
     await ensureHarvestDrafts(party.farm.id, party);
   }
 
-  // Captured before we stamp "now" below, so this render still shows what's
-  // new since the *previous* visit rather than immediately zeroing itself out.
-  const since = party.opportunitiesLastSeenAt;
+  const briefing = await getBriefing(party);
 
-  const [openPostCount, opportunityCount, newSinceLastVisit, draftCount, topMatches, topProduce] =
-    await Promise.all([
-      prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
-      prisma.match.count({
-        where: {
-          status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
-        },
-      }),
-      prisma.match.count({
-        where: {
-          status: "SUGGESTED",
-          createdAt: since ? { gt: since } : undefined,
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
-        },
-      }),
-      party.farm
-        ? prisma.post.count({ where: { partyId: party.id, status: "DRAFT" } })
-        : Promise.resolve(0),
-      prisma.match.findMany({
-        where: {
-          status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
-        },
-        include: {
-          postA: { include: { party: true } },
-          postB: { include: { party: true } },
-        },
-        orderBy: { score: "desc" },
-        take: 3,
-      }),
-      party.farm
-        ? prisma.produceStock.findFirst({
-            where: { farmId: party.farm.id, quantity: { gt: 0 } },
-            orderBy: { quantity: "desc" },
-          })
-        : Promise.resolve(null),
-    ]);
-
-  await prisma.party.update({
-    where: { id: party.id },
-    data: { opportunitiesLastSeenAt: new Date() },
-  });
-
-  const reputation = summarizeReputation(party.reputation);
+  // The top few are the briefing proper; the rest is available but folded
+  // away, because a list long enough to scroll is a list nobody triages.
+  const headline = briefing.items.slice(0, 6);
+  const rest = briefing.items.slice(6);
+  const empty = briefingEmptyState(briefing.hasPosts);
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">
-          {greeting()}, {party.name.split(" ")[0]} 👋
+          {greeting()}, {party.name.split(" ")[0]}
         </h1>
         <p className="text-sm text-gray-500">
-          {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
+          {party.farm ? party.farm.farmName : `${party.locality}, ${party.region}`}
+          {headline.length > 0 && ` · ${headline.length} thing${headline.length === 1 ? "" : "s"} for you today`}
         </p>
       </div>
 
-      {draftCount > 0 && (
-        <Link
-          href="/dashboard/posts"
-          className="rounded-lg border border-border bg-warning-bg p-3 text-sm font-medium text-warning-fg hover:opacity-90"
-        >
-          🌾 {draftCount} listing{draftCount === 1 ? "" : "s"} drafted from your upcoming
-          harvest — confirm to publish →
-        </Link>
+      {headline.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <p className="text-lg font-medium">{empty.headline}</p>
+          <p className="mt-1 text-sm text-gray-500">{empty.detail}</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {headline.map((item) => (
+            <BriefingCard key={item.key} item={item} />
+          ))}
+        </ul>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {topProduce && (
-          <StatLine
-            emoji={categoryEmoji("PRODUCE")}
-            text={`${topProduce.quantity} ${topProduce.unit.toLowerCase()} of ${topProduce.cropType}${
-              topProduce.perishable ? " ready" : ""
-            }`}
-          />
-        )}
-        <StatLine
-          emoji="🤝"
-          text={
-            since && newSinceLastVisit > 0
-              ? `${newSinceLastVisit} new match${newSinceLastVisit === 1 ? "" : "es"} since your last visit`
-              : opportunityCount > 0
-                ? `${opportunityCount} open match${opportunityCount === 1 ? "" : "es"}`
-                : "No new matches yet"
-          }
-        />
-        <StatLine
-          emoji="📦"
-          text={`${openPostCount} active listing${openPostCount === 1 ? "" : "s"}`}
-        />
-        <StatLine
-          emoji="⭐"
-          text={
-            reputation.hasHistory
-              ? `Reputation ${reputation.headline} · ${reputation.completedLine}`
-              : "No trade history yet"
-          }
-        />
-      </div>
+      {rest.length > 0 && (
+        <details className="rounded-xl border border-border bg-card px-4 py-3">
+          <summary className="cursor-pointer text-sm text-gray-600 select-none">
+            {rest.length} more
+          </summary>
+          <ul className="mt-3 flex flex-col gap-3">
+            {rest.map((item) => (
+              <BriefingCard key={item.key} item={item} />
+            ))}
+          </ul>
+        </details>
+      )}
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-medium">Today&rsquo;s opportunities</h2>
-          <Link href="/dashboard/opportunities" className="text-sm text-gray-500 underline">
-            See all
+          <h2 className="text-lg font-medium">Start something</h2>
+          {/* Posts have no nav entry of their own by design — the product
+              leads with objectives, not with a listings inbox — but the
+              things you already started still have to be one tap away. */}
+          <Link href="/dashboard/posts" className="text-sm text-gray-500 underline">
+            What you&rsquo;re working on
           </Link>
         </div>
-        <ul className="flex flex-col gap-2">
-          {topMatches.map((m) => {
-            const { theirs } = resolveMatchSides(m, party.id);
-            const isNew = since ? m.createdAt > since : true;
-            return (
-              <li key={m.id} className="rounded border p-3 text-sm">
-                <OpportunityLine post={theirs} isNew={isNew} />
-              </li>
-            );
-          })}
-          {topMatches.length === 0 && (
-            <li className="text-sm text-gray-400">
-              No opportunities yet — post what you have or need to get matched.
-            </li>
-          )}
-        </ul>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
-        <div className="flex flex-wrap gap-3">
-          <QuickAction
-            href="/dashboard/posts?type=HAVE&category=PRODUCE"
-            emoji={categoryEmoji("PRODUCE")}
-            label="Sell produce"
-          />
-          <QuickAction
-            href="/dashboard/posts?type=NEED&category=TRANSPORT"
-            emoji={categoryEmoji("TRANSPORT")}
-            label="Need transport"
-          />
-          <QuickAction
-            href="/dashboard/posts?type=NEED&category=EQUIPMENT"
-            emoji={categoryEmoji("EQUIPMENT")}
-            label="Borrow equipment"
-          />
-          <QuickAction
-            href="/dashboard/posts?type=NEED&category=INPUTS"
-            emoji={categoryEmoji("INPUTS")}
-            label="Need supplies"
-          />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StartAction objective="SELL" />
+          <StartAction objective="TRANSPORT_NEED" />
+          <StartAction objective="NEED_REPAIR" />
+          <StartAction objective="HIRE_LABOR" />
         </div>
       </div>
     </div>
   );
 }
 
-function StatLine({ emoji, text }: { emoji: string; text: string }) {
+// Colour carries the kind so the eye can sort the list before reading it:
+// red is a deadline, amber is somebody waiting, neutral is a suggestion.
+const TONE: Record<BriefingItem["kind"], string> = {
+  time_critical: "border-l-4 border-l-red-500",
+  waiting_on_you: "border-l-4 border-l-amber-500",
+  maintenance: "border-l-4 border-l-orange-400",
+  anticipation: "border-l-4 border-l-violet-400",
+  opportunity: "border-l-4 border-l-accent",
+  signal: "border-l-4 border-l-sky-400",
+};
+
+function BriefingCard({ item }: { item: BriefingItem }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-new-bg text-lg">
-        {emoji}
-      </span>
-      <span className="text-right text-sm">{text}</span>
-    </div>
+    <li className={`rounded-xl border border-border bg-card p-4 ${TONE[item.kind]}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-medium">
+            <span className="mr-2">{item.emoji}</span>
+            {item.headline}
+          </p>
+          {item.detail && <p className="mt-1 text-sm text-gray-500">{item.detail}</p>}
+        </div>
+        <Link
+          href={item.href}
+          className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+        >
+          {item.actionLabel}
+        </Link>
+      </div>
+    </li>
   );
 }
 
-function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew: boolean }) {
-  return (
-    <span>
-      {categoryEmoji(post.category)} {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
-      {post.title}
-      {isNew && (
-        <Badge tone="success" className="ml-2">
-          New
-        </Badge>
-      )}
-    </span>
-  );
-}
-
-function QuickAction({ href, emoji, label }: { href: string; emoji: string; label: string }) {
+function StartAction({ objective }: { objective: Objective }) {
+  const spec = OBJECTIVES[objective];
   return (
     <Link
-      href={href}
-      className="flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+      href={`/dashboard/posts?objective=${objective}`}
+      className="flex flex-col gap-1 rounded-xl border border-border bg-card p-3 text-sm hover:border-accent hover:bg-new-bg"
     >
-      <span>{emoji}</span>
-      {label}
+      <span className="text-xl">{spec.emoji}</span>
+      <span className="font-medium">{spec.label}</span>
     </Link>
   );
 }

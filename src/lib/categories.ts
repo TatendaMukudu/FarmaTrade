@@ -12,6 +12,10 @@ export const CATEGORY_EMOJI: Record<PostCategory, string> = {
   EQUIPMENT: "🚜",
   TRANSPORT: "🚛",
   INPUTS: "🛒",
+  LABOR: "👷",
+  STORAGE: "🏬",
+  FINANCE: "🏦",
+  SERVICES: "🛠️",
 };
 
 export const CATEGORY_LABEL: Record<PostCategory, string> = {
@@ -20,6 +24,10 @@ export const CATEGORY_LABEL: Record<PostCategory, string> = {
   EQUIPMENT: "Equipment",
   TRANSPORT: "Transport",
   INPUTS: "Seed, fertilizer & supplies",
+  LABOR: "Labour",
+  STORAGE: "Storage & cold chain",
+  FINANCE: "Finance & insurance",
+  SERVICES: "Repairs & services",
 };
 
 export function categoryEmoji(category: PostCategory): string {

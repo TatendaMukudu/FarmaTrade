@@ -55,7 +55,7 @@ export function isPartyInMatch(
   return match.postA.partyId === partyId || match.postB.partyId === partyId;
 }
 
-// district match beats province match beats "just the province name" — a
+// locality match beats region match beats "just the region name" — a
 // deterministic proxy for physical distance until Party carries real
 // coordinates worth ranking on.
 export function distanceLabel(
@@ -64,18 +64,24 @@ export function distanceLabel(
   myDistrict: string,
   myProvince: string,
 ): string {
-  if (theirDistrict === myDistrict) return "Same district";
-  if (theirProvince === myProvince) return "Same province";
+  if (theirDistrict === myDistrict) return "Same locality";
+  if (theirProvince === myProvince) return "Same region";
   return theirProvince;
 }
 
 // Decimal (Prisma) askingPrice × quantity when both are present, else just
-// the price, else nothing worth showing.
+// the price, else nothing worth showing. Returns the currency alongside
+// the amount — every post carries its own (defaulting to USD), so a
+// display that only ever showed a bare "$" was silently assuming every
+// price was USD in a market that also runs on ZiG and, in border trade,
+// ZAR.
 export function estimatedPostValue(post: {
   askingPrice: unknown;
   quantity: number | null;
-}): number | null {
+  currency: string;
+}): { amount: number; currency: string } | null {
   if (post.askingPrice == null) return null;
   const price = Number(post.askingPrice);
-  return post.quantity != null ? price * post.quantity : price;
+  const amount = post.quantity != null ? price * post.quantity : price;
+  return { amount, currency: post.currency };
 }

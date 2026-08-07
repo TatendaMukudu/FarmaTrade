@@ -5,7 +5,9 @@
 // these only to set up the surrounding state that action expects to exist.
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
-import type { PartyRole } from "@/generated/prisma/client";
+import { objectiveSpec } from "@/lib/objectives";
+import { regionPoint, DEFAULT_COUNTRY } from "@/lib/countries";
+import type { Capability, Objective, PostCategory, MemoryKind } from "@/generated/prisma/client";
 
 let counter = 0;
 function unique(prefix: string) {
@@ -15,10 +17,12 @@ function unique(prefix: string) {
 
 export async function createTestParty(
   opts: {
-    roles?: PartyRole[];
-    province?: string;
-    district?: string;
+    capabilities?: Capability[];
+    countryCode?: string;
+    region?: string;
+    locality?: string;
     password?: string;
+    operatingRadiusKm?: number;
   } = {},
 ) {
   const email = `${unique("test")}@example.test`;
@@ -34,35 +38,84 @@ export async function createTestParty(
     data: {
       userId: user.id,
       name: user.name,
-      roles: opts.roles ?? ["TRADER"],
-      province: opts.province ?? "Harare",
-      district: opts.district ?? "Harare",
+      capabilities: opts.capabilities ?? ["BUYER", "SUPPLIER"],
+      countryCode: opts.countryCode ?? DEFAULT_COUNTRY,
+      region: opts.region ?? "Harare",
+      locality: opts.locality ?? "Harare",
+      operatingRadiusKm: opts.operatingRadiusKm,
+      // Placed from the region centroid, exactly as signup does — a fixture
+      // that skipped this would only ever exercise the unplaced fallback.
+      ...(() => {
+        const point = regionPoint(opts.countryCode ?? DEFAULT_COUNTRY, opts.region ?? "Harare");
+        return { latitude: point?.latitude, longitude: point?.longitude };
+      })(),
     },
   });
   await prisma.reputation.create({ data: { partyId: party.id } });
   return { user, party, email, password };
 }
 
+// `objective` is the real input; `type` is derived from it so a fixture can
+// never declare a combination the app itself can't produce (a SELL post
+// that claims to be a NEED, say), which would make a matching test pass
+// against data the composer would never create.
 export async function createTestPost(
   partyId: string,
   overrides: Partial<{
-    type: "HAVE" | "NEED";
-    category: "PRODUCE" | "LIVESTOCK" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
+    objective: Objective;
+    category: PostCategory;
     title: string;
-    province: string;
-    district: string;
+    countryCode: string;
+    region: string;
+    locality: string;
     status: "OPEN" | "DRAFT" | "CLOSED";
+    urgent: boolean;
+    quantity: number;
   }> = {},
 ) {
+  const objective = overrides.objective ?? "SELL";
   return prisma.post.create({
     data: {
       partyId,
-      type: overrides.type ?? "HAVE",
+      objective,
+      type: objectiveSpec(objective).type,
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
-      province: overrides.province ?? "Harare",
-      district: overrides.district ?? "Harare",
+      countryCode: overrides.countryCode ?? DEFAULT_COUNTRY,
+      region: overrides.region ?? "Harare",
+      locality: overrides.locality ?? "Harare",
+      ...(() => {
+        const point = regionPoint(
+          overrides.countryCode ?? DEFAULT_COUNTRY,
+          overrides.region ?? "Harare",
+        );
+        return { latitude: point?.latitude, longitude: point?.longitude };
+      })(),
       status: overrides.status ?? "OPEN",
+      urgent: overrides.urgent ?? false,
+      quantity: overrides.quantity,
+    },
+  });
+}
+
+export async function createTestMemoryEvent(
+  partyId: string,
+  event: {
+    kind: MemoryKind;
+    subject: string;
+    occurredAt: Date;
+    counterpartyId?: string;
+    category?: PostCategory;
+  },
+) {
+  return prisma.memoryEvent.create({
+    data: {
+      partyId,
+      kind: event.kind,
+      subject: event.subject,
+      occurredAt: event.occurredAt,
+      counterpartyId: event.counterpartyId ?? null,
+      category: event.category ?? null,
     },
   });
 }
@@ -71,6 +124,10 @@ export async function createTestMatch(postAId: string, postBId: string, status: 
   return prisma.match.create({
     data: { postAId, postBId, score: 80, reasons: ["test fixture"], status },
   });
+}
+
+export async function createTestPhoto(postId: string, storageKey: string, mimeType = "image/jpeg") {
+  return prisma.photo.create({ data: { postId, storageKey, mimeType } });
 }
 
 // Deletes everything hanging off a set of test parties, in FK-safe order.
@@ -101,6 +158,22 @@ export async function cleanupParties(partyIds: string[]) {
   await prisma.post.deleteMany({ where: { partyId: { in: partyIds } } });
   await prisma.relation.deleteMany({ where: { OR: [{ partyAId: { in: partyIds } }, { partyBId: { in: partyIds } }] } });
   await prisma.reputation.deleteMany({ where: { partyId: { in: partyIds } } });
+
+  // Farm and its inventory. Posts are already gone above, which matters:
+  // Post.produceId/livestockId/equipmentId reference these rows, so the
+  // farm can only be torn down once nothing points into it.
+  const farms = await prisma.farm.findMany({
+    where: { partyId: { in: partyIds } },
+    select: { id: true },
+  });
+  const farmIds = farms.map((f) => f.id);
+  if (farmIds.length) {
+    await prisma.produceStock.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.livestock.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.equipment.deleteMany({ where: { farmId: { in: farmIds } } });
+    await prisma.farm.deleteMany({ where: { id: { in: farmIds } } });
+  }
+  await prisma.transportProfile.deleteMany({ where: { partyId: { in: partyIds } } });
   const parties = await prisma.party.findMany({ where: { id: { in: partyIds } }, select: { id: true, userId: true } });
   const userIds = parties.map((p) => p.userId).filter((id): id is string => id !== null);
   await prisma.party.deleteMany({ where: { id: { in: partyIds } } });

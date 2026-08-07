@@ -4,19 +4,37 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { signupAction, type SignupState } from "./actions";
 import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { CAPABILITY_LABEL, CAPABILITY_EMOJI } from "@/lib/capabilities";
+import type { Capability } from "@/generated/prisma/enums";
 
 const initialState: SignupState = {};
+
+// The capabilities worth offering at signup. Not all seventeen: a
+// registration form is the worst possible place to make someone read a
+// taxonomy, and the rest can be added from Settings once they're in.
+const SIGNUP_CAPABILITIES: Capability[] = [
+  "FARMER",
+  "BUYER",
+  "SUPPLIER",
+  "TRANSPORTER",
+  "MECHANIC",
+  "LABOR_PROVIDER",
+  "COLD_STORAGE",
+  "VETERINARIAN",
+];
 
 export default function SignupPage() {
   const [state, formAction, pending] = useActionState(
     signupAction,
     initialState,
   );
-  const [roles, setRoles] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<string[]>([]);
 
-  function toggleRole(role: string) {
-    setRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+  function toggleCapability(capability: string) {
+    setCapabilities((prev) =>
+      prev.includes(capability)
+        ? prev.filter((c) => c !== capability)
+        : [...prev, capability],
     );
   }
 
@@ -37,18 +55,18 @@ export default function SignupPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="province">
-              Province
+            <label className="text-sm font-medium" htmlFor="region">
+              Region
             </label>
             <select
-              id="province"
-              name="province"
+              id="region"
+              name="region"
               required
               className="rounded border px-3 py-2 text-sm"
               defaultValue=""
             >
               <option value="" disabled>
-                Select province
+                Select region
               </option>
               {ZIMBABWE_PROVINCES.map((p) => (
                 <option key={p} value={p}>
@@ -57,34 +75,31 @@ export default function SignupPage() {
               ))}
             </select>
           </div>
-          <Field label="District" name="district" required />
+          <Field label="Locality" name="locality" required />
         </div>
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium">
-            What are you registering as? (pick at least one)
+            What do you do? (pick everything that applies)
           </legend>
-          <RoleCheckbox
-            label="Farm owner"
-            value="FARM"
-            checked={roles.includes("FARM")}
-            onChange={() => toggleRole("FARM")}
-          />
-          <RoleCheckbox
-            label="Trader (buyer/seller)"
-            value="TRADER"
-            checked={roles.includes("TRADER")}
-            onChange={() => toggleRole("TRADER")}
-          />
-          <RoleCheckbox
-            label="Transport provider"
-            value="TRANSPORTER"
-            checked={roles.includes("TRANSPORTER")}
-            onChange={() => toggleRole("TRANSPORTER")}
-          />
+          <p className="text-xs text-gray-500">
+            Most people do more than one. Each one you pick is work FarmaTrade
+            can bring you.
+          </p>
+          <div className="mt-1 grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {SIGNUP_CAPABILITIES.map((c) => (
+              <CapabilityCheckbox
+                key={c}
+                label={`${CAPABILITY_EMOJI[c]} ${CAPABILITY_LABEL[c]}`}
+                value={c}
+                checked={capabilities.includes(c)}
+                onChange={() => toggleCapability(c)}
+              />
+            ))}
+          </div>
         </fieldset>
 
-        {roles.includes("FARM") && (
+        {capabilities.includes("FARMER") && (
           <div className="flex flex-col gap-4 rounded border border-dashed p-4">
             <Field label="Farm name" name="farmName" required />
             <Field
@@ -96,7 +111,7 @@ export default function SignupPage() {
           </div>
         )}
 
-        {roles.includes("TRANSPORTER") && (
+        {capabilities.includes("TRANSPORTER") && (
           <div className="flex flex-col gap-4 rounded border border-dashed p-4">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium" htmlFor="vehicleType">
@@ -184,7 +199,7 @@ function Field({
   );
 }
 
-function RoleCheckbox({
+function CapabilityCheckbox({
   label,
   value,
   checked,
@@ -199,7 +214,7 @@ function RoleCheckbox({
     <label className="flex items-center gap-2 text-sm">
       <input
         type="checkbox"
-        name="roles"
+        name="capabilities"
         value={value}
         checked={checked}
         onChange={onChange}

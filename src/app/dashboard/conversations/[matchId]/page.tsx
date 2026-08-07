@@ -45,8 +45,8 @@ export default async function ConversationPage({
   const needPost = match.postA.type === "NEED" ? match.postA : match.postB;
   if (match.status === "ACCEPTED" && match.postA.category !== "TRANSPORT") {
     transporters = await findTransportersForRoute(
-      { province: havePost.province, district: havePost.district },
-      { province: needPost.province, district: needPost.district },
+      { region: havePost.region, locality: havePost.locality },
+      { region: needPost.region, locality: needPost.locality },
     );
   }
 
@@ -130,11 +130,11 @@ export default async function ConversationPage({
           <p className="text-sm font-medium">Need transport for this?</p>
           <p className="text-xs text-gray-500">
             These transporters&apos; routes cover{" "}
-            {havePost.district === needPost.district
-              ? havePost.district
-              : havePost.province === needPost.province
-                ? `${havePost.district} → ${needPost.district}`
-                : `${havePost.province} → ${needPost.province}`}
+            {havePost.locality === needPost.locality
+              ? havePost.locality
+              : havePost.region === needPost.region
+                ? `${havePost.locality} → ${needPost.locality}`
+                : `${havePost.region} → ${needPost.region}`}
             .
           </p>
           <ul className="flex flex-col gap-2">
@@ -153,7 +153,7 @@ export default async function ConversationPage({
                       {t.party.name}
                     </Link>
                     <p className="text-xs text-gray-500">
-                      {t.province}
+                      {t.region}
                       {t.destinationProvince ? ` → ${t.destinationProvince}` : ""}
                     </p>
                   </div>
@@ -179,7 +179,11 @@ export default async function ConversationPage({
               {theirs.party.name} to confirm their side.
             </p>
           ) : (
-            <ConfirmForm matchId={match.id} counterpartyName={theirs.party.name} />
+            <ConfirmForm
+              matchId={match.id}
+              counterpartyName={theirs.party.name}
+              counterpartyWasSupplier={theirs.type === "HAVE"}
+            />
           )}
         </div>
       )}

@@ -3,6 +3,12 @@
 import { useActionState } from "react";
 import { updateProfile, type ProfileActionState } from "./actions";
 import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import {
+  ALL_CAPABILITIES,
+  CAPABILITY_LABEL,
+  CAPABILITY_EMOJI,
+  COMMON_LANGUAGES,
+} from "@/lib/capabilities";
 import type { getCurrentParty } from "@/lib/auth";
 
 const initialState: ProfileActionState = {};
@@ -36,14 +42,14 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium" htmlFor="province">
-            Province
+          <label className="text-sm font-medium" htmlFor="region">
+            Region
           </label>
           <select
-            id="province"
-            name="province"
+            id="region"
+            name="region"
             required
-            defaultValue={party.province}
+            defaultValue={party.region}
             className="rounded-lg border border-border px-3 py-2 text-sm"
           >
             {ZIMBABWE_PROVINCES.map((p) => (
@@ -53,8 +59,88 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
             ))}
           </select>
         </div>
-        <Field label="District" name="district" defaultValue={party.district} required />
+        <Field label="Locality" name="locality" defaultValue={party.locality} required />
       </div>
+
+      {/* The operating profile. This is the difference between "my account"
+          and "my agricultural business" — and every field here directly
+          improves what the Opportunity engine can route to this party. */}
+      <fieldset className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <legend className="px-1 text-sm font-medium">What you do</legend>
+        <p className="text-xs text-gray-500">
+          Everything you tick is work FarmaTrade can bring you. Most businesses
+          do more than one thing.
+        </p>
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {ALL_CAPABILITIES.map((c) => (
+            <label key={c} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="capabilities"
+                value={c}
+                defaultChecked={party.capabilities.includes(c)}
+              />
+              {CAPABILITY_EMOJI[c]} {CAPABILITY_LABEL[c]}
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-4">
+          <Field
+            label="How far will you travel? (km)"
+            name="operatingRadiusKm"
+            type="number"
+            defaultValue={party.operatingRadiusKm?.toString() ?? ""}
+          />
+          <Field
+            label="Years in business (optional)"
+            name="yearsExperience"
+            type="number"
+            defaultValue={party.yearsExperience?.toString() ?? ""}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="languages">
+            Languages you do business in (one per line)
+          </label>
+          <textarea
+            id="languages"
+            name="languages"
+            rows={2}
+            defaultValue={party.languages.join("\n")}
+            placeholder={COMMON_LANGUAGES.join("\n")}
+            className="rounded-lg border border-border px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="licenses">
+            Licences & registrations (one per line, optional)
+          </label>
+          <textarea
+            id="licenses"
+            name="licenses"
+            rows={2}
+            defaultValue={party.licenses.join("\n")}
+            placeholder={"Class 2 driver's licence\nZIMRA export permit"}
+            className="rounded-lg border border-border px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="availabilityNote">
+            When you&rsquo;re available (optional)
+          </label>
+          <input
+            id="availabilityNote"
+            name="availabilityNote"
+            defaultValue={party.availabilityNote ?? ""}
+            placeholder="e.g. Mon–Sat 6am–6pm, harvest season only"
+            className="rounded-lg border border-border px-3 py-2 text-sm"
+          />
+        </div>
+      </fieldset>
 
       {party.farm && (
         <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">

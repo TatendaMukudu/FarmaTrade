@@ -27,6 +27,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const { signupAction } = await import("./actions");
 const { prisma } = await import("@/lib/prisma");
+const { resetRateLimit } = await import("@/lib/rate-limit");
 
 function formData(fields: Record<string, string | string[]>) {
   const fd = new FormData();
@@ -73,16 +74,16 @@ describe("signupAction", () => {
       name: "Tendai Farmer",
       email,
       password: "password123",
-      province: "Mashonaland East",
-      district: "Marondera",
-      roles: ["TRADER"],
+      region: "Mashonaland East",
+      locality: "Marondera",
+      capabilities: ["BUYER"],
     });
 
     await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
 
     const user = await prisma.user.findUnique({ where: { email }, include: { party: { include: { reputation: true } } } });
     expect(user).not.toBeNull();
-    expect(user!.party?.roles).toEqual(["TRADER"]);
+    expect(user!.party?.capabilities).toEqual(["BUYER"]);
     expect(user!.party?.reputation).not.toBeNull();
   });
 
@@ -94,9 +95,9 @@ describe("signupAction", () => {
       name: "Farm Owner",
       email,
       password: "password123",
-      province: "Mashonaland East",
-      district: "Marondera",
-      roles: ["FARM"],
+      region: "Mashonaland East",
+      locality: "Marondera",
+      capabilities: ["FARMER"],
       farmName: "Green Acres",
     });
 
@@ -114,9 +115,9 @@ describe("signupAction", () => {
       name: "Cookie Check",
       email,
       password: "password123",
-      province: "Harare",
-      district: "Harare",
-      roles: ["TRADER"],
+      region: "Harare",
+      locality: "Harare",
+      capabilities: ["BUYER"],
     });
 
     await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
@@ -132,9 +133,9 @@ describe("signupAction", () => {
         name: "Dup Test",
         email,
         password: "password123",
-        province: "Harare",
-        district: "Harare",
-        roles: ["TRADER"],
+        region: "Harare",
+        locality: "Harare",
+        capabilities: ["BUYER"],
       });
 
     await expect(signupAction({}, fd())).rejects.toThrow(RedirectSignal);
@@ -152,9 +153,9 @@ describe("signupAction", () => {
       name: "",
       email,
       password: "short",
-      province: "Harare",
-      district: "Harare",
-      roles: ["TRADER"],
+      region: "Harare",
+      locality: "Harare",
+      capabilities: ["BUYER"],
     });
 
     const result = await signupAction({}, fd);
@@ -165,7 +166,13 @@ describe("signupAction", () => {
   });
 
   it("rate-limits repeated signups from the same IP", async () => {
-    fakeRequestHeaders.set("x-forwarded-for", "203.0.113.7");
+    // The limiter now lives in Postgres and survives both restarts and
+    // test runs — which is the whole point of the change, but means this
+    // test has to start from a known count rather than assuming a fresh
+    // process gave it one. A unique IP per run keeps the runs independent.
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 20}`;
+    fakeRequestHeaders.set("x-forwarded-for", ip);
+    await resetRateLimit(`signup:${ip}`);
 
     for (let i = 0; i < 20; i++) {
       const email = uniqueEmail();
@@ -174,9 +181,9 @@ describe("signupAction", () => {
         name: "Rate Test",
         email,
         password: "password123",
-        province: "Harare",
-        district: "Harare",
-        roles: ["TRADER"],
+        region: "Harare",
+        locality: "Harare",
+        capabilities: ["BUYER"],
       });
       await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
     }
@@ -186,9 +193,9 @@ describe("signupAction", () => {
       name: "Rate Test Overflow",
       email,
       password: "password123",
-      province: "Harare",
-      district: "Harare",
-      roles: ["TRADER"],
+      region: "Harare",
+      locality: "Harare",
+      capabilities: ["BUYER"],
     });
     const result = await signupAction({}, fd);
     expect(result.error).toMatch(/too many signups/i);

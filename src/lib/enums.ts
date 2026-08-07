@@ -3,7 +3,6 @@
 // drift from the schema); only the human-readable label is hand-written
 // here, once, instead of being re-typed at every call site.
 import {
-  PartyRole,
   LivestockSpecies,
   LivestockSex,
   ProduceUnit,
@@ -11,7 +10,9 @@ import {
   VehicleType,
 } from "@/generated/prisma/enums";
 
-export const PARTY_ROLES = Object.values(PartyRole);
+// Party capabilities live in capabilities.ts rather than here: unlike these
+// enums, they carry behaviour (which objectives each one can serve), and
+// splitting the labels from that routing table would invite drift.
 
 export const LIVESTOCK_SPECIES = Object.values(LivestockSpecies);
 export const LIVESTOCK_SPECIES_LABEL: Record<LivestockSpecies, string> = {

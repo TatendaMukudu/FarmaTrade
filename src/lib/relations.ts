@@ -1,13 +1,19 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 
 // Recomputed from Match history rather than incremented in place, same
 // discipline as recomputeReputation — a repeat-trading-pair signal that's
 // an emergent view over the graph, not a separately tracked counter.
-export async function recomputeRelation(partyId1: string, partyId2: string) {
+//
+// Optional transaction client, same reasoning as recomputeReputation: the
+// caller that just flipped a Match to COMPLETED wants this recomputed
+// against that same transaction's view, not a separate round trip that
+// could race with a concurrent confirmation.
+export async function recomputeRelation(partyId1: string, partyId2: string, db: Prisma.TransactionClient = prisma) {
   const [partyAId, partyBId] = [partyId1, partyId2].sort();
 
-  const completedCount = await prisma.match.count({
+  const completedCount = await db.match.count({
     where: {
       status: "COMPLETED",
       OR: [
@@ -19,7 +25,7 @@ export async function recomputeRelation(partyId1: string, partyId2: string) {
 
   if (completedCount === 0) return;
 
-  await prisma.relation.upsert({
+  await db.relation.upsert({
     where: {
       partyAId_partyBId_kind: { partyAId, partyBId, kind: "PREFERRED_PARTNER" },
     },
