@@ -42,14 +42,14 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium" htmlFor="province">
-            Province
+          <label className="text-sm font-medium" htmlFor="region">
+            Region
           </label>
           <select
-            id="province"
-            name="province"
+            id="region"
+            name="region"
             required
-            defaultValue={party.province}
+            defaultValue={party.region}
             className="rounded-lg border border-border px-3 py-2 text-sm"
           >
             {ZIMBABWE_PROVINCES.map((p) => (
@@ -59,7 +59,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
             ))}
           </select>
         </div>
-        <Field label="District" name="district" defaultValue={party.district} required />
+        <Field label="Locality" name="locality" defaultValue={party.locality} required />
       </div>
 
       {/* The operating profile. This is the difference between "my account"

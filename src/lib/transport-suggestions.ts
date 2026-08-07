@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
-export type RouteEnd = { province: string; district: string };
+export type RouteEnd = { region: string; locality: string };
 
 const MAX_SUGGESTIONS = 5;
 
@@ -28,8 +28,8 @@ export async function findTransportersForRoute(origin: RouteEnd, destination: Ro
       type: "HAVE",
       category: "TRANSPORT",
       status: "OPEN",
-      province: origin.province,
-      OR: [{ destinationProvince: null }, { destinationProvince: destination.province }],
+      region: origin.region,
+      OR: [{ destinationProvince: null }, { destinationProvince: destination.region }],
     },
     include: { party: { include: { reputation: true } } },
     orderBy: { createdAt: "desc" },

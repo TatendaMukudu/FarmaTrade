@@ -47,7 +47,7 @@ export default async function DashboardPage() {
           {greeting()}, {party.name.split(" ")[0]}
         </h1>
         <p className="text-sm text-gray-500">
-          {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
+          {party.farm ? party.farm.farmName : `${party.locality}, ${party.region}`}
           {headline.length > 0 && ` · ${headline.length} thing${headline.length === 1 ? "" : "s"} for you today`}
         </p>
       </div>

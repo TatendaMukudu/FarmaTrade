@@ -17,7 +17,7 @@ export type Briefing = {
 
 export async function getBriefing(party: {
   id: string;
-  province: string;
+  region: string;
 }): Promise<Briefing> {
   const [
     draftCount,

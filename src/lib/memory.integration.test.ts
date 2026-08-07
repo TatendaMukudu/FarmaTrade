@@ -36,8 +36,8 @@ async function loginAs(userId: string) {
 }
 
 async function setUpAcceptedTrade() {
-  const seller = await createTestParty({ province: "Harare", district: "Harare" });
-  const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+  const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+  const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
   const have = await createTestPost(seller.party.id, {
     objective: "SELL",
     category: "PRODUCE",
@@ -91,8 +91,8 @@ describe("operational memory from completed trades", () => {
   });
 
   it("records a rental as a rental, not a sale", async () => {
-    const owner = await createTestParty({ province: "Harare", district: "Harare" });
-    const renter = await createTestParty({ province: "Harare", district: "Harare" });
+    const owner = await createTestParty({ region: "Harare", locality: "Harare" });
+    const renter = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(owner.party.id, renter.party.id);
 
     const offer = await createTestPost(owner.party.id, {
@@ -185,8 +185,8 @@ describe("multidimensional trust aggregation", () => {
   });
 
   it("counts a counterparty as a repeat partner only after a second completed trade", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     async function completeOneTrade() {

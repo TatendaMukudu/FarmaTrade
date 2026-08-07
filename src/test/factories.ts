@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { objectiveSpec } from "@/lib/objectives";
+import { regionPoint, DEFAULT_COUNTRY } from "@/lib/countries";
 import type { Capability, Objective, PostCategory, MemoryKind } from "@/generated/prisma/client";
 
 let counter = 0;
@@ -17,9 +18,11 @@ function unique(prefix: string) {
 export async function createTestParty(
   opts: {
     capabilities?: Capability[];
-    province?: string;
-    district?: string;
+    countryCode?: string;
+    region?: string;
+    locality?: string;
     password?: string;
+    operatingRadiusKm?: number;
   } = {},
 ) {
   const email = `${unique("test")}@example.test`;
@@ -36,8 +39,16 @@ export async function createTestParty(
       userId: user.id,
       name: user.name,
       capabilities: opts.capabilities ?? ["BUYER", "SUPPLIER"],
-      province: opts.province ?? "Harare",
-      district: opts.district ?? "Harare",
+      countryCode: opts.countryCode ?? DEFAULT_COUNTRY,
+      region: opts.region ?? "Harare",
+      locality: opts.locality ?? "Harare",
+      operatingRadiusKm: opts.operatingRadiusKm,
+      // Placed from the region centroid, exactly as signup does — a fixture
+      // that skipped this would only ever exercise the unplaced fallback.
+      ...(() => {
+        const point = regionPoint(opts.countryCode ?? DEFAULT_COUNTRY, opts.region ?? "Harare");
+        return { latitude: point?.latitude, longitude: point?.longitude };
+      })(),
     },
   });
   await prisma.reputation.create({ data: { partyId: party.id } });
@@ -54,8 +65,9 @@ export async function createTestPost(
     objective: Objective;
     category: PostCategory;
     title: string;
-    province: string;
-    district: string;
+    countryCode: string;
+    region: string;
+    locality: string;
     status: "OPEN" | "DRAFT" | "CLOSED";
     urgent: boolean;
     quantity: number;
@@ -69,8 +81,16 @@ export async function createTestPost(
       type: objectiveSpec(objective).type,
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
-      province: overrides.province ?? "Harare",
-      district: overrides.district ?? "Harare",
+      countryCode: overrides.countryCode ?? DEFAULT_COUNTRY,
+      region: overrides.region ?? "Harare",
+      locality: overrides.locality ?? "Harare",
+      ...(() => {
+        const point = regionPoint(
+          overrides.countryCode ?? DEFAULT_COUNTRY,
+          overrides.region ?? "Harare",
+        );
+        return { latitude: point?.latitude, longitude: point?.longitude };
+      })(),
       status: overrides.status ?? "OPEN",
       urgent: overrides.urgent ?? false,
       quantity: overrides.quantity,

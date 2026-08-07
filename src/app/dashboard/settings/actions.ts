@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { profileSchema } from "@/lib/validation";
+import { regionPoint } from "@/lib/countries";
 import type { VehicleType, Capability } from "@/generated/prisma/client";
 
 // Freeform multi-line fields (languages, licences) arrive as one textarea
@@ -30,8 +31,8 @@ export async function updateProfile(
     name: formData.get("name"),
     phone: formData.get("phone") || undefined,
     contactDetails: formData.get("contactDetails") || undefined,
-    province: formData.get("province"),
-    district: formData.get("district"),
+    region: formData.get("region"),
+    locality: formData.get("locality"),
     capabilities: formData.getAll("capabilities"),
     operatingRadiusKm: formData.get("operatingRadiusKm") || undefined,
     languages: lines(formData.get("languages")),
@@ -55,8 +56,14 @@ export async function updateProfile(
       name: data.name,
       phone: data.phone,
       contactDetails: data.contactDetails,
-      province: data.province,
-      district: data.district,
+      region: data.region,
+      locality: data.locality,
+      // Re-derived on every save, so moving region actually moves you on
+      // the map rather than leaving stale coordinates behind.
+      ...(() => {
+        const point = regionPoint(party.countryCode, data.region);
+        return { latitude: point?.latitude ?? null, longitude: point?.longitude ?? null };
+      })(),
       capabilities: data.capabilities as Capability[],
       operatingRadiusKm: data.operatingRadiusKm ?? null,
       languages: data.languages ?? [],

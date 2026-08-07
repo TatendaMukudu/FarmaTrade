@@ -89,8 +89,8 @@ export default async function PostsPage({
 
       <AddToggle label="Start something new" defaultOpen={!!defaultObjective}>
         <PostForm
-          defaultProvince={party.province}
-          defaultDistrict={party.district}
+          defaultProvince={party.region}
+          defaultDistrict={party.locality}
           defaultObjective={defaultObjective}
         />
       </AddToggle>
@@ -109,7 +109,7 @@ export default async function PostsPage({
                     · {p.title}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {CATEGORY_LABEL[p.category]} · {p.district}, {p.province}
+                    {CATEGORY_LABEL[p.category]} · {p.locality}, {p.region}
                     {p.destinationDistrict &&
                       p.destinationProvince &&
                       ` → ${p.destinationDistrict}, ${p.destinationProvince}`}

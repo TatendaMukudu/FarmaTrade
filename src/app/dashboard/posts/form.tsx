@@ -165,7 +165,7 @@ export function PostForm({
 
       {isTransport && (
         <div className="flex flex-wrap gap-3 rounded-lg bg-new-bg p-3">
-          <Field label="Destination province (optional)">
+          <Field label="Destination region (optional)">
             <select
               name="destinationProvince"
               defaultValue=""
@@ -179,7 +179,7 @@ export function PostForm({
               ))}
             </select>
           </Field>
-          <Field label="Destination district (optional)">
+          <Field label="Destination locality (optional)">
             <input
               name="destinationDistrict"
               placeholder="e.g. Harare"
@@ -210,9 +210,9 @@ export function PostForm({
           </Field>
 
           <div className="flex flex-wrap gap-3">
-            <Field label={isTransport ? "Starting province" : "Province"}>
+            <Field label={isTransport ? "Starting region" : "Region"}>
               <select
-                name="province"
+                name="region"
                 defaultValue={defaultProvince}
                 className="rounded-lg border border-border px-2 py-1 text-sm"
               >
@@ -223,9 +223,9 @@ export function PostForm({
                 ))}
               </select>
             </Field>
-            <Field label={isTransport ? "Starting district" : "District"}>
+            <Field label={isTransport ? "Starting locality" : "Locality"}>
               <input
-                name="district"
+                name="locality"
                 defaultValue={defaultDistrict}
                 required
                 className="rounded-lg border border-border px-2 py-1 text-sm"

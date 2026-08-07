@@ -70,7 +70,7 @@ export default async function PartyProfilePage({
             )}
           </div>
           <p className="text-sm text-gray-500">
-            {party.district}, {party.province}
+            {party.locality}, {party.region}
             {party.operatingRadiusKm ? ` · travels up to ${party.operatingRadiusKm}km` : ""}
             {party.yearsExperience ? ` · ${party.yearsExperience} years in business` : ""}
           </p>

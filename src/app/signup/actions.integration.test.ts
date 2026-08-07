@@ -74,8 +74,8 @@ describe("signupAction", () => {
       name: "Tendai Farmer",
       email,
       password: "password123",
-      province: "Mashonaland East",
-      district: "Marondera",
+      region: "Mashonaland East",
+      locality: "Marondera",
       capabilities: ["BUYER"],
     });
 
@@ -95,8 +95,8 @@ describe("signupAction", () => {
       name: "Farm Owner",
       email,
       password: "password123",
-      province: "Mashonaland East",
-      district: "Marondera",
+      region: "Mashonaland East",
+      locality: "Marondera",
       capabilities: ["FARMER"],
       farmName: "Green Acres",
     });
@@ -115,8 +115,8 @@ describe("signupAction", () => {
       name: "Cookie Check",
       email,
       password: "password123",
-      province: "Harare",
-      district: "Harare",
+      region: "Harare",
+      locality: "Harare",
       capabilities: ["BUYER"],
     });
 
@@ -133,8 +133,8 @@ describe("signupAction", () => {
         name: "Dup Test",
         email,
         password: "password123",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         capabilities: ["BUYER"],
       });
 
@@ -153,8 +153,8 @@ describe("signupAction", () => {
       name: "",
       email,
       password: "short",
-      province: "Harare",
-      district: "Harare",
+      region: "Harare",
+      locality: "Harare",
       capabilities: ["BUYER"],
     });
 
@@ -181,8 +181,8 @@ describe("signupAction", () => {
         name: "Rate Test",
         email,
         password: "password123",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         capabilities: ["BUYER"],
       });
       await expect(signupAction({}, fd)).rejects.toThrow(RedirectSignal);
@@ -193,8 +193,8 @@ describe("signupAction", () => {
       name: "Rate Test Overflow",
       email,
       password: "password123",
-      province: "Harare",
-      district: "Harare",
+      region: "Harare",
+      locality: "Harare",
       capabilities: ["BUYER"],
     });
     const result = await signupAction({}, fd);

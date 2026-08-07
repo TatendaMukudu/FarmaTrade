@@ -13,8 +13,8 @@ const baseSignup = {
   name: "Tendai",
   email: "tendai@example.com",
   password: "password123",
-  province: "Mashonaland East",
-  district: "Marondera",
+  region: "Mashonaland East",
+  locality: "Marondera",
   capabilities: ["FARMER"] as string[],
 };
 const validSignup = { ...baseSignup, farmName: "Tendai's Farm" };
@@ -88,8 +88,8 @@ describe("postSchema", () => {
     objective: "SELL",
     category: "PRODUCE",
     title: "10 tonnes of maize",
-    province: "Mashonaland East",
-    district: "Marondera",
+    region: "Mashonaland East",
+    locality: "Marondera",
   };
 
   it("accepts a minimal valid post", () => {

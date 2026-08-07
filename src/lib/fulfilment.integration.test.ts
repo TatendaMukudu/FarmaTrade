@@ -45,8 +45,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("takes the sold quantity off the farm's produce stock", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const farm = await farmFor(seller.party.id);
@@ -61,8 +61,8 @@ describe("settling the goods when a trade completes", () => {
         type: "HAVE",
         category: "PRODUCE",
         title: "3 tonnes of oranges",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         quantity: 3,
         produceId: stock.id,
       },
@@ -77,8 +77,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("takes off only what was actually sold on a partial sale", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const farm = await farmFor(seller.party.id);
@@ -93,8 +93,8 @@ describe("settling the goods when a trade completes", () => {
         type: "HAVE",
         category: "PRODUCE",
         title: "4 tonnes of maize",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         quantity: 4,
         produceId: stock.id,
       },
@@ -108,8 +108,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("closes both posts so sold goods stop matching", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const have = await createTestPost(seller.party.id, { objective: "SELL", quantity: 2 });
@@ -123,8 +123,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("leaves a standing order open — that's the whole point of the flag", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const have = await createTestPost(seller.party.id, { objective: "SELL", quantity: 2 });
@@ -135,8 +135,8 @@ describe("settling the goods when a trade completes", () => {
         type: "NEED",
         category: "PRODUCE",
         title: "Maize, every month",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         quantity: 2,
         recurring: true,
       },
@@ -150,8 +150,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("never drives stock negative when the listing overstates what's on hand", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const farm = await farmFor(seller.party.id);
@@ -165,8 +165,8 @@ describe("settling the goods when a trade completes", () => {
         type: "HAVE",
         category: "PRODUCE",
         title: "5 tonnes of oranges",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         quantity: 5,
         produceId: stock.id,
       },
@@ -180,8 +180,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("does not touch stock until both sides have confirmed", async () => {
-    const seller = await createTestParty({ province: "Harare", district: "Harare" });
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
     const farm = await farmFor(seller.party.id);
@@ -195,8 +195,8 @@ describe("settling the goods when a trade completes", () => {
         type: "HAVE",
         category: "PRODUCE",
         title: "3 tonnes of oranges",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         quantity: 3,
         produceId: stock.id,
       },
@@ -214,8 +214,8 @@ describe("settling the goods when a trade completes", () => {
   });
 
   it("marks sold equipment unavailable but leaves rented equipment on the books", async () => {
-    const owner = await createTestParty({ province: "Harare", district: "Harare" });
-    const other = await createTestParty({ province: "Harare", district: "Harare" });
+    const owner = await createTestParty({ region: "Harare", locality: "Harare" });
+    const other = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(owner.party.id, other.party.id);
 
     const farm = await farmFor(owner.party.id);
@@ -234,8 +234,8 @@ describe("settling the goods when a trade completes", () => {
           type: "HAVE",
           category: "EQUIPMENT",
           title: objective,
-          province: "Harare",
-          district: "Harare",
+          region: "Harare",
+          locality: "Harare",
           equipmentId,
         },
       });

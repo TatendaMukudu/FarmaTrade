@@ -33,8 +33,8 @@ async function loginAs(userId: string) {
 }
 
 async function setUpMatchedPair(matchStatus: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
-  const seller = await createTestParty({ province: "Harare", district: "Harare" });
-  const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+  const seller = await createTestParty({ region: "Harare", locality: "Harare" });
+  const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
   const have = await createTestPost(seller.party.id, { objective: "SELL", category: "PRODUCE" });
   const need = await createTestPost(buyer.party.id, { objective: "BUY", category: "PRODUCE" });
   const match = await createTestMatch(have.id, need.id, matchStatus);

@@ -4,7 +4,7 @@ import { deriveSignals, median, MIN_SAMPLE, type WindowCounts } from "./signals-
 function window(overrides: Partial<WindowCounts> = {}): WindowCounts {
   return {
     category: "PRODUCE",
-    province: "Manicaland",
+    region: "Manicaland",
     subject: null,
     recentDemand: 0,
     recentSupply: 0,
@@ -127,8 +127,8 @@ describe("deriveSignals — strength", () => {
 
   it("returns signals strongest first", () => {
     const signals = deriveSignals([
-      window({ province: "Harare", recentDemand: 6, recentSupply: 5, priorDemand: 5, priorSupply: 5 }),
-      window({ province: "Manicaland", recentDemand: 40, recentSupply: 2 }),
+      window({ region: "Harare", recentDemand: 6, recentSupply: 5, priorDemand: 5, priorSupply: 5 }),
+      window({ region: "Manicaland", recentDemand: 40, recentSupply: 2 }),
     ]);
     for (let i = 1; i < signals.length; i++) {
       expect(signals[i - 1].strength).toBeGreaterThanOrEqual(signals[i].strength);

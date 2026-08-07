@@ -127,7 +127,7 @@ export default async function OpportunitiesPage() {
                             )}
                           </div>
                           <p className="mt-1 font-medium">Your post: {yours.title}</p>
-                          <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
+                          <MatchCounterpart post={theirs} myDistrict={party.locality} myProvince={party.region} />
                           {m.reasons.length > 0 && (
                             <p className="mt-2 text-sm font-medium text-foreground">
                               Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
@@ -234,12 +234,12 @@ function MatchCounterpart({
       <p className="text-xs text-gray-400">
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
-        {distanceLabel(post.district, post.province, myDistrict, myProvince)}
+        {distanceLabel(post.locality, post.region, myDistrict, myProvince)}
         {estimatedValue != null &&
           ` · Est. value ${estimatedValue.currency} ${estimatedValue.amount.toLocaleString()}`}
         {post.destinationDistrict &&
           post.destinationProvince &&
-          ` · Route: ${post.district} → ${post.destinationDistrict}`}
+          ` · Route: ${post.locality} → ${post.destinationDistrict}`}
       </p>
       {/* The two trust facts most likely to decide whether this is worth a
           phone call, surfaced on the card rather than one tap away on the

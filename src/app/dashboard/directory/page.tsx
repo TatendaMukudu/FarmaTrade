@@ -109,7 +109,7 @@ export default async function DirectoryPage({
                   </div>
 
                   <p className="mt-1 text-sm text-gray-500">
-                    {p.district}, {p.province}
+                    {p.locality}, {p.region}
                     {p.operatingRadiusKm ? ` · travels ${p.operatingRadiusKm}km` : ""}
                   </p>
 

@@ -10,6 +10,7 @@ import { uploadPhoto, deletePhoto } from "@/lib/storage";
 import { detectImageFormat, ACCEPTED_IMAGE_FORMATS } from "@/lib/image-validation";
 import { logger } from "@/lib/logger";
 import { objectiveSpec } from "@/lib/objectives";
+import { regionPoint } from "@/lib/countries";
 import type { Objective, PostCategory } from "@/generated/prisma/client";
 
 export type PostActionState = { error?: string };
@@ -64,8 +65,8 @@ export async function createPost(
     description: formData.get("description") || undefined,
     quantity: formData.get("quantity") || undefined,
     unit: formData.get("unit") || undefined,
-    province: formData.get("province"),
-    district: formData.get("district"),
+    region: formData.get("region"),
+    locality: formData.get("locality"),
     askingPrice: formData.get("askingPrice") || undefined,
     currency: formData.get("currency") || undefined,
     urgent: formData.get("urgent") === "on",
@@ -97,8 +98,16 @@ export async function createPost(
       description: data.description,
       quantity: data.quantity,
       unit: data.unit,
-      province: data.province,
-      district: data.district,
+      countryCode: party.countryCode,
+      region: data.region,
+      locality: data.locality,
+      // Denormalised from the region at creation: a post's location is
+      // where the goods are, and must not move later when the party edits
+      // their own profile.
+      ...(() => {
+        const point = regionPoint(party.countryCode, data.region);
+        return { latitude: point?.latitude, longitude: point?.longitude };
+      })(),
       askingPrice: data.askingPrice,
       currency: data.currency,
       urgent: data.urgent ?? false,

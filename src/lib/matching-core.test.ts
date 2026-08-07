@@ -13,8 +13,11 @@ function post(overrides: Partial<Post> = {}): Post {
     description: null,
     quantity: 10,
     unit: "TONNE",
-    province: "Mashonaland East",
-    district: "Marondera",
+    countryCode: "ZW",
+    region: "Mashonaland East",
+    locality: "Marondera",
+    latitude: null,
+    longitude: null,
     askingPrice: null,
     currency: "USD",
     status: "OPEN",
@@ -53,8 +56,8 @@ describe("scoreMatch", () => {
     // only ever selects candidates that pair — so the fixture models a SELL
     // against a BUY rather than two posts pointing the same way.
     const { score, reasons } = scoreMatch(
-      post({ objective: "SELL", type: "HAVE", province: "Manicaland", district: "Mutare" }),
-      post({ objective: "BUY", type: "NEED", province: "Mashonaland East", district: "Marondera" }),
+      post({ objective: "SELL", type: "HAVE", region: "Manicaland", locality: "Mutare" }),
+      post({ objective: "BUY", type: "NEED", region: "Mashonaland East", locality: "Marondera" }),
       null,
       null,
     );
@@ -65,34 +68,61 @@ describe("scoreMatch", () => {
     ]);
   });
 
-  it("rewards same district over same province", () => {
-    const sameProvinceOnly = scoreMatch(
-      post({ province: "Manicaland", district: "Mutare" }),
-      post({ province: "Manicaland", district: "Chimanimani" }),
-      null,
-      null,
-    );
-    const sameDistrict = scoreMatch(
-      post({ province: "Manicaland", district: "Mutare" }),
-      post({ province: "Manicaland", district: "Mutare" }),
-      null,
-      null,
-    );
-    expect(sameProvinceOnly.reasons).toContain("same province");
-    expect(sameProvinceOnly.reasons).not.toContain("same district");
-    expect(sameDistrict.reasons).toContain("same district");
-    expect(sameDistrict.score).toBeGreaterThan(sameProvinceOnly.score);
+  it("scores closer counterparties higher, on a continuous scale", () => {
+    // Proximity is measured, not tested against a boundary. There's no
+    // cliff at an administrative line, because a line on a map has nothing
+    // to do with how far a truck has to drive.
+    const near = scoreMatch(post(), post(), null, null, 3);
+    const middling = scoreMatch(post(), post(), null, null, 70);
+    const farAway = scoreMatch(post(), post(), null, null, 500);
+
+    expect(near.score).toBeGreaterThan(middling.score);
+    expect(middling.score).toBeGreaterThan(farAway.score);
+    expect(near.reasons).toContain("right nearby");
   });
 
-  it("credits a TRANSPORT candidate whose destination lands on the new post's province, even in a different province", () => {
+  it("cites a border crossing without disqualifying it", () => {
+    // Mutare to Beira is closer than Mutare to Bulawayo. The cost is
+    // paperwork, not distance, so it's surfaced and left to the farmer.
+    const crossBorder = scoreMatch(
+      post({ countryCode: "MZ", region: "Sofala", locality: "Beira" }),
+      post({ countryCode: "ZW", region: "Manicaland", locality: "Mutare" }),
+      null,
+      null,
+      250,
+    );
+    expect(crossBorder.reasons).toContain("across a border — check permits");
+    expect(crossBorder.score).toBeGreaterThan(50);
+  });
+
+  it("falls back to same-region when a post has no coordinates", () => {
+    const placed = scoreMatch(
+      post({ region: "Manicaland" }),
+      post({ region: "Manicaland" }),
+      null,
+      null,
+      null,
+    );
+    const elsewhere = scoreMatch(
+      post({ region: "Masvingo" }),
+      post({ region: "Manicaland" }),
+      null,
+      null,
+      null,
+    );
+    expect(placed.reasons).toContain("same area");
+    expect(placed.score).toBeGreaterThan(elsewhere.score);
+  });
+
+  it("credits a TRANSPORT candidate whose destination lands on the new post's region, even in a different region", () => {
     const { score, reasons } = scoreMatch(
       post({
         category: "TRANSPORT",
-        province: "Harare",
-        district: "Harare",
+        region: "Harare",
+        locality: "Harare",
         destinationProvince: "Manicaland",
       }),
-      post({ category: "TRANSPORT", province: "Manicaland", district: "Mutare" }),
+      post({ category: "TRANSPORT", region: "Manicaland", locality: "Mutare" }),
       null,
       null,
     );
@@ -102,8 +132,8 @@ describe("scoreMatch", () => {
 
   it("does not credit 'on your route' for non-TRANSPORT categories, even with matching destination fields", () => {
     const { reasons } = scoreMatch(
-      post({ category: "PRODUCE", province: "Harare", destinationProvince: "Manicaland" }),
-      post({ category: "PRODUCE", province: "Manicaland" }),
+      post({ category: "PRODUCE", region: "Harare", destinationProvince: "Manicaland" }),
+      post({ category: "PRODUCE", region: "Manicaland" }),
       null,
       null,
     );
@@ -111,7 +141,7 @@ describe("scoreMatch", () => {
   });
 
   it("weights a high-confidence average rating over a bare completed count", () => {
-    const differentProvinces = { province: "Manicaland" } as const;
+    const differentProvinces = { region: "Manicaland" } as const;
     const highConfidence = scoreMatch(
       post(differentProvinces),
       post(),
@@ -140,9 +170,9 @@ describe("scoreMatch", () => {
   });
 
   it("adds a founder-vouched or network-referred reason and bonus when verified", () => {
-    const unverified = scoreMatch(post({ province: "Manicaland" }), post(), null, null);
-    const founder = scoreMatch(post({ province: "Manicaland" }), post(), null, "FOUNDER");
-    const network = scoreMatch(post({ province: "Manicaland" }), post(), null, "NETWORK");
+    const unverified = scoreMatch(post({ region: "Manicaland" }), post(), null, null);
+    const founder = scoreMatch(post({ region: "Manicaland" }), post(), null, "FOUNDER");
+    const network = scoreMatch(post({ region: "Manicaland" }), post(), null, "NETWORK");
     expect(founder.reasons).toContain("founder-vouched");
     expect(network.reasons).toContain("network-referred");
     expect(founder.score).toBe(unverified.score + 10);
@@ -159,8 +189,8 @@ describe("scoreMatch", () => {
 
   it("never scores above 100 even when every bonus stacks", () => {
     const { score } = scoreMatch(
-      post({ province: "Harare", district: "Harare", urgent: true }),
-      post({ province: "Harare", district: "Harare", urgent: true }),
+      post({ region: "Harare", locality: "Harare", urgent: true }),
+      post({ region: "Harare", locality: "Harare", urgent: true }),
       reputation({ completedCount: 20, averageRating: 5, ratingCount: 50 }),
       "FOUNDER",
     );

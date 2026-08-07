@@ -25,7 +25,7 @@ const PRICE_MOVE = 0.15;
 
 export type WindowCounts = {
   category: PostCategory;
-  province: string | null;
+  region: string | null;
   subject: string | null;
   recentDemand: number;
   recentSupply: number;
@@ -38,7 +38,7 @@ export type WindowCounts = {
 export type SignalDraft = {
   kind: SignalKind;
   category: PostCategory;
-  province: string | null;
+  region: string | null;
   subject: string | null;
   headline: string;
   detail: string;
@@ -46,8 +46,8 @@ export type SignalDraft = {
   sampleSize: number;
 };
 
-function where(province: string | null): string {
-  return province ? ` in ${province}` : "";
+function where(region: string | null): string {
+  return region ? ` in ${region}` : "";
 }
 
 function what(subject: string | null, category: PostCategory): string {
@@ -69,7 +69,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
 
   for (const w of windows) {
     const subject = what(w.subject, w.category);
-    const place = where(w.province);
+    const place = where(w.region);
 
     // --- Demand trend -----------------------------------------------------
     if (w.recentDemand >= MIN_SAMPLE && w.priorDemand > 0) {
@@ -79,7 +79,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "DEMAND_RISING",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `Demand for ${subject} is up ${pct}%${place}`,
           detail: `${w.recentDemand} buyers looking this period, up from ${w.priorDemand}.`,
@@ -91,7 +91,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "DEMAND_FALLING",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `Demand for ${subject} is down ${pct}%${place}`,
           detail: `${w.recentDemand} buyers looking this period, down from ${w.priorDemand}.`,
@@ -113,7 +113,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "TRANSPORT_SCARCE",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `Transport is scarce${place}`,
           detail: `${w.recentDemand} loads looking for a vehicle against ${w.recentSupply} on offer — book early and expect to pay more.`,
@@ -124,7 +124,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "TRANSPORT_AVAILABLE",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `Plenty of transport available${place}`,
           detail: `${w.recentSupply} vehicles on offer against ${w.recentDemand} loads — a good week to negotiate.`,
@@ -135,7 +135,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "SUPPLY_TIGHT",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `More buyers than sellers for ${subject}${place}`,
           detail: `${w.recentDemand} looking to buy against ${w.recentSupply} offering — a seller's market right now.`,
@@ -146,7 +146,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: "SUPPLY_GLUT",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `More sellers than buyers for ${subject}${place}`,
           detail: `${w.recentSupply} offering against ${w.recentDemand} looking to buy — expect to compete on price.`,
@@ -170,7 +170,7 @@ export function deriveSignals(windows: WindowCounts[]): SignalDraft[] {
         out.push({
           kind: rising ? "PRICE_RISING" : "PRICE_FALLING",
           category: w.category,
-          province: w.province,
+          region: w.region,
           subject: w.subject,
           headline: `Asking prices for ${subject} are ${rising ? "up" : "down"} ${pct}%${place}`,
           detail: `Median asking price moved from ${Math.round(w.priorMedianPrice)} to ${Math.round(w.recentMedianPrice)}.`,

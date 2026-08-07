@@ -12,7 +12,7 @@ const HARVEST_DRAFT_WINDOW_DAYS = 7;
 // Idempotent by construction — checked, not remembered: a produce row that
 // already has a non-CLOSED post attached is skipped, so calling this on
 // every page load never creates duplicates.
-export async function ensureHarvestDrafts(farmId: string, party: { id: string; province: string; district: string }) {
+export async function ensureHarvestDrafts(farmId: string, party: { id: string; region: string; locality: string }) {
   const windowEnd = new Date();
   windowEnd.setDate(windowEnd.getDate() + HARVEST_DRAFT_WINDOW_DAYS);
 
@@ -35,8 +35,8 @@ export async function ensureHarvestDrafts(farmId: string, party: { id: string; p
       title: `${item.quantity} ${item.unit.toLowerCase()} of ${item.cropType}`,
       quantity: item.quantity,
       unit: item.unit,
-      province: party.province,
-      district: party.district,
+      region: party.region,
+      locality: party.locality,
       status: "DRAFT",
       urgent: item.perishable,
       produceId: item.id,

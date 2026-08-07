@@ -17,8 +17,9 @@ export const signupSchema = z
     password: z.string().min(8, "Password must be at least 8 characters"),
     phone: z.string().trim().optional(),
     contactDetails: z.string().trim().optional(),
-    province: z.string().trim().min(1, "Province is required"),
-    district: z.string().trim().min(1, "District is required"),
+    countryCode: z.string().trim().length(2).optional(),
+    region: z.string().trim().min(1, "Region is required"),
+    locality: z.string().trim().min(1, "Locality is required"),
     capabilities: z
       .array(z.enum(ALL_CAPABILITIES))
       .min(1, "Pick at least one thing you do"),
@@ -49,8 +50,8 @@ export const profileSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   phone: z.string().trim().optional(),
   contactDetails: z.string().trim().optional(),
-  province: z.string().trim().min(1, "Province is required"),
-  district: z.string().trim().min(1, "District is required"),
+  region: z.string().trim().min(1, "Region is required"),
+  locality: z.string().trim().min(1, "Locality is required"),
   capabilities: z.array(z.enum(ALL_CAPABILITIES)).min(1, "Pick at least one thing you do"),
   operatingRadiusKm: z.coerce.number().int().positive().max(2000).optional(),
   languages: z.array(z.string().trim()).optional(),
@@ -110,8 +111,8 @@ export const postSchema = z.object({
   description: z.string().trim().optional(),
   quantity: z.coerce.number().positive().optional(),
   unit: z.string().trim().optional(),
-  province: z.string().trim().min(1, "Province is required"),
-  district: z.string().trim().min(1, "District is required"),
+  region: z.string().trim().min(1, "Region is required"),
+  locality: z.string().trim().min(1, "Locality is required"),
   askingPrice: z.coerce.number().positive().optional(),
   // Freeform like `unit` — CURRENCIES in zimbabwe.ts is a suggested list
   // for the form, not a constraint enforced here.

@@ -55,7 +55,7 @@ export function isPartyInMatch(
   return match.postA.partyId === partyId || match.postB.partyId === partyId;
 }
 
-// district match beats province match beats "just the province name" — a
+// locality match beats region match beats "just the region name" — a
 // deterministic proxy for physical distance until Party carries real
 // coordinates worth ranking on.
 export function distanceLabel(
@@ -64,8 +64,8 @@ export function distanceLabel(
   myDistrict: string,
   myProvince: string,
 ): string {
-  if (theirDistrict === myDistrict) return "Same district";
-  if (theirProvince === myProvince) return "Same province";
+  if (theirDistrict === myDistrict) return "Same locality";
+  if (theirProvince === myProvince) return "Same region";
   return theirProvince;
 }
 

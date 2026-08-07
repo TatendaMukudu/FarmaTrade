@@ -7,6 +7,7 @@ import { hashPassword, createSession } from "@/lib/auth";
 import { signupSchema } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { regionPoint, DEFAULT_COUNTRY } from "@/lib/countries";
 import type { Capability, VehicleType } from "@/generated/prisma/client";
 
 export type SignupState = { error?: string };
@@ -49,8 +50,9 @@ export async function signupAction(
     email: formData.get("email"),
     password: formData.get("password"),
     phone: formData.get("phone") || undefined,
-    province: formData.get("province"),
-    district: formData.get("district"),
+    countryCode: formData.get("countryCode") || undefined,
+    region: formData.get("region"),
+    locality: formData.get("locality"),
     capabilities: formData.getAll("capabilities"),
     farmName: formData.get("farmName") || undefined,
     sizeHectares: formData.get("sizeHectares") || undefined,
@@ -84,14 +86,23 @@ export async function signupAction(
       },
     });
 
+    // Coordinates derived from the chosen region's centroid. Matching runs
+    // on these, not on the region name — a party without them can only be
+    // reached by the same-region fallback.
+    const countryCode = data.countryCode ?? DEFAULT_COUNTRY;
+    const point = regionPoint(countryCode, data.region);
+
     const party = await tx.party.create({
       data: {
         userId: createdUser.id,
         name: data.name,
         capabilities: data.capabilities as Capability[],
         phone: data.phone,
-        province: data.province,
-        district: data.district,
+        countryCode,
+        region: data.region,
+        locality: data.locality,
+        latitude: point?.latitude,
+        longitude: point?.longitude,
       },
     });
 

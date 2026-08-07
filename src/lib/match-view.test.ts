@@ -68,13 +68,13 @@ describe("isPartyInMatch", () => {
 });
 
 describe("distanceLabel", () => {
-  it("prefers 'Same district' over 'Same province'", () => {
-    expect(distanceLabel("Mutare", "Manicaland", "Mutare", "Manicaland")).toBe("Same district");
+  it("prefers 'Same locality' over 'Same region'", () => {
+    expect(distanceLabel("Mutare", "Manicaland", "Mutare", "Manicaland")).toBe("Same locality");
   });
-  it("falls back to 'Same province' when only the province matches", () => {
-    expect(distanceLabel("Chimanimani", "Manicaland", "Mutare", "Manicaland")).toBe("Same province");
+  it("falls back to 'Same region' when only the region matches", () => {
+    expect(distanceLabel("Chimanimani", "Manicaland", "Mutare", "Manicaland")).toBe("Same region");
   });
-  it("falls back to the counterparty's province name otherwise", () => {
+  it("falls back to the counterparty's region name otherwise", () => {
     expect(distanceLabel("Harare", "Harare", "Mutare", "Manicaland")).toBe("Harare");
   });
 });

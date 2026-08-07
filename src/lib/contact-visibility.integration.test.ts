@@ -55,7 +55,7 @@ describe("contact visibility", () => {
     // A suggestion is the platform's opinion, not a relationship either
     // side agreed to. If this unlocked contact details, anyone could post a
     // matching listing and harvest whoever it paired them with.
-    const viewer = await createTestParty({ province: "Harare", district: "Harare" });
+    const viewer = await createTestParty({ region: "Harare", locality: "Harare" });
     const subject = await partyWithContact("+263772222222");
     partyIds.push(viewer.party.id, subject.party.id);
 
@@ -68,7 +68,7 @@ describe("contact visibility", () => {
   });
 
   it("reveals them once a match between the two is accepted", async () => {
-    const viewer = await createTestParty({ province: "Harare", district: "Harare" });
+    const viewer = await createTestParty({ region: "Harare", locality: "Harare" });
     const subject = await partyWithContact("+263773333333");
     partyIds.push(viewer.party.id, subject.party.id);
 
@@ -88,9 +88,9 @@ describe("contact visibility", () => {
     // The IDOR-shaped version of the bug: A and B have a deal, C has
     // nothing to do with either, and C must not inherit B's number just
     // because B has an accepted match with somebody.
-    const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+    const buyer = await createTestParty({ region: "Harare", locality: "Harare" });
     const subject = await partyWithContact("+263774444444");
-    const outsider = await createTestParty({ province: "Harare", district: "Harare" });
+    const outsider = await createTestParty({ region: "Harare", locality: "Harare" });
     partyIds.push(buyer.party.id, subject.party.id, outsider.party.id);
 
     const theirs = await createTestPost(subject.party.id, { objective: "SELL" });
@@ -110,7 +110,7 @@ describe("contact visibility", () => {
   });
 
   it("records an audit event when one party's number reaches another", async () => {
-    const viewer = await createTestParty({ province: "Harare", district: "Harare" });
+    const viewer = await createTestParty({ region: "Harare", locality: "Harare" });
     const subject = await partyWithContact("+263776666666");
     partyIds.push(viewer.party.id, subject.party.id);
 

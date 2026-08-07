@@ -34,7 +34,7 @@ export default async function FarmPage() {
       <div>
         <h1 className="text-2xl font-semibold">{party.farm.farmName}</h1>
         <p className="text-sm text-gray-500">
-          {party.district}, {party.province}
+          {party.locality}, {party.region}
           {party.farm.sizeHectares ? ` · ${party.farm.sizeHectares} ha` : ""}
         </p>
       </div>

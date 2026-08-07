@@ -31,7 +31,7 @@ export default async function MarketPage() {
   const party = await getCurrentParty();
   if (!party) return null;
 
-  const { local, national, total } = await getFreshSignals(party.province);
+  const { local, national, total } = await getFreshSignals(party.region);
 
   return (
     <div className="flex flex-col gap-8">
@@ -44,8 +44,8 @@ export default async function MarketPage() {
       </div>
 
       <Section
-        title={`In ${party.province}`}
-        empty="Not enough activity in your province yet to say anything useful."
+        title={`In ${party.region}`}
+        empty="Not enough activity in your region yet to say anything useful."
         signals={local}
       />
 

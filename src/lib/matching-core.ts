@@ -1,5 +1,6 @@
 import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
 import { objectiveSpec } from "@/lib/objectives";
+import { distanceBand, distanceLabelFor } from "@/lib/geo-core";
 
 // Deterministic, rules-based scoring — no ML, no history to learn from yet.
 // Geography and category are the qualifying filters; reputation only ever
@@ -18,37 +19,55 @@ export function scoreMatch(
   newPost: Post,
   reputation: Reputation | null,
   verifiedBy: VerificationSource | null,
+  // Great-circle kilometres between the two posts. Null when either side
+  // has no coordinates, in which case scoring falls back to the old
+  // same-region test rather than inventing a distance.
+  distanceKm: number | null = null,
 ): { score: number; reasons: string[] } {
   let score = 50;
   const reasons: string[] = [];
 
   // Lead with the objective pairing: it's the strongest evidence the match
   // makes sense at all, and it's what the old model couldn't say. "They're
-  // selling, you're buying" is a better first line than "same province",
+  // selling, you're buying" is a better first line than "same region",
   // which is true of thousands of irrelevant posts.
   reasons.push(
     `they're ${objectiveSpec(candidate.objective).gerund}, you're ${objectiveSpec(newPost.objective).gerund}`,
   );
 
-  const sameProvince = candidate.province === newPost.province;
-  const sameDistrict = sameProvince && candidate.district === newPost.district;
+  const sameCountry = candidate.countryCode === newPost.countryCode;
+  const sameRegion = sameCountry && candidate.region === newPost.region;
+
   // TRANSPORT only: a HAVE post's destination is a transporter's route, a
   // NEED post's destination is where goods need to end up. A candidate
-  // qualifies on the route even when pickup provinces differ, as long as
-  // one side's destination overlaps the other's location.
+  // qualifies on the route even when origins are far apart, as long as one
+  // side's destination overlaps the other's location.
   const onRoute =
-    !sameProvince &&
     newPost.category === "TRANSPORT" &&
-    ((candidate.destinationProvince != null && candidate.destinationProvince === newPost.province) ||
-      (newPost.destinationProvince != null && newPost.destinationProvince === candidate.province));
+    ((candidate.destinationProvince != null && candidate.destinationProvince === newPost.region) ||
+      (newPost.destinationProvince != null && newPost.destinationProvince === candidate.region));
 
-  if (sameProvince) {
-    reasons.push("same province");
-    if (sameDistrict) {
-      score += 20;
-      reasons.push("same district");
-    }
-  } else if (onRoute) {
+  if (distanceKm != null) {
+    // Proximity on a continuous scale rather than a boundary test. Closer
+    // is better, without a cliff at an administrative line that has
+    // nothing to do with how far a truck has to drive.
+    const band = distanceBand(distanceKm);
+    const bonus = { same_area: 25, nearby: 18, regional: 8, far: 0 }[band];
+    score += bonus;
+    reasons.push(distanceLabelFor(distanceKm, { sameCountry }).toLowerCase());
+
+    // Crossing a border is a real cost — customs, permits, currency — so
+    // it's cited even though it no longer disqualifies. The farmer decides
+    // whether the extra 200km of buyer is worth the paperwork.
+    if (!sameCountry) reasons.push("across a border — check permits");
+  } else if (sameRegion) {
+    // No coordinates on one side: fall back to the old test rather than
+    // guessing a position.
+    score += 15;
+    reasons.push("same area");
+  }
+
+  if (onRoute) {
     score += 15;
     reasons.push("on your route");
   }

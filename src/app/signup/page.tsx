@@ -55,18 +55,18 @@ export default function SignupPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="province">
-              Province
+            <label className="text-sm font-medium" htmlFor="region">
+              Region
             </label>
             <select
-              id="province"
-              name="province"
+              id="region"
+              name="region"
               required
               className="rounded border px-3 py-2 text-sm"
               defaultValue=""
             >
               <option value="" disabled>
-                Select province
+                Select region
               </option>
               {ZIMBABWE_PROVINCES.map((p) => (
                 <option key={p} value={p}>
@@ -75,7 +75,7 @@ export default function SignupPage() {
               ))}
             </select>
           </div>
-          <Field label="District" name="district" required />
+          <Field label="Locality" name="locality" required />
         </div>
 
         <fieldset className="flex flex-col gap-2">

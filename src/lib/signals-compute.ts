@@ -18,7 +18,7 @@ const WINDOW_DAYS = 14;
 
 type Bucket = {
   category: PostCategory;
-  province: string | null;
+  region: string | null;
   subject: string | null;
   recentDemand: number;
   recentSupply: number;
@@ -28,8 +28,8 @@ type Bucket = {
   priorPrices: number[];
 };
 
-function bucketKey(category: PostCategory, province: string | null, subject: string | null) {
-  return `${category}|${province ?? ""}|${subject ?? ""}`;
+function bucketKey(category: PostCategory, region: string | null, subject: string | null) {
+  return `${category}|${region ?? ""}|${subject ?? ""}`;
 }
 
 // Recomputes every signal from the last two windows and replaces the
@@ -49,7 +49,7 @@ export async function recomputeMarketSignals(now = new Date()) {
     select: {
       type: true,
       category: true,
-      province: true,
+      region: true,
       askingPrice: true,
       quantity: true,
       createdAt: true,
@@ -58,23 +58,23 @@ export async function recomputeMarketSignals(now = new Date()) {
 
   const buckets = new Map<string, Bucket>();
 
-  // Every post lands in two buckets: one scoped to its province and one
+  // Every post lands in two buckets: one scoped to its region and one
   // national. A farmer in Manicaland cares what's happening in Manicaland;
   // an exporter comparing regions needs the national line, and computing
   // it here is free versus aggregating provinces at read time.
   const add = (
     category: PostCategory,
-    province: string | null,
+    region: string | null,
     isDemand: boolean,
     isRecent: boolean,
     unitPrice: number | null,
   ) => {
-    const key = bucketKey(category, province, null);
+    const key = bucketKey(category, region, null);
     let b = buckets.get(key);
     if (!b) {
       b = {
         category,
-        province,
+        region,
         subject: null,
         recentDemand: 0,
         recentSupply: 0,
@@ -105,13 +105,13 @@ export async function recomputeMarketSignals(now = new Date()) {
     const price = p.askingPrice != null ? Number(p.askingPrice) : null;
     const unitPrice = price != null && p.quantity != null && p.quantity > 0 ? price / p.quantity : price;
 
-    add(p.category, p.province, isDemand, isRecent, unitPrice);
+    add(p.category, p.region, isDemand, isRecent, unitPrice);
     add(p.category, null, isDemand, isRecent, unitPrice);
   }
 
   const windows: WindowCounts[] = [...buckets.values()].map((b) => ({
     category: b.category,
-    province: b.province,
+    region: b.region,
     subject: b.subject,
     recentDemand: b.recentDemand,
     recentSupply: b.recentSupply,
@@ -132,7 +132,7 @@ export async function recomputeMarketSignals(now = new Date()) {
         data: drafts.map((d) => ({
           kind: d.kind,
           category: d.category,
-          province: d.province,
+          region: d.region,
           subject: d.subject,
           headline: d.headline,
           detail: d.detail,

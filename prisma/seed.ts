@@ -21,8 +21,8 @@ async function createAccount(opts: {
   email: string;
   name: string;
   phone: string;
-  province: string;
-  district: string;
+  region: string;
+  locality: string;
   capabilities: Capability[];
   passwordHash: string;
   verifiedBy?: "FOUNDER" | "NETWORK";
@@ -47,8 +47,8 @@ async function createAccount(opts: {
       userId: user.id,
       name: opts.name,
       phone: opts.phone,
-      province: opts.province,
-      district: opts.district,
+      region: opts.region,
+      locality: opts.locality,
       capabilities: opts.capabilities,
       verifiedBy: opts.verifiedBy,
     },
@@ -165,8 +165,8 @@ async function main() {
     email: "tendai@moyofarm.co.zw",
     name: "Tendai Moyo",
     phone: "+263771234001",
-    province: "Mashonaland West",
-    district: "Chinhoyi",
+    region: "Mashonaland West",
+    locality: "Chinhoyi",
     capabilities: ["FARMER"],
     passwordHash,
     verifiedBy: "FOUNDER",
@@ -205,8 +205,8 @@ async function main() {
     email: "tapiwa@haulzw.co.zw",
     name: "Tapiwa Muzenda",
     phone: "+263771234002",
-    province: "Mashonaland West",
-    district: "Chinhoyi",
+    region: "Mashonaland West",
+    locality: "Chinhoyi",
     capabilities: ["TRANSPORTER"],
     passwordHash,
     transport: { vehicleType: "TRUCK", capacityKg: 7000, serviceRegion: "Mashonaland West" },
@@ -216,8 +216,8 @@ async function main() {
     email: "grace@chikwanhatrading.co.zw",
     name: "Grace Chikwanha",
     phone: "+263771234003",
-    province: "Mashonaland West",
-    district: "Chinhoyi",
+    region: "Mashonaland West",
+    locality: "Chinhoyi",
     capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
     verifiedBy: "FOUNDER",
@@ -228,8 +228,8 @@ async function main() {
     email: "blessing@chikaufranch.co.zw",
     name: "Blessing Chikafu",
     phone: "+263771234004",
-    province: "Midlands",
-    district: "Gweru",
+    region: "Midlands",
+    locality: "Gweru",
     capabilities: ["FARMER"],
     passwordHash,
     verifiedBy: "NETWORK",
@@ -258,8 +258,8 @@ async function main() {
     email: "isaac@moyanastores.co.zw",
     name: "Isaac Moyana",
     phone: "+263771234005",
-    province: "Midlands",
-    district: "Gweru",
+    region: "Midlands",
+    locality: "Gweru",
     capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
   });
@@ -269,8 +269,8 @@ async function main() {
     email: "rudo@sitholeorchards.co.zw",
     name: "Rudo Sithole",
     phone: "+263771234006",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     capabilities: ["FARMER"],
     passwordHash,
     farm: { farmName: "Sithole Orchards", sizeHectares: 18 },
@@ -300,8 +300,8 @@ async function main() {
     email: "patricia@zuluexports.co.zw",
     name: "Patricia Zulu",
     phone: "+263771234007",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     capabilities: ["BUYER", "SUPPLIER"],
     passwordHash,
   });
@@ -310,8 +310,8 @@ async function main() {
     email: "nyasha@coldchainzw.co.zw",
     name: "Nyasha Dube",
     phone: "+263771234008",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     capabilities: ["TRANSPORTER"],
     passwordHash,
     transport: {
@@ -326,8 +326,8 @@ async function main() {
     email: "farai@ncubefarms.co.zw",
     name: "Farai Ncube",
     phone: "+263771234009",
-    province: "Matabeleland South",
-    district: "Gwanda",
+    region: "Matabeleland South",
+    locality: "Gwanda",
     capabilities: ["FARMER"],
     passwordHash,
     farm: { farmName: "Ncube Farms", sizeHectares: 30 },
@@ -360,8 +360,8 @@ async function main() {
       type: "HAVE",
       category: "PRODUCE",
       title: "3 tonnes of oranges, need to move before they spoil",
-      province: "Manicaland",
-      district: "Mutare",
+      region: "Manicaland",
+      locality: "Mutare",
       quantity: 3,
       unit: "TONNE",
       urgent: true,
@@ -374,8 +374,8 @@ async function main() {
       type: "NEED",
       category: "PRODUCE",
       title: "Oranges for export, any quantity",
-      province: "Manicaland",
-      district: "Mutare",
+      region: "Manicaland",
+      locality: "Mutare",
     },
   });
   await prisma.match.create({
@@ -384,7 +384,7 @@ async function main() {
       postBId: orangesNeed.id,
       score: 78,
       status: "SUGGESTED",
-      reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
+      reasons: ["same locality", "counterparty: new, no history yet", "time-sensitive"],
     },
   });
 
@@ -396,8 +396,8 @@ async function main() {
       type: "NEED",
       category: "TRANSPORT",
       title: "Refrigerated truck needed this week",
-      province: "Manicaland",
-      district: "Mutare",
+      region: "Manicaland",
+      locality: "Mutare",
       urgent: true,
     },
   });
@@ -408,8 +408,8 @@ async function main() {
       type: "HAVE",
       category: "TRANSPORT",
       title: "Refrigerated truck, based in Mutare",
-      province: "Manicaland",
-      district: "Mutare",
+      region: "Manicaland",
+      locality: "Mutare",
     },
   });
   await prisma.match.create({
@@ -418,7 +418,7 @@ async function main() {
       postBId: transportHave.id,
       score: 82,
       status: "SUGGESTED",
-      reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
+      reasons: ["same locality", "counterparty: new, no history yet", "time-sensitive"],
     },
   });
 
@@ -430,8 +430,8 @@ async function main() {
       type: "HAVE",
       category: "EQUIPMENT",
       title: "Idle tractor, available most of the season",
-      province: "Mashonaland West",
-      district: "Chinhoyi",
+      region: "Mashonaland West",
+      locality: "Chinhoyi",
     },
   });
   await prisma.post.create({
@@ -441,8 +441,8 @@ async function main() {
       type: "HAVE",
       category: "TRANSPORT",
       title: "7-tonne truck available for local hauls",
-      province: "Mashonaland West",
-      district: "Chinhoyi",
+      region: "Mashonaland West",
+      locality: "Chinhoyi",
     },
   });
   await prisma.post.create({
@@ -452,8 +452,8 @@ async function main() {
       type: "HAVE",
       category: "EQUIPMENT",
       title: "Plough available to borrow after planting season",
-      province: "Midlands",
-      district: "Gweru",
+      region: "Midlands",
+      locality: "Gweru",
     },
   });
   await prisma.post.create({
@@ -463,8 +463,8 @@ async function main() {
       type: "NEED",
       category: "PRODUCE",
       title: "50 bags of maize, monthly",
-      province: "Midlands",
-      district: "Gweru",
+      region: "Midlands",
+      locality: "Gweru",
       quantity: 50,
       unit: "BAG",
       neededBy: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -477,8 +477,8 @@ async function main() {
       type: "HAVE",
       category: "LIVESTOCK",
       title: "Goats available, various ages",
-      province: "Matabeleland South",
-      district: "Gwanda",
+      region: "Matabeleland South",
+      locality: "Gwanda",
       quantity: 25,
     },
   });
@@ -505,8 +505,8 @@ async function main() {
         type: "HAVE",
         category: "LIVESTOCK",
         title: opts.title,
-        province: "Mashonaland West",
-        district: "Chinhoyi",
+        region: "Mashonaland West",
+        locality: "Chinhoyi",
         quantity: opts.quantity,
         status: "CLOSED",
       },
@@ -518,8 +518,8 @@ async function main() {
         type: "NEED",
         category: "LIVESTOCK",
         title: `Need: ${opts.title}`,
-        province: "Mashonaland West",
-        district: "Chinhoyi",
+        region: "Mashonaland West",
+        locality: "Chinhoyi",
         quantity: opts.quantity,
         status: "CLOSED",
       },
@@ -530,7 +530,7 @@ async function main() {
         postBId: need.id,
         score: 90,
         status: "COMPLETED",
-        reasons: ["same district", "repeat trading partner"],
+        reasons: ["same locality", "repeat trading partner"],
       },
     });
 
@@ -690,8 +690,8 @@ async function main() {
     daysAgo: number;
     objective: "SELL" | "BUY" | "TRANSPORT_OFFER" | "TRANSPORT_NEED";
     category: "PRODUCE" | "LIVESTOCK" | "TRANSPORT";
-    province: string;
-    district: string;
+    region: string;
+    locality: string;
     title: string;
     quantity?: number;
     askingPrice?: number;
@@ -717,8 +717,8 @@ async function main() {
   push(3, 16, 27, {
     objective: "BUY",
     category: "PRODUCE",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     title: "Oranges wanted",
     quantity: 2,
     askingPrice: 400,
@@ -726,8 +726,8 @@ async function main() {
   push(9, 1, 13, {
     objective: "BUY",
     category: "PRODUCE",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     title: "Oranges wanted for export",
     quantity: 2,
     askingPrice: 520,
@@ -735,8 +735,8 @@ async function main() {
   push(3, 1, 13, {
     objective: "SELL",
     category: "PRODUCE",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     title: "Oranges, graded",
     quantity: 2,
     askingPrice: 520,
@@ -747,15 +747,15 @@ async function main() {
   push(8, 1, 13, {
     objective: "TRANSPORT_NEED",
     category: "TRANSPORT",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     title: "Load needs moving to Harare",
   });
   push(2, 1, 13, {
     objective: "TRANSPORT_OFFER",
     category: "TRANSPORT",
-    province: "Manicaland",
-    district: "Mutare",
+    region: "Manicaland",
+    locality: "Mutare",
     title: "Truck available",
   });
 
@@ -764,8 +764,8 @@ async function main() {
   push(10, 1, 13, {
     objective: "SELL",
     category: "PRODUCE",
-    province: "Midlands",
-    district: "Gweru",
+    region: "Midlands",
+    locality: "Gweru",
     title: "Maize, bagged",
     quantity: 50,
     askingPrice: 300,
@@ -773,8 +773,8 @@ async function main() {
   push(2, 1, 13, {
     objective: "BUY",
     category: "PRODUCE",
-    province: "Midlands",
-    district: "Gweru",
+    region: "Midlands",
+    locality: "Gweru",
     title: "Maize wanted",
     quantity: 50,
     askingPrice: 300,
@@ -787,8 +787,8 @@ async function main() {
       type: a.objective === "SELL" || a.objective === "TRANSPORT_OFFER" ? "HAVE" : "NEED",
       category: a.category,
       title: a.title,
-      province: a.province,
-      district: a.district,
+      region: a.region,
+      locality: a.locality,
       quantity: a.quantity,
       askingPrice: a.askingPrice,
       // CLOSED so this backdated volume feeds the market picture without
