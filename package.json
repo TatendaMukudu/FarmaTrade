@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "prisma migrate deploy && next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "postinstall": "prisma generate",
     "db:seed": "prisma db seed",

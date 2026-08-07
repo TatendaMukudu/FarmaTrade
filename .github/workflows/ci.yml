@@ -51,6 +51,13 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
+        # `npm run typecheck` is `next typegen && tsc --noEmit`, and the
+        # typegen half is not optional: PageProps/LayoutProps are globals
+        # Next generates from the route tree, so a bare `tsc --noEmit` fails
+        # on every page that uses them. It passes on a dev machine only
+        # because a previous `next build` left the generated types behind —
+        # which is exactly how this step got merged green and then failed
+        # here on a clean checkout.
         run: npm run typecheck
 
       - name: Unit tests
