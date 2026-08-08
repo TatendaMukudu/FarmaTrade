@@ -58,7 +58,7 @@ export function LivestockForm({
       <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
       <SubmitButton pending={pending} label={initial ? "Save" : "Add livestock"} />
       {onDone && (
-        <button type="button" onClick={onDone} className="text-xs text-gray-500 underline">
+        <button type="button" onClick={onDone} className="text-xs text-muted-fg underline">
           Cancel
         </button>
       )}

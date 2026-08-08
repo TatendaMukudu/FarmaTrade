@@ -24,7 +24,7 @@ export default function SignupPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-4 py-12">
       <div>
         <h1 className="text-2xl font-semibold">Create your FarmaTrade account</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-fg">
           For farm owners, buyers/sellers, and transport providers.
         </p>
       </div>
@@ -117,13 +117,13 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? "Creating account…" : "Create account"}
         </button>
       </form>
 
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted-fg">
         Already have an account?{" "}
         <Link href="/login" className="underline">
           Log in

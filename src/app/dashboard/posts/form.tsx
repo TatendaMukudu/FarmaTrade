@@ -147,7 +147,7 @@ export function PostForm({
       )}
 
       <details className="rounded-lg border border-border px-3 py-2 text-sm">
-        <summary className="cursor-pointer select-none text-gray-600">
+        <summary className="cursor-pointer select-none text-muted-fg">
           More details (description, location, timing)
         </summary>
         <div className="mt-3 flex flex-col gap-3">
@@ -248,7 +248,7 @@ export function PostForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500">{label}</label>
+      <label className="text-xs text-muted-fg">{label}</label>
       {children}
     </div>
   );

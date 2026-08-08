@@ -25,7 +25,7 @@ export default function ErrorBoundary({
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
       <p className="text-lg font-semibold">Something went wrong.</p>
-      <p className="max-w-sm text-sm text-gray-500">
+      <p className="max-w-sm text-sm text-muted-fg">
         That&apos;s on us, not you — it&apos;s been logged. Try again, or head back to your dashboard.
       </p>
       <div className="flex gap-3">

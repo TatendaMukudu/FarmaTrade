@@ -57,7 +57,7 @@ export function ProduceForm({
         Perishable
       </label>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500" htmlFor="expectedHarvestDate">
+        <label className="text-xs text-muted-fg" htmlFor="expectedHarvestDate">
           Expected harvest (optional)
         </label>
         <input
@@ -71,7 +71,7 @@ export function ProduceForm({
       <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />
       <SubmitButton pending={pending} label={initial ? "Save" : "Add produce"} />
       {onDone && (
-        <button type="button" onClick={onDone} className="text-xs text-gray-500 underline">
+        <button type="button" onClick={onDone} className="text-xs text-muted-fg underline">
           Cancel
         </button>
       )}

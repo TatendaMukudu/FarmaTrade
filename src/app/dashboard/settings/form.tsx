@@ -98,7 +98,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
         </p>
       )}
       {state.success && (
-        <p className="text-sm text-green-700" role="status">
+        <p className="text-sm text-accent" role="status">
           Saved.
         </p>
       )}

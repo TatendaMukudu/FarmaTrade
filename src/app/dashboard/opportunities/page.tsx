@@ -108,12 +108,12 @@ export default async function OpportunitiesPage() {
     <div className="flex flex-col gap-10">
       <div>
         <h1 className="text-2xl font-semibold">Opportunities</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           Matches FarmaTrade found between your posts and the opposite side.
         </p>
       </div>
 
-      {plan.empty && <p className="text-sm text-gray-400">{plan.message}</p>}
+      {plan.empty && <p className="text-sm text-subtle-fg">{plan.message}</p>}
 
       {coverage.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -142,7 +142,7 @@ export default async function OpportunitiesPage() {
           <div key={group.bucket} className="flex flex-col gap-3">
             <h2 className="text-lg font-medium">{group.label}</h2>
             {group.empty ? (
-              <p className="text-sm text-gray-400">{group.message}</p>
+              <p className="text-sm text-subtle-fg">{group.message}</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {group.matches.map((ranked) => {
@@ -154,7 +154,7 @@ export default async function OpportunitiesPage() {
                     <li key={m.id} className="rounded-lg border border-border bg-card p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-subtle-fg">
                             <span>{m.status}</span>
                             {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
                             {strength && strength >= 2 && (
@@ -179,7 +179,7 @@ export default async function OpportunitiesPage() {
                               when there isn't enough history to say
                               something honest. */}
                           {ranked.lane?.line && (
-                            <p className="mt-2 text-sm text-gray-600">
+                            <p className="mt-2 text-sm text-muted-fg">
                               Track record: {ranked.lane.line}
                               {ranked.lane.classLine && ` ${ranked.lane.classLine}`}
                             </p>
@@ -190,7 +190,7 @@ export default async function OpportunitiesPage() {
                               in production; it is a debugging aid, not
                               something a buyer needs to read. */}
                           {process.env.NODE_ENV !== "production" && (
-                            <p className="mt-1 text-xs text-gray-400">
+                            <p className="mt-1 text-xs text-subtle-fg">
                               Ranked {ranked.rank} · {ranked.rationale.join(" · ")}
                             </p>
                           )}
@@ -220,7 +220,7 @@ export default async function OpportunitiesPage() {
                       {m.status === "ACCEPTED" && (
                         <div className="mt-4 border-t border-border pt-4">
                           {myConfirmation ? (
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-fg">
                               You reported: {myConfirmation.outcome.replace(/_/g, " ")}.
                               Waiting on {theirs.party.name} to confirm their side.
                             </p>
@@ -235,7 +235,7 @@ export default async function OpportunitiesPage() {
               </ul>
             )}
             {group.hidden > 0 && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-subtle-fg">
                 {group.hidden} more in this section, ranked lower.
               </p>
             )}
@@ -254,7 +254,7 @@ export default async function OpportunitiesPage() {
               return (
                 <li
                   key={m.id}
-                  className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-gray-600"
+                  className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-fg"
                 >
                   {yours.title} ↔ {theirs.party.name} ({theirs.title}) ·{" "}
                   {myConfirmation?.outcome.replace(/_/g, " ") ?? "—"}
@@ -284,7 +284,7 @@ function MatchCounterpart({
 
   return (
     <div className="mt-1">
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-muted-fg">
         {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
         {post.recurring && (
           <Badge tone="info" className="ml-2">
@@ -292,7 +292,7 @@ function MatchCounterpart({
           </Badge>
         )}
       </p>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-subtle-fg">
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}

@@ -45,7 +45,7 @@ export default async function PostsPage({
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">Your posts</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           Say what you have or what you need — FarmaTrade matches it against
           the opposite side automatically.
         </p>
@@ -110,14 +110,16 @@ export default async function PostsPage({
                   <p className="font-medium">
                     <span
                       className={
-                        p.type === "HAVE" ? "text-green-700" : "text-blue-700"
+                        p.type === "HAVE"
+                          ? "text-green-700 dark:text-green-400"
+                          : "text-blue-700 dark:text-blue-400"
                       }
                     >
                       {p.type === "HAVE" ? "I have" : "I need"}
                     </span>{" "}
                     · {p.title}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-fg">
                     {CATEGORY_LABEL[p.category]} · {p.district}, {p.province}
                     {p.destinationDistrict &&
                       p.destinationProvince &&
@@ -138,7 +140,7 @@ export default async function PostsPage({
                     {p.travelDate && ` · travelling ${p.travelDate.toLocaleDateString()}`}
                   </p>
                   {p.description && (
-                    <p className="mt-1 text-sm text-gray-600">{p.description}</p>
+                    <p className="mt-1 text-sm text-muted-fg">{p.description}</p>
                   )}
                   {p.photos.length > 0 && (
                     <div className="mt-2 flex gap-2">
@@ -155,7 +157,7 @@ export default async function PostsPage({
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="text-xs whitespace-nowrap text-gray-400">
+                  <span className="text-xs whitespace-nowrap text-subtle-fg">
                     {matchCount} match{matchCount === 1 ? "" : "es"}
                   </span>
                   {p.status === "OPEN" && (
@@ -175,7 +177,7 @@ export default async function PostsPage({
           );
         })}
         {rest.length === 0 && drafts.length === 0 && (
-          <li className="text-sm text-gray-400">No posts yet.</li>
+          <li className="text-sm text-subtle-fg">No posts yet.</li>
         )}
       </ul>
     </div>

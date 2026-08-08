@@ -113,7 +113,7 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold">
           {greeting(region.timeZone)}, {party.name.split(" ")[0]} 👋
         </h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
         </p>
       </div>
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-medium">Today&rsquo;s opportunities</h2>
-          <Link href="/dashboard/opportunities" className="text-sm text-gray-500 underline">
+          <Link href="/dashboard/opportunities" className="text-sm text-muted-fg underline">
             See all
           </Link>
         </div>
@@ -180,7 +180,7 @@ export default async function DashboardPage() {
             );
           })}
           {topMatches.length === 0 && (
-            <li className="text-sm text-gray-400">
+            <li className="text-sm text-subtle-fg">
               No opportunities yet — post what you have or need to get matched.
             </li>
           )}
@@ -245,7 +245,7 @@ function QuickAction({ href, emoji, label }: { href: string; emoji: string; labe
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+      className="flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium hover:bg-new-bg"
     >
       <span>{emoji}</span>
       {label}

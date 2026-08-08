@@ -26,14 +26,14 @@ export default async function DashboardLayout({
         <div className="mt-auto flex flex-col gap-1 border-t border-border pt-4">
           <Link
             href="/dashboard/settings"
-            className="rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-new-bg"
+            className="rounded-lg px-3 py-2 text-sm text-muted-fg hover:bg-new-bg"
           >
             ⚙️ Settings
           </Link>
           <form action={logoutAction}>
             <button
               type="submit"
-              className="w-full rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-new-bg"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-fg hover:bg-new-bg"
             >
               ↩ Log out
             </button>
@@ -47,11 +47,11 @@ export default async function DashboardLayout({
             FarmaTrade
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/settings" className="text-sm text-gray-600 underline">
+            <Link href="/dashboard/settings" className="text-sm text-muted-fg underline">
               Settings
             </Link>
             <form action={logoutAction}>
-              <button type="submit" className="text-sm text-gray-600 underline">
+              <button type="submit" className="text-sm text-muted-fg underline">
                 Log out
               </button>
             </form>

@@ -33,7 +33,7 @@ export function Sidebar({ hasFarm }: { hasFarm: boolean }) {
           className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
             isActive(pathname, item.href)
               ? "bg-accent text-accent-foreground"
-              : "text-gray-600 hover:bg-new-bg"
+              : "text-muted-fg hover:bg-new-bg"
           }`}
         >
           <span className="text-base">{item.icon}</span>
@@ -53,7 +53,7 @@ export function BottomTabs({ hasFarm }: { hasFarm: boolean }) {
           key={item.href}
           href={item.href}
           className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
-            isActive(pathname, item.href) ? "text-accent" : "text-gray-500"
+            isActive(pathname, item.href) ? "text-accent" : "text-muted-fg"
           }`}
         >
           <span className="text-lg">{item.icon}</span>

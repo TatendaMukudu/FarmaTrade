@@ -21,7 +21,7 @@ export function ConfirmForm({
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <input type="hidden" name="matchId" value={matchId} />
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500" htmlFor={`outcome-${matchId}`}>
+        <label className="text-xs text-muted-fg" htmlFor={`outcome-${matchId}`}>
           Did this go through?
         </label>
         <select
@@ -36,7 +36,7 @@ export function ConfirmForm({
         </select>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500" htmlFor={`score-${matchId}`}>
+        <label className="text-xs text-muted-fg" htmlFor={`score-${matchId}`}>
           Rate {counterpartyName} (optional)
         </label>
         <select
@@ -54,7 +54,7 @@ export function ConfirmForm({
         </select>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-gray-500" htmlFor={`comment-${matchId}`}>
+        <label className="text-xs text-muted-fg" htmlFor={`comment-${matchId}`}>
           Comment (optional)
         </label>
         <input
@@ -66,7 +66,7 @@ export function ConfirmForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? "Saving…" : "Log outcome"}
       </button>
