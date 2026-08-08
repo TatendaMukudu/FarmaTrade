@@ -14,6 +14,7 @@ import {
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
 import { formatMoney, regionFor } from "@/lib/regions";
+import { pluralizeUnit } from "@/lib/units";
 import { Badge } from "@/components/badge";
 import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
@@ -154,7 +155,7 @@ export default async function OpportunitiesPage() {
               <div key={yours.id} className="rounded-card border border-border bg-new-bg p-3">
                 <p className="text-sm font-medium text-new-fg">
                   Combined available for &ldquo;{yours.title}&rdquo;: {combined.toLocaleString()} /{" "}
-                  {needed.toLocaleString()} {yours.unit ?? ""} across {count} matches
+                  {needed.toLocaleString()} {yours.unit ? pluralizeUnit(yours.unit, needed) : ""} across {count} matches
                 </p>
                 <div className="mt-2 h-2 w-full overflow-hidden rounded-pill bg-border">
                   <div

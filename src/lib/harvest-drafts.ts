@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { formatQuantity } from "@/lib/units";
 
 const HARVEST_DRAFT_WINDOW_DAYS = 7;
 
@@ -32,7 +33,7 @@ export async function ensureHarvestDrafts(farmId: string, party: { id: string; p
       partyId: party.id,
       type: "HAVE",
       category: "PRODUCE",
-      title: `${item.quantity} ${item.unit.toLowerCase()} of ${item.cropType}`,
+      title: `${formatQuantity(item.quantity, item.unit)} of ${item.cropType}`,
       quantity: item.quantity,
       unit: item.unit,
       province: party.province,

@@ -18,6 +18,8 @@
 //
 // Pure and DB-free.
 
+import { unitPerLabel } from "@/lib/units";
+
 // Below this many listings there is no range worth quoting — it would be
 // one or two neighbours' opinions with a statistic painted on.
 export const MIN_LISTINGS = 4;
@@ -108,8 +110,8 @@ export function summarizePrices(
         high,
         line:
           low === high
-            ? `${subject} in ${district}: asking ${currencySymbol}${money(median)} per ${unit.toLowerCase()} across ${group.length} listings.`
-            : `${subject} in ${district}: asking ${currencySymbol}${money(low)}–${currencySymbol}${money(high)} per ${unit.toLowerCase()} across ${group.length} listings.`,
+            ? `${subject} in ${district}: asking ${currencySymbol}${money(median)} per ${unitPerLabel(unit)} across ${group.length} listings.`
+            : `${subject} in ${district}: asking ${currencySymbol}${money(low)}–${currencySymbol}${money(high)} per ${unitPerLabel(unit)} across ${group.length} listings.`,
       };
     })
     .sort((a, b) => b.listings - a.listings || a.subject.localeCompare(b.subject));

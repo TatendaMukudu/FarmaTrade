@@ -16,6 +16,7 @@ import {
   StarIcon,
 } from "@/components/icons";
 import { regionFor } from "@/lib/regions";
+import { pluralizeUnit } from "@/lib/units";
 import { loadPendingStamps, loadPriceSignals, stampBanner } from "@/lib/confirmations";
 import { promptsWorthSurfacing } from "@/lib/confirmations-core";
 import { signalForSubject } from "@/lib/price-signals";
@@ -225,7 +226,7 @@ export default async function DashboardPage() {
           <StatTile
             icon={<ProduceIcon />}
             value={`${topProduce.quantity}`}
-            label={`${topProduce.unit.toLowerCase()} of ${topProduce.cropType}${topProduce.perishable ? " ready" : ""}`}
+            label={`${pluralizeUnit(topProduce.unit, topProduce.quantity)} of ${topProduce.cropType}${topProduce.perishable ? " ready" : ""}`}
             href="/dashboard/farm"
           />
         ) : (

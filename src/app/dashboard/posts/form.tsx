@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
 import { regionFor } from "@/lib/regions";
+import { formatQuantity } from "@/lib/units";
 import { CATEGORY_LABEL } from "@/lib/categories";
 import type { PostCategory as Category } from "@/generated/prisma/enums";
 
@@ -111,7 +112,7 @@ export function PostForm({
             {forThisCategory.map((item) => (
               <option key={item.ref} value={item.ref}>
                 {item.label}
-                {item.quantity != null && ` — ${item.quantity}${item.unit ? ` ${item.unit.toLowerCase()}` : ""}`}
+                {item.quantity != null && ` — ${formatQuantity(item.quantity, item.unit)}`}
               </option>
             ))}
           </select>
