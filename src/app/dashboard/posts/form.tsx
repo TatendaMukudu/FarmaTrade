@@ -43,14 +43,14 @@ export function PostForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
+      className="flex flex-col gap-3 rounded-card border border-border bg-card p-4"
     >
       <div className="flex flex-wrap gap-3">
         <Field label="What?">
           <select
             name="type"
             defaultValue={defaultType}
-            className="rounded-lg border border-border px-2 py-1 text-sm"
+            className="rounded-card border border-border px-2 py-1 text-sm"
           >
             <option value="HAVE">I have</option>
             <option value="NEED">I need</option>
@@ -61,7 +61,7 @@ export function PostForm({
             name="category"
             value={category}
             onChange={(e) => setCategory(e.target.value as Category)}
-            className="rounded-lg border border-border px-2 py-1 text-sm"
+            className="rounded-card border border-border px-2 py-1 text-sm"
           >
             {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => (
               <option key={c} value={c}>
@@ -77,7 +77,7 @@ export function PostForm({
           name="title"
           required
           placeholder="e.g. 10 head of breeding cattle"
-          className="w-full rounded-lg border border-border px-2 py-1 text-sm"
+          className="w-full rounded-card border border-border px-2 py-1 text-sm"
         />
       </Field>
 
@@ -97,29 +97,29 @@ export function PostForm({
             name="quantity"
             type="number"
             step="any"
-            className="w-24 rounded-lg border border-border px-2 py-1 text-sm"
+            className="w-24 rounded-card border border-border px-2 py-1 text-sm"
           />
         </Field>
         <Field label="Unit (optional)">
-          <input name="unit" className="w-24 rounded-lg border border-border px-2 py-1 text-sm" />
+          <input name="unit" className="w-24 rounded-card border border-border px-2 py-1 text-sm" />
         </Field>
         <Field label="Price (optional)">
           <input
             name="askingPrice"
             type="number"
             step="any"
-            className="w-32 rounded-lg border border-border px-2 py-1 text-sm"
+            className="w-32 rounded-card border border-border px-2 py-1 text-sm"
           />
         </Field>
       </div>
 
       {category === "TRANSPORT" && (
-        <div className="flex flex-wrap gap-3 rounded-lg bg-new-bg p-3">
+        <div className="flex flex-wrap gap-3 rounded-card bg-new-bg p-3">
           <Field label={`Destination ${region.labels.level1.toLowerCase()} (optional)`}>
             <select
               name="destinationProvince"
               defaultValue=""
-              className="rounded-lg border border-border px-2 py-1 text-sm"
+              className="rounded-card border border-border px-2 py-1 text-sm"
             >
               <option value="">Not sure yet</option>
               {region.level1.map((p) => (
@@ -133,20 +133,20 @@ export function PostForm({
             <input
               name="destinationDistrict"
               placeholder={region.labels.level2}
-              className="rounded-lg border border-border px-2 py-1 text-sm"
+              className="rounded-card border border-border px-2 py-1 text-sm"
             />
           </Field>
           <Field label="Travel date (optional)">
             <input
               name="travelDate"
               type="date"
-              className="rounded-lg border border-border px-2 py-1 text-sm"
+              className="rounded-card border border-border px-2 py-1 text-sm"
             />
           </Field>
         </div>
       )}
 
-      <details className="rounded-lg border border-border px-3 py-2 text-sm">
+      <details className="rounded-card border border-border px-3 py-2 text-sm">
         <summary className="cursor-pointer select-none text-muted-fg">
           More details (description, location, timing)
         </summary>
@@ -155,7 +155,7 @@ export function PostForm({
             <textarea
               name="description"
               rows={2}
-              className="w-full rounded-lg border border-border px-2 py-1 text-sm"
+              className="w-full rounded-card border border-border px-2 py-1 text-sm"
             />
           </Field>
 
@@ -171,7 +171,7 @@ export function PostForm({
                 <select
                   name="province"
                   defaultValue={defaultProvince}
-                  className="rounded-lg border border-border px-2 py-1 text-sm"
+                  className="rounded-card border border-border px-2 py-1 text-sm"
                 >
                   {region.level1.map((p) => (
                     <option key={p} value={p}>
@@ -184,7 +184,7 @@ export function PostForm({
                   name="province"
                   defaultValue={defaultProvince}
                   required
-                  className="rounded-lg border border-border px-2 py-1 text-sm"
+                  className="rounded-card border border-border px-2 py-1 text-sm"
                 />
               )}
             </Field>
@@ -199,11 +199,11 @@ export function PostForm({
                 name="district"
                 defaultValue={defaultDistrict}
                 required
-                className="rounded-lg border border-border px-2 py-1 text-sm"
+                className="rounded-card border border-border px-2 py-1 text-sm"
               />
             </Field>
             <Field label="Needed by (optional)">
-              <input name="neededBy" type="date" className="rounded-lg border border-border px-2 py-1 text-sm" />
+              <input name="neededBy" type="date" className="rounded-card border border-border px-2 py-1 text-sm" />
             </Field>
           </div>
 
@@ -237,7 +237,7 @@ export function PostForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+        className="w-fit rounded-card bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? "Posting…" : "Post"}
       </button>

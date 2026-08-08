@@ -31,7 +31,7 @@ function LabelledField({
   );
 }
 
-const CONTROL = "rounded border border-border px-3 py-2 text-sm";
+const CONTROL = "rounded-control border border-border px-3 py-2 text-sm";
 
 function Level1Input({
   region,

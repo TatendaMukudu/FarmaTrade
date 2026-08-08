@@ -30,7 +30,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
           rows={2}
           defaultValue={party.contactDetails ?? ""}
           placeholder="Office line, sales email, who to ask for — whatever's useful for a stranger to reach you"
-          className="rounded-lg border border-border px-3 py-2 text-sm"
+          className="rounded-card border border-border px-3 py-2 text-sm"
         />
       </div>
 
@@ -43,7 +43,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       </div>
 
       {party.farm && (
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-col gap-4 rounded-card border border-border bg-card p-4">
           <p className="text-sm font-medium">Farm</p>
           <Field label="Farm name" name="farmName" defaultValue={party.farm.farmName} required />
           <Field
@@ -57,7 +57,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       )}
 
       {party.transportProfile && (
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-col gap-4 rounded-card border border-border bg-card p-4">
           <p className="text-sm font-medium">Transport</p>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium" htmlFor="vehicleType">
@@ -68,7 +68,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
               name="vehicleType"
               required
               defaultValue={party.transportProfile.vehicleType}
-              className="rounded-lg border border-border px-3 py-2 text-sm"
+              className="rounded-card border border-border px-3 py-2 text-sm"
             >
               <option value="TRUCK">Truck</option>
               <option value="REFRIGERATED_TRUCK">Refrigerated truck</option>
@@ -106,7 +106,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+        className="w-fit rounded-card bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? "Saving…" : "Save changes"}
       </button>
@@ -141,7 +141,7 @@ function Field({
         defaultValue={defaultValue}
         required={required}
         step={step}
-        className="rounded-lg border border-border px-3 py-2 text-sm"
+        className="rounded-card border border-border px-3 py-2 text-sm"
       />
     </div>
   );

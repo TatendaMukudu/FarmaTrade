@@ -30,7 +30,7 @@ export function Sidebar({ hasFarm }: { hasFarm: boolean }) {
         <Link
           key={item.href}
           href={item.href}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+          className={`flex items-center gap-3 rounded-card px-3 py-2 text-sm font-medium ${
             isActive(pathname, item.href)
               ? "bg-accent text-accent-foreground"
               : "text-muted-fg hover:bg-new-bg"

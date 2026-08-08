@@ -19,7 +19,7 @@ export function TextField({
         name={name}
         type="text"
         defaultValue={defaultValue}
-        className="rounded-lg border border-border px-2 py-1 text-sm"
+        className="rounded-card border border-border px-2 py-1 text-sm"
       />
     </div>
   );
@@ -46,7 +46,7 @@ export function NumberField({
         step="any"
         defaultValue={defaultValue}
         required
-        className="w-24 rounded-lg border border-border px-2 py-1 text-sm"
+        className="w-24 rounded-card border border-border px-2 py-1 text-sm"
       />
     </div>
   );
@@ -74,7 +74,7 @@ export function SelectField({
         id={name}
         name={name}
         defaultValue={defaultValue}
-        className="rounded-lg border border-border px-2 py-1 text-sm"
+        className="rounded-card border border-border px-2 py-1 text-sm"
       >
         {options.map((o) => (
           <option key={o} value={o}>
@@ -91,7 +91,7 @@ export function SubmitButton({ pending, label }: { pending: boolean; label: stri
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+      className="rounded-card bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
     >
       {pending ? "Saving…" : label}
     </button>

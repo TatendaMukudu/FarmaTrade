@@ -11,13 +11,13 @@ export default function Home() {
       <div className="flex gap-4">
         <Link
           href="/login"
-          className="rounded border border-black px-4 py-2 text-sm font-medium"
+          className="rounded-control border border-black px-4 py-2 text-sm font-medium"
         >
           Log in
         </Link>
         <Link
           href="/signup"
-          className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+          className="rounded-control bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
         >
           Sign up
         </Link>

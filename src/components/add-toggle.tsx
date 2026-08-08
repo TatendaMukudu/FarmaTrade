@@ -28,7 +28,7 @@ export function AddToggle({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-fit rounded-lg border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent hover:text-accent-foreground"
+        className="w-fit rounded-card border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent hover:text-accent-foreground"
       >
         + {label}
       </button>

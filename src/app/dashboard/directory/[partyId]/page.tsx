@@ -66,7 +66,7 @@ export default async function PartyProfilePage({
 
         <div className="shrink-0 text-right">
           <p
-            className={`inline-block rounded-full whitespace-nowrap font-semibold ${
+            className={`inline-block rounded-pill whitespace-nowrap font-semibold ${
               reputation.tone === "success" ? "bg-success-bg text-success-fg" : "bg-new-bg text-new-fg"
             } ${reputation.hasStars ? "px-3 py-1 text-xl" : "px-2 py-0.5 text-xs font-medium"}`}
           >
@@ -77,7 +77,7 @@ export default async function PartyProfilePage({
       </div>
 
       {party.farm && (
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-card border border-border bg-card p-4">
           <p className="font-medium">{party.farm.farmName}</p>
           {party.farm.sizeHectares && (
             <p className="text-sm text-muted-fg">{party.farm.sizeHectares} ha</p>
@@ -91,7 +91,7 @@ export default async function PartyProfilePage({
       )}
 
       {party.transportProfile && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-fg">
+        <div className="rounded-card border border-border bg-card p-4 text-sm text-muted-fg">
           {party.transportProfile.vehicleType}
           {party.transportProfile.capacityKg ? ` · ${party.transportProfile.capacityKg}kg capacity` : ""}
           {party.transportProfile.serviceRegion ? ` · serves ${party.transportProfile.serviceRegion}` : ""}
@@ -99,7 +99,7 @@ export default async function PartyProfilePage({
       )}
 
       {(party.phone || party.contactDetails) && (
-        <div className="rounded-lg border border-border bg-card p-4">
+        <div className="rounded-card border border-border bg-card p-4">
           <p className="text-xs text-muted-fg">Contact</p>
           {party.phone && <p className="font-medium">{party.phone}</p>}
           {party.contactDetails && (

@@ -49,6 +49,17 @@
   --color-subtle-fg: #6b7280;
 }
 
+/* One radius per role, so the page lines up.
+   Corners were previously picked per element — `rounded`, `rounded-lg` and
+   `rounded-full` mixed with no rule about which meant what — and cards that
+   sat next to each other disagreed. Nothing looked wrong on its own; the
+   cause is invisible until it's named. Three roles is all this app has. */
+@theme {
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
