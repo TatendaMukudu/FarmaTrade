@@ -2,19 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  DirectoryIcon,
+  FarmIcon,
+  HomeIcon,
+  ListingIcon,
+  MatchIcon,
+} from "@/components/icons";
 
-type NavItem = { href: string; label: string; icon: string };
+type NavItem = {
+  href: string;
+  label: string;
+  Icon: (props: { className?: string }) => React.JSX.Element;
+};
 
-// Emoji here are functional (fast recognition of a fixed set of
-// destinations on a small screen), not decoration — same rule as the
-// category icons elsewhere in the app.
+// Icons mark a fixed set of destinations for fast recognition on a small
+// screen. Every one sits beside its own text label, so the icon is a
+// scanning aid rather than the only thing carrying the meaning.
 function navItems(hasFarm: boolean): NavItem[] {
   return [
-    { href: "/dashboard", label: "Home", icon: "🏠" },
-    ...(hasFarm ? [{ href: "/dashboard/farm", label: "Farm", icon: "🌾" }] : []),
-    { href: "/dashboard/directory", label: "Directory", icon: "📇" },
-    { href: "/dashboard/posts", label: "Posts", icon: "📮" },
-    { href: "/dashboard/opportunities", label: "Opportunities", icon: "🤝" },
+    { href: "/dashboard", label: "Home", Icon: HomeIcon },
+    ...(hasFarm ? [{ href: "/dashboard/farm", label: "Farm", Icon: FarmIcon }] : []),
+    { href: "/dashboard/directory", label: "Directory", Icon: DirectoryIcon },
+    { href: "/dashboard/posts", label: "Posts", Icon: ListingIcon },
+    { href: "/dashboard/opportunities", label: "Opportunities", Icon: MatchIcon },
   ];
 }
 
@@ -36,7 +47,7 @@ export function Sidebar({ hasFarm }: { hasFarm: boolean }) {
               : "text-muted-fg hover:bg-new-bg"
           }`}
         >
-          <span className="text-base">{item.icon}</span>
+          <item.Icon />
           {item.label}
         </Link>
       ))}
@@ -56,7 +67,7 @@ export function BottomTabs({ hasFarm }: { hasFarm: boolean }) {
             isActive(pathname, item.href) ? "text-accent" : "text-muted-fg"
           }`}
         >
-          <span className="text-lg">{item.icon}</span>
+          <item.Icon />
           {item.label}
         </Link>
       ))}

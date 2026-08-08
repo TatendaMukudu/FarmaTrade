@@ -28,14 +28,14 @@ export default async function DashboardLayout({
             href="/dashboard/settings"
             className="rounded-card px-3 py-2 text-sm text-muted-fg hover:bg-new-bg"
           >
-            ⚙️ Settings
+            Settings
           </Link>
           <form action={logoutAction}>
             <button
               type="submit"
               className="w-full rounded-card px-3 py-2 text-left text-sm text-muted-fg hover:bg-new-bg"
             >
-              ↩ Log out
+              Log out
             </button>
           </form>
         </div>

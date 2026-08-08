@@ -6,7 +6,15 @@ import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
-import { categoryEmoji } from "@/lib/categories";
+import {
+  CategoryIcon,
+  ListingIcon,
+  LocationIcon,
+  MatchIcon,
+  ProduceIcon,
+  SproutIcon,
+  StarIcon,
+} from "@/components/icons";
 import { regionFor } from "@/lib/regions";
 import { loadPendingStamps, loadPriceSignals, stampBanner } from "@/lib/confirmations";
 import { promptsWorthSurfacing } from "@/lib/confirmations-core";
@@ -126,7 +134,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">
-          {greeting(region.timeZone)}, {party.name.split(" ")[0]} 👋
+          {greeting(region.timeZone)}, {party.name.split(" ")[0]}
         </h1>
         <p className="text-sm text-muted-fg">
           {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
@@ -193,7 +201,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
-          emoji="🤝"
+          icon={<MatchIcon />}
           value={String(since && newSinceLastVisit > 0 ? newSinceLastVisit : opportunityCount)}
           label={
             since && newSinceLastVisit > 0
@@ -203,26 +211,26 @@ export default async function DashboardPage() {
           href="/dashboard/opportunities"
         />
         <StatTile
-          emoji="📦"
+          icon={<ListingIcon />}
           value={String(openPostCount)}
           label={`active listing${openPostCount === 1 ? "" : "s"}`}
           href="/dashboard/posts"
         />
         <StatTile
-          emoji="⭐"
-          value={reputation.hasHistory ? reputation.headline : "—"}
+          icon={<StarIcon />}
+          value={reputation.hasHistory ? reputation.headline.replace("★", "").trim() : "—"}
           label={reputation.hasHistory ? reputation.completedLine : "no trade history yet"}
         />
         {topProduce ? (
           <StatTile
-            emoji={categoryEmoji("PRODUCE")}
+            icon={<ProduceIcon />}
             value={`${topProduce.quantity}`}
             label={`${topProduce.unit.toLowerCase()} of ${topProduce.cropType}${topProduce.perishable ? " ready" : ""}`}
             href="/dashboard/farm"
           />
         ) : (
           <StatTile
-            emoji="📍"
+            icon={<LocationIcon />}
             value={party.district}
             label={party.province}
           />
@@ -249,7 +257,7 @@ export default async function DashboardPage() {
         />
         {topMatches.length === 0 ? (
           <EmptyState
-            emoji="🌱"
+            icon={<SproutIcon />}
             title="No opportunities yet"
             hint="Post what you have or what you need, and FarmaTrade matches it against the opposite side."
             action={{ href: "/dashboard/posts", label: "Create a post" }}
@@ -279,22 +287,22 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap gap-3">
           <QuickAction
             href="/dashboard/posts?type=HAVE&category=PRODUCE"
-            emoji={categoryEmoji("PRODUCE")}
+            icon={<ProduceIcon />}
             label="Sell produce"
           />
           <QuickAction
             href="/dashboard/posts?type=NEED&category=TRANSPORT"
-            emoji={categoryEmoji("TRANSPORT")}
+            icon={<CategoryIcon category="TRANSPORT" />}
             label="Need transport"
           />
           <QuickAction
             href="/dashboard/posts?type=NEED&category=EQUIPMENT"
-            emoji={categoryEmoji("EQUIPMENT")}
+            icon={<CategoryIcon category="EQUIPMENT" />}
             label="Borrow equipment"
           />
           <QuickAction
             href="/dashboard/posts?type=NEED&category=INPUTS"
-            emoji={categoryEmoji("INPUTS")}
+            icon={<CategoryIcon category="INPUTS" />}
             label="Need supplies"
           />
         </div>
@@ -306,7 +314,8 @@ export default async function DashboardPage() {
 function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew: boolean }) {
   return (
     <span>
-      {categoryEmoji(post.category)} {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
+      <CategoryIcon category={post.category} className="inline-block align-text-bottom" />{" "}
+      {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
       {post.title}
       {isNew && (
         <Badge tone="success" className="ml-2">
@@ -317,13 +326,13 @@ function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew
   );
 }
 
-function QuickAction({ href, emoji, label }: { href: string; emoji: string; label: string }) {
+function QuickAction({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   return (
     <Link
       href={href}
       className="flex items-center gap-2 rounded-control border border-border px-4 py-2 text-sm font-medium hover:bg-new-bg"
     >
-      <span>{emoji}</span>
+      {icon}
       {label}
     </Link>
   );

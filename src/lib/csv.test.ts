@@ -66,3 +66,52 @@ describe("normalizeRow", () => {
     expect(result).toEqual({ cropType: "Maize" });
   });
 });
+
+// A farmer's own spreadsheet, not a machine export. Nobody keeps records in
+// a column called "cropType".
+describe("normalizeRow header synonyms", () => {
+  const PRODUCE = ["cropType", "quantity", "unit", "perishable", "expectedHarvestDate", "notes"];
+  const LIVESTOCK = ["species", "breed", "sex", "quantity", "notes"];
+
+  it("recognises the words farmers actually write", () => {
+    expect(
+      normalizeRow({ Crop: "Mhunga", Qty: "12", Units: "TONNE" }, PRODUCE),
+    ).toEqual({ cropType: "Mhunga", quantity: "12", unit: "TONNE" });
+  });
+
+  it("keeps a native crop name exactly as typed", () => {
+    expect(normalizeRow({ Item: "Nyimo", Amount: "3" }, PRODUCE).cropType).toBe("Nyimo");
+  });
+
+  it("reads 'Head' as a count on a livestock sheet", () => {
+    expect(normalizeRow({ Animal: "CATTLE", Head: "18" }, LIVESTOCK)).toEqual({
+      species: "CATTLE",
+      quantity: "18",
+    });
+  });
+
+  it("resolves an ambiguous header against the sheet it is on", () => {
+    // "Type" means the crop on a produce sheet and the animal on a
+    // livestock one. Only one field set is ever in play.
+    expect(normalizeRow({ Type: "Maize" }, PRODUCE)).toEqual({ cropType: "Maize" });
+    expect(normalizeRow({ Type: "GOAT" }, LIVESTOCK)).toEqual({ species: "GOAT" });
+  });
+
+  it("lets an exact header win over another column's synonym", () => {
+    const row = normalizeRow({ cropType: "Maize", Item: "something else" }, PRODUCE);
+    expect(row.cropType).toBe("Maize");
+  });
+
+  it("tolerates punctuation and spacing in headers", () => {
+    expect(normalizeRow({ "Crop (type)": "Sorghum", "Harvest date": "2026-09-01" }, PRODUCE)).toEqual({
+      cropType: "Sorghum",
+      expectedHarvestDate: "2026-09-01",
+    });
+  });
+
+  it("ignores a column it does not recognise rather than guessing", () => {
+    expect(normalizeRow({ "Paddock number": "7", Crop: "Maize" }, PRODUCE)).toEqual({
+      cropType: "Maize",
+    });
+  });
+});

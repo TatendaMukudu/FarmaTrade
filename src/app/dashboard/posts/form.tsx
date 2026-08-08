@@ -8,7 +8,18 @@ import type { PostCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
 
+export type InventoryOption = {
+  ref: string;
+  category: Category;
+  // Exactly what the farmer called it. Never normalised, never translated —
+  // "Mhunga" stays "Mhunga".
+  label: string;
+  quantity?: number | null;
+  unit?: string | null;
+};
+
 export function PostForm({
+  inventory = [],
   countryCode,
   defaultProvince,
   defaultDistrict,
@@ -16,6 +27,7 @@ export function PostForm({
   defaultCategory = "PRODUCE",
   onDone,
 }: {
+  inventory?: InventoryOption[];
   countryCode: string;
   defaultProvince: string;
   defaultDistrict: string;
@@ -26,6 +38,7 @@ export function PostForm({
   const region = regionFor(countryCode);
   const formRef = useRef<HTMLFormElement>(null);
   const [category, setCategory] = useState<Category>(defaultCategory);
+  const forThisCategory = inventory.filter((i) => i.category === category);
   const [state, formAction, pending] = useActionState(
     async (prev: PostActionState, formData: FormData) => {
       const result = await createPost(prev, formData);
@@ -71,6 +84,39 @@ export function PostForm({
           </select>
         </Field>
       </div>
+
+      {forThisCategory.length > 0 && (
+        <Field label="From your farm records (optional)">
+          <select
+            name="inventoryRef"
+            defaultValue=""
+            onChange={(e) => {
+              // Fills the title with the farmer's own name for the item.
+              // Left editable: this is a starting point, not a lock.
+              const picked = inventory.find((i) => i.ref === e.target.value);
+              const form = formRef.current;
+              if (!form || !picked) return;
+              const title = form.elements.namedItem("title") as HTMLInputElement | null;
+              const quantity = form.elements.namedItem("quantity") as HTMLInputElement | null;
+              const unit = form.elements.namedItem("unit") as HTMLInputElement | null;
+              if (title && !title.value) title.value = picked.label;
+              if (quantity && !quantity.value && picked.quantity != null) {
+                quantity.value = String(picked.quantity);
+              }
+              if (unit && !unit.value && picked.unit) unit.value = picked.unit;
+            }}
+            className="w-full rounded-card border border-border px-2 py-1 text-sm"
+          >
+            <option value="">Not from my records</option>
+            {forThisCategory.map((item) => (
+              <option key={item.ref} value={item.ref}>
+                {item.label}
+                {item.quantity != null && ` — ${item.quantity}${item.unit ? ` ${item.unit.toLowerCase()}` : ""}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       <Field label="Title">
         <input

@@ -15,6 +15,7 @@ import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
 import { formatMoney, regionFor } from "@/lib/regions";
 import { Badge } from "@/components/badge";
+import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
@@ -30,10 +31,8 @@ const BUCKET_LIMIT: Record<Bucket, number> = {
   worth_knowing: 3,
 };
 
-// The enum spelled for a human. "COMPLETED GOOD" was leaking straight
-// through to the History list.
-// How much is actually known about this counterparty, said plainly. The
-// tier names are ours; a farmer should read what they mean.
+// Enums spelled for a human. "COMPLETED GOOD" and "MATCHED" were leaking
+// straight through to the page.
 const MATCH_STATUS_LABEL: Record<string, string> = {
   SUGGESTED: "Suggested",
   ACCEPTED: "Agreed",
@@ -41,6 +40,8 @@ const MATCH_STATUS_LABEL: Record<string, string> = {
   COMPLETED: "Completed",
 };
 
+// How much is actually known about this counterparty, said plainly. The
+// tier names are ours; a farmer should read what they mean.
 const CONFIDENCE_LABEL: Record<string, string> = {
   confirmed: "Well-established trader",
   reliable: "Has traded before",
@@ -138,7 +139,7 @@ export default async function OpportunitiesPage() {
 
       {plan.empty && (
         <EmptyState
-          emoji="🌱"
+          icon={<SproutIcon />}
           title="No opportunities yet"
           hint="Post what you have or what you need, and FarmaTrade matches it against the opposite side."
           action={{ href: "/dashboard/posts", label: "Create a post" }}

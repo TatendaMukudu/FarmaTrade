@@ -45,18 +45,17 @@ export function LinkCard({
 
 // The number first, then what it counts.
 //
-// The old StatLine rendered an emoji and then a full sentence at one size
+// The old StatLine rendered an icon and then a full sentence at one size
 // ("3 active listings"), right-aligned. It read as prose, so nothing was
 // scannable and four stacked looked like a list of notes rather than a
-// dashboard. The emoji stays — it is doing real work as a category marker,
-// and swapping it for an abstract icon would help nobody.
+// dashboard.
 export function StatTile({
-  emoji,
+  icon,
   value,
   label,
   href,
 }: {
-  emoji: string;
+  icon: React.ReactNode;
   value: string;
   label: string;
   href?: string;
@@ -65,9 +64,9 @@ export function StatTile({
     <div className="flex items-start gap-3">
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-new-bg text-lg"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-new-bg text-muted-fg"
       >
-        {emoji}
+        {icon}
       </span>
       <div className="min-w-0">
         <p className="text-2xl leading-none font-semibold">{value}</p>
@@ -82,21 +81,21 @@ export function StatTile({
 // filled one so "nothing time-critical right now" reads as an answer rather
 // than as something that failed to load.
 export function EmptyState({
-  emoji = "—",
+  icon,
   title,
   hint,
   action,
 }: {
-  emoji?: string;
+  icon?: React.ReactNode;
   title: string;
   hint?: string;
   action?: { href: string; label: string };
 }) {
   return (
     <div className="rounded-card border border-dashed border-border px-4 py-8 text-center">
-      <p aria-hidden="true" className="text-2xl opacity-40">
-        {emoji}
-      </p>
+      {icon && (
+        <span className="inline-flex text-subtle-fg [&>svg]:h-8 [&>svg]:w-8">{icon}</span>
+      )}
       <p className="mt-2 text-sm font-medium">{title}</p>
       {hint && <p className="mt-1 text-sm text-muted-fg">{hint}</p>}
       {action && (

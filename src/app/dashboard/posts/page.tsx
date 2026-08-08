@@ -1,6 +1,6 @@
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { PostForm } from "./form";
+import { PostForm, type InventoryOption } from "./form";
 import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
@@ -36,6 +36,54 @@ export default async function PostsPage({
   const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
     ? (categoryParam as PostCategory)
     : undefined;
+
+  // What this farmer has actually recorded, in their own words. Livestock
+  // has no free-text name of its own, so it is described from the fields
+  // that do carry the farmer's wording (breed) plus the species.
+  const farm = party.farm
+    ? await prisma.farm.findUnique({
+        where: { id: party.farm.id },
+        select: {
+          produce: {
+            where: { quantity: { gt: 0 } },
+            select: { id: true, cropType: true, quantity: true, unit: true },
+          },
+          livestock: {
+            select: { id: true, species: true, breed: true, quantity: true },
+          },
+          equipment: {
+            where: { available: true },
+            select: { id: true, name: true },
+          },
+        },
+      })
+    : null;
+
+  const inventory: InventoryOption[] = farm
+    ? [
+        ...farm.produce.map((r) => ({
+          ref: `produce:${r.id}`,
+          category: "PRODUCE" as const,
+          label: r.cropType,
+          quantity: r.quantity,
+          unit: r.unit,
+        })),
+        ...farm.livestock.map((r) => ({
+          ref: `livestock:${r.id}`,
+          category: "LIVESTOCK" as const,
+          label: r.breed ? `${r.breed} ${r.species.toLowerCase()}` : r.species.toLowerCase(),
+          quantity: r.quantity,
+          unit: null,
+        })),
+        ...farm.equipment.map((r) => ({
+          ref: `equipment:${r.id}`,
+          category: "EQUIPMENT" as const,
+          label: r.name,
+          quantity: null,
+          unit: null,
+        })),
+      ]
+    : [];
 
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
@@ -100,6 +148,7 @@ export default async function PostsPage({
 
       <AddToggle label="New post" defaultOpen={!!(defaultType || defaultCategory)}>
         <PostForm
+          inventory={inventory}
           countryCode={party.countryCode}
           defaultProvince={party.province}
           defaultDistrict={party.district}
