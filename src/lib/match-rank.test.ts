@@ -9,6 +9,7 @@ import {
   type RankableMatch,
 } from "./match-rank";
 import { reliabilityByKind, tallyReasonOutcomes } from "./reason-reliability";
+import { laneHistory, summarizeTradeOutcomes } from "./trade-outcomes";
 import type { MatchSignal } from "./matching-core";
 
 const NOW = new Date("2026-08-08T09:00:00Z");
@@ -181,6 +182,59 @@ describe("rankOne", () => {
         "standing_order",
       ]),
     );
+  });
+});
+
+describe("lane history in ranking", () => {
+  const LANE = "produce:harare~marondera";
+
+  function laneWith(good: number, fellThrough: number) {
+    return laneHistory(
+      summarizeTradeOutcomes([
+        ...Array.from({ length: good }, () => ({
+          lane: LANE,
+          laneLabel: "Produce between Harare and Marondera",
+          counterpartyClass: "new" as const,
+          outcome: "completed_good" as const,
+        })),
+        ...Array.from({ length: fellThrough }, () => ({
+          lane: LANE,
+          laneLabel: "Produce between Harare and Marondera",
+          counterpartyClass: "new" as const,
+          outcome: "did_not_happen" as const,
+        })),
+      ]),
+    );
+  }
+
+  it("attaches the lane's recorded history to the ranked match", () => {
+    const ranked = rankOne(match({ lane: LANE, laneClass: "new" }), {
+      now: NOW,
+      lanes: laneWith(6, 1),
+    });
+    expect(ranked.lane?.line).toContain("6 completed well");
+  });
+
+  it("attaches nothing when the match carries no lane", () => {
+    expect(rankOne(match(), { now: NOW, lanes: laneWith(6, 1) }).lane).toBeNull();
+  });
+
+  it("ranks a lane whose trades mostly fell through below one where they held", () => {
+    const m = match({ lane: LANE, laneClass: "new" });
+    const good = rankOne(m, { now: NOW, lanes: laneWith(6, 1) });
+    const bad = rankOne(m, { now: NOW, lanes: laneWith(1, 6) });
+    expect(bad.limitations).toContain("lane_mostly_fell_through");
+    expect(good.limitations).not.toContain("lane_mostly_fell_through");
+    expect(bad.rank).toBeLessThan(good.rank);
+  });
+
+  it("demotes such a lane without burying it beneath a genuinely urgent match", () => {
+    const badLane = rankOne(
+      match({ id: "a", lane: LANE, laneClass: "new", theirs: post({ neededBy: daysFromNow(1) }) }),
+      { now: NOW, lanes: laneWith(1, 6) },
+    );
+    const routine = rankOne(match({ id: "b" }), { now: NOW });
+    expect(badLane.rank).toBeGreaterThan(routine.rank);
   });
 });
 

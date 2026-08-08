@@ -11,7 +11,7 @@ import {
   distanceLabel,
   estimatedPostValue,
 } from "@/lib/match-view";
-import { loadReasonReliability, toRankableMatch } from "@/lib/match-ranking";
+import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
 import { Badge } from "@/components/badge";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
@@ -37,7 +37,7 @@ export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
   if (!party) return null;
 
-  const [active, history, relations, reliability] = await Promise.all([
+  const [active, history, relations, matchingHistory] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SUGGESTED", "ACCEPTED"] },
@@ -69,7 +69,7 @@ export default async function OpportunitiesPage() {
     prisma.relation.findMany({
       where: { OR: [{ partyAId: party.id }, { partyBId: party.id }] },
     }),
-    loadReasonReliability(),
+    loadMatchingHistory(),
   ]);
 
   const strengthByCounterparty = new Map<string, number>();
@@ -83,7 +83,7 @@ export default async function OpportunitiesPage() {
   const now = new Date();
   const plan = planMatches(
     active.map((m) => toRankableMatch(m, party.id, strengthByCounterparty)),
-    { now, reliability, limit: BUCKET_LIMIT },
+    { now, ...matchingHistory, limit: BUCKET_LIMIT },
   );
 
   // Coverage is computed over every active match, not per bucket — "how much
@@ -168,12 +168,26 @@ export default async function OpportunitiesPage() {
                               Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
                             </p>
                           )}
+                          {/* What has happened before on this route, in
+                              counts rather than forecasts. Absent entirely
+                              when there isn't enough history to say
+                              something honest. */}
+                          {ranked.lane?.line && (
+                            <p className="mt-2 text-sm text-gray-600">
+                              Track record: {ranked.lane.line}
+                              {ranked.lane.classLine && ` ${ranked.lane.classLine}`}
+                            </p>
+                          )}
                           {/* The ordering is inspectable on purpose — a rank
                               nobody can see the working for is one nobody can
-                              tell us is wrong. */}
-                          <p className="mt-1 text-xs text-gray-400">
-                            Ranked {ranked.rank} · {ranked.rationale.join(" · ")}
-                          </p>
+                              tell us is wrong. Kept out of the farmer's way
+                              in production; it is a debugging aid, not
+                              something a buyer needs to read. */}
+                          {process.env.NODE_ENV !== "production" && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              Ranked {ranked.rank} · {ranked.rationale.join(" · ")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
                           {m.status === "SUGGESTED" && (

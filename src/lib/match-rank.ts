@@ -1,6 +1,5 @@
-// Read-time ranking, ported from the platform's `ai/priority-office.js`
-// (the scoring shape and its rationale trail) and `ai/behaviour.js`
-// (bucketing, volume caps, and treating silence as a valid state).
+// Read-time ranking: the order opportunities are shown in, decided fresh on
+// every page load rather than frozen into the row when the match was made.
 //
 // The problem this fixes: `Match.score` is computed once inside
 // `generateMatchesForPost` and never revisited. A counterparty who completes
@@ -14,8 +13,8 @@
 // writes to them. Ranking is recomputed on every read from rows the pages
 // already fetch, which costs one pure function call and no migration.
 //
-// The layering is the platform module's, kept deliberately lexicographic so
-// the ordering stays explicable rather than being an opaque weighted sum:
+// The layering is deliberately lexicographic rather than one opaque weighted
+// sum, so the ordering stays explicable to the farmer it's shown to:
 //
 //   priority   x100  — a deadline always beats a nicety
 //   confidence  x20  — better-evidenced beats better-guessed
@@ -23,10 +22,11 @@
 //                      learned; can flip a confidence tier, never a priority
 //   polarity     x8  — the tie-break between equals
 //
-// Boundary, inherited from behaviour.js and worth keeping: this file decides
-// HOW matches are delivered — order, grouping, volume — and never WHAT is
-// true about them. It creates no reasons, and it can only ever lower a
-// confidence, never raise one.
+// Boundary worth keeping: this file decides HOW matches are delivered —
+// order, grouping, volume — and never WHAT is true about them. It creates no
+// reasons, and it can only ever lower a confidence, never raise one. That
+// separation is what lets the ordering be tuned freely without any risk of
+// it quietly inventing a claim about a counterparty.
 //
 // Pure and DB-free. `match-ranking.ts` is the server-side wrapper that feeds
 // it.
@@ -41,6 +41,7 @@ import {
   type ReasonKind,
   type ReasonReliability,
 } from "@/lib/reason-reliability";
+import { laneBrief, type CounterpartyClass, type LaneBrief, type LaneHistory } from "@/lib/trade-outcomes";
 
 export type Priority = "urgent" | "high" | "medium" | "low";
 export type Confidence = "confirmed" | "reliable" | "promising" | "calibrating";
@@ -82,14 +83,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const EVIDENCE_WEIGHT = 0.4;
 
 const PREFERRED_PARTNER_BONUS = 12;
-// Mirrors priority-office's `pinnedFirst`: an explicit standing arrangement
-// outranks a preference we merely inferred.
+// Smaller than a preferred partner on purpose: `recurring` is a label the
+// poster typed, while Relation.strength was earned across completed trades.
 const STANDING_ORDER_BONUS = 6;
 
 const PENALTY = {
   no_outcome_history: 10,
   small_sample: 5,
   counterparty_fell_through: 15,
+  // Deliberately mild. A lane where trades have mostly not held is worth
+  // knowing about and worth ranking below one where they have — but it is
+  // history, not a verdict on this pairing, and burying the match would deny
+  // the farmer the choice.
+  lane_mostly_fell_through: 8,
   listing_expired: 40,
 } as const;
 
@@ -123,6 +129,10 @@ export type RankableMatch = {
   theirs: RankablePost;
   counterpartyReputation: RankableReputation;
   counterpartyVerifiedBy: VerificationSource | null;
+  // Which category-and-route bucket this trade sits in, and how well known
+  // its least-established side is — the key into recorded lane history.
+  lane?: string;
+  laneClass?: CounterpartyClass;
   // Relation.strength for this counterparty, if a Relation row exists.
   relationStrength?: number;
   // True once you've filed your side of the confirmation and are waiting on
@@ -138,6 +148,9 @@ export type RankedMatch<M extends RankableMatch = RankableMatch> = {
   confidence: Confidence;
   bucket: Bucket;
   limitations: string[];
+  // What has happened before on this category and route. Null when there
+  // isn't enough recorded history to say anything honest.
+  lane: LaneBrief | null;
   // Why this landed where it did, in the order the terms were applied. Not
   // decoration: an ordering nobody can inspect is one nobody can correct.
   rationale: string[];
@@ -146,6 +159,7 @@ export type RankedMatch<M extends RankableMatch = RankableMatch> = {
 export type RankOptions = {
   now?: Date;
   reliability?: ReasonReliability;
+  lanes?: LaneHistory;
 };
 
 function daysBetween(from: Date, to: Date): number {
@@ -301,6 +315,12 @@ export function rankOne<M extends RankableMatch>(
   const bucket = bucketOf(match, priority, now);
   const limitations = limitationsOf(match, now);
 
+  const lane =
+    opts.lanes && match.lane
+      ? laneBrief(opts.lanes, match.lane, match.laneClass ?? "new")
+      : null;
+  if (lane?.mostlyFellThrough) limitations.push("lane_mostly_fell_through");
+
   const rationale: string[] = [`priority:${priority}`, `confidence:${confidence}`];
 
   let rank = 0;
@@ -347,6 +367,7 @@ export function rankOne<M extends RankableMatch>(
     confidence,
     bucket,
     limitations,
+    lane,
     rationale,
   };
 }
@@ -379,9 +400,8 @@ export type MatchPlan<M extends RankableMatch> = {
   groups: MatchGroup<M>[];
 };
 
-// behaviour.js's `plan()`: group, rank within group, cap volume, and return
-// first-class empty states. Thirty undifferentiated cards is not a list a
-// farmer on a phone can act on.
+// Group, rank within group, cap volume, and return first-class empty states.
+// Thirty undifferentiated cards is not a list a farmer on a phone can act on.
 export const DEFAULT_BUCKET_LIMIT = 5;
 
 export function planMatches<M extends RankableMatch>(

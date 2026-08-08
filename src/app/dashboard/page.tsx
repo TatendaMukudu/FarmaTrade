@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
-import { loadReasonReliability, toRankableMatch } from "@/lib/match-ranking";
+import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
 import { categoryEmoji } from "@/lib/categories";
 import { Badge } from "@/components/badge";
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     draftCount,
     matchCandidates,
     topProduce,
-    reliability,
+    matchingHistory,
   ] = await Promise.all([
       prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
       prisma.match.count({
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
             orderBy: { quantity: "desc" },
           })
         : Promise.resolve(null),
-    loadReasonReliability(),
+    loadMatchingHistory(),
   ]);
 
   await prisma.party.update({
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
   const reputation = summarizeReputation(party.reputation);
   const topMatches = rankMatches(
     matchCandidates.map((m) => toRankableMatch(m, party.id)),
-    { reliability },
+    matchingHistory,
   ).slice(0, TOP_MATCHES_SHOWN);
 
   return (

@@ -1,7 +1,7 @@
-// The Confidence Engine, ported from the platform's `ai/confidence.js`.
+// Which of FarmaTrade's own reasons actually predict a trade.
 //
-// "A system that knows WHERE it is reliable is more trustworthy than a
-// smarter one that doesn't." `scoreMatch` hands out fixed points per reason
+// A matcher that knows where it is reliable is worth more to a farmer than a
+// cleverer one that doesn't. `scoreMatch` hands out fixed points per reason
 // — +20 for same district, +15 for on-route — and has never once checked
 // whether those reasons actually predict a trade happening. This is the
 // check.
@@ -11,8 +11,8 @@
 // a labelled example of "we cited X, and here's what the parties did about
 // it." Nothing new has to be recorded to start reading it.
 //
-// Two rules carried over verbatim from the platform module, because both are
-// the honest posture rather than the convenient one:
+// Two rules here are the honest posture rather than the convenient one, and
+// both matter more in a thin market than they would in a busy one:
 //   - Below MIN_FEEDBACK responses it reports `calibrating`, full stop. It
 //     does not claim a reliability it hasn't earned, and it does not let a
 //     2-for-2 streak masquerade as a proven signal.
@@ -109,8 +109,9 @@ export function reliability(tally: Tally | undefined | null): Reliability {
 }
 
 // Does this reason still deserve the points matching-core assigns it? False
-// only once it has earned enough feedback and proved mostly unhelpful — the
-// platform module's `shouldSurface`, kept asymmetric on purpose.
+// only once it has earned enough feedback and proved mostly unhelpful —
+// asymmetric on purpose, since being slow to condemn a reason costs a farmer
+// far less than being quick to.
 export function shouldTrust(rel: Reliability): boolean {
   return !(rel.tier === "unproven" && rel.total >= MIN_FEEDBACK_TO_STAND_DOWN);
 }

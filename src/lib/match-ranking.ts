@@ -2,39 +2,86 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "@/lib/matching-core";
 import { resolveMatchSides } from "@/lib/match-view";
-import { reliabilityByKind, tallyReasonOutcomes, type ReasonReliability } from "@/lib/reason-reliability";
+import {
+  reliabilityByKind,
+  tallyReasonOutcomes,
+  type ReasonReliability,
+} from "@/lib/reason-reliability";
+import {
+  counterpartyClassOf,
+  laneHistory,
+  laneKey,
+  outcomeOf,
+  summarizeTradeOutcomes,
+  weakerClass,
+  type LaneHistory,
+  type TradeRecord,
+} from "@/lib/trade-outcomes";
 import type { RankableMatch } from "@/lib/match-rank";
 import type { Party, Post, Reputation, TransactionConfirmation } from "@/generated/prisma/client";
 
 // The server-side seam between the pure ranking modules and Prisma: pages
-// call these two, and never have to know that ranking is assembled from
-// three separate pure functions.
+// call these, and never have to know that ranking is assembled from four
+// separate pure functions.
 
 // Enough settled matches to be a real sample, bounded so this stays one
 // cheap query rather than a full-table scan as the network grows. Newest
-// first, so what the tally reflects is how the reasons are performing now.
-const RELIABILITY_SAMPLE_SIZE = 5000;
+// first, so what it reflects is how matching is performing now.
+const HISTORY_SAMPLE_SIZE = 5000;
 
-// How every cited reason has actually performed across the whole network —
-// not per party. A single farmer will never settle enough matches to say
-// anything about whether "on your route" predicts a trade; the network will.
+// Everything FarmaTrade has learned from its own settled matches. Two
+// different readings of one scan:
 //
-// Derived on read from `Match.reasons` and `Match.status`, which have been
-// accumulating since launch. No rollup table until this query stops being
-// cheap, and no migration to start using it.
-export async function loadReasonReliability(): Promise<ReasonReliability> {
+//   reliability — per reason kind, does citing this predict a trade
+//   lanes       — per category and route, do trades like this hold up
+//
+// Both are network-wide rather than per party, and deliberately so. A single
+// farmer will never settle enough matches to say whether "on your route"
+// means anything; the network will. Both are derived on read from columns
+// that have been filling up since launch, so neither needed a migration to
+// start working.
+export type MatchingHistory = {
+  reliability: ReasonReliability;
+  lanes: LaneHistory;
+};
+
+export async function loadMatchingHistory(): Promise<MatchingHistory> {
   const settled = await prisma.match.findMany({
     where: { status: { in: ["ACCEPTED", "DECLINED", "COMPLETED"] } },
     select: {
       reasons: true,
       status: true,
       confirmations: { select: { outcome: true } },
+      postA: {
+        select: {
+          category: true,
+          district: true,
+          party: {
+            select: {
+              verifiedBy: true,
+              reputation: { select: { completedCount: true, ratingCount: true } },
+            },
+          },
+        },
+      },
+      postB: {
+        select: {
+          category: true,
+          district: true,
+          party: {
+            select: {
+              verifiedBy: true,
+              reputation: { select: { completedCount: true, ratingCount: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: { updatedAt: "desc" },
-    take: RELIABILITY_SAMPLE_SIZE,
+    take: HISTORY_SAMPLE_SIZE,
   });
 
-  return reliabilityByKind(
+  const reliability = reliabilityByKind(
     tallyReasonOutcomes(
       settled.map((m) => ({
         reasons: m.reasons,
@@ -46,6 +93,21 @@ export async function loadReasonReliability(): Promise<ReasonReliability> {
       })),
     ),
   );
+
+  const records: TradeRecord[] = settled.map((m) => {
+    const { lane, laneLabel } = laneKey(m.postA.category, m.postA.district, m.postB.district);
+    return {
+      lane,
+      laneLabel,
+      counterpartyClass: weakerClass(
+        counterpartyClassOf(m.postA.party.reputation, m.postA.party.verifiedBy),
+        counterpartyClassOf(m.postB.party.reputation, m.postB.party.verifiedBy),
+      ),
+      outcome: outcomeOf(m.status, m.confirmations),
+    };
+  });
+
+  return { reliability, lanes: laneHistory(summarizeTradeOutcomes(records)) };
 }
 
 type PostWithParty = Post & { party: Party & { reputation: Reputation | null } };
@@ -72,6 +134,8 @@ export function toRankableMatch<
   const { yours, theirs } = resolveMatchSides<PostWithParty>(match, partyId);
   const { signals } = scoreMatch(theirs, yours, theirs.party.reputation, theirs.party.verifiedBy);
 
+  const { lane } = laneKey(yours.category, yours.district, theirs.district);
+
   return {
     id: match.id,
     status: match.status,
@@ -81,6 +145,13 @@ export function toRankableMatch<
     theirs,
     counterpartyReputation: theirs.party.reputation,
     counterpartyVerifiedBy: theirs.party.verifiedBy,
+    lane,
+    // Looked up the same way it was recorded — on the least-established
+    // side — so a brief is read off the sample it actually belongs to.
+    laneClass: weakerClass(
+      counterpartyClassOf(yours.party.reputation, yours.party.verifiedBy),
+      counterpartyClassOf(theirs.party.reputation, theirs.party.verifiedBy),
+    ),
     relationStrength: strengthByCounterparty?.get(theirs.party.id),
     awaitingCounterparty: match.confirmations?.some((c) => c.partyId === partyId) ?? false,
     source: match,
