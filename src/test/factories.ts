@@ -16,6 +16,7 @@ function unique(prefix: string) {
 export async function createTestParty(
   opts: {
     roles?: PartyRole[];
+    countryCode?: string;
     province?: string;
     district?: string;
     password?: string;
@@ -35,6 +36,7 @@ export async function createTestParty(
       userId: user.id,
       name: user.name,
       roles: opts.roles ?? ["TRADER"],
+      countryCode: opts.countryCode ?? "ZW",
       province: opts.province ?? "Harare",
       district: opts.district ?? "Harare",
     },
@@ -49,8 +51,10 @@ export async function createTestPost(
     type: "HAVE" | "NEED";
     category: "PRODUCE" | "LIVESTOCK" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
     title: string;
+    countryCode: string;
     province: string;
     district: string;
+    openToCrossBorder: boolean;
     status: "OPEN" | "DRAFT" | "CLOSED";
   }> = {},
 ) {
@@ -60,8 +64,10 @@ export async function createTestPost(
       type: overrides.type ?? "HAVE",
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
+      countryCode: overrides.countryCode ?? "ZW",
       province: overrides.province ?? "Harare",
       district: overrides.district ?? "Harare",
+      openToCrossBorder: overrides.openToCrossBorder ?? false,
       status: overrides.status ?? "OPEN",
     },
   });

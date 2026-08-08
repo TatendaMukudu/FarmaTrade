@@ -31,6 +31,22 @@
      history never reads as good or bad, just unknown. */
   --color-new-bg: #f1f5f9;
   --color-new-fg: #475569;
+
+  /* Secondary text, as tokens rather than raw Tailwind greys.
+     `text-gray-400` was being used for the match reason line, the distance
+     label and every empty state — text that carries real information — at
+     about 2.8:1 on white. That is below the 4.5:1 minimum and it is the
+     text most likely to be unreadable on a phone in daylight, which is the
+     ordinary condition here rather than an edge case.
+     Raw greys were also the wrong tool for a second reason: they are fixed
+     hex values, so they did not flip with the theme and got steadily worse
+     as the dark palette diverged from the light one.
+     muted  — secondary text that still carries meaning (7.5:1 on white)
+     subtle — tertiary labels and timestamps (4.8:1 on white)
+     Both pass AA in both themes. There is no third, fainter step on
+     purpose: if text matters enough to render, it matters enough to read. */
+  --color-muted-fg: #4b5563;
+  --color-subtle-fg: #6b7280;
 }
 
 @theme inline {
@@ -49,6 +65,8 @@
   --color-info-fg: var(--color-info-fg);
   --color-new-bg: var(--color-new-bg);
   --color-new-fg: var(--color-new-fg);
+  --color-muted-fg: var(--color-muted-fg);
+  --color-subtle-fg: var(--color-subtle-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -76,6 +94,11 @@
 
     --color-new-bg: #1e293b;
     --color-new-fg: #94a3b8;
+
+    /* Lighter than their light-mode counterparts, not darker — on #0a0a0a
+       the same greys would fall through the floor. */
+    --color-muted-fg: #d4d4d8;
+    --color-subtle-fg: #a1a1aa;
   }
 }
 
@@ -83,4 +106,31 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Keyboard and switch users had nothing to go on: no focus styling was
+   defined anywhere, so they got the browser default where one survived and
+   nothing at all where a reset had removed it. Defined once, here, rather
+   than per component — a focus ring that depends on someone remembering to
+   add it is one that will be missing somewhere.
+   :focus-visible rather than :focus, so a farmer tapping a button on a
+   phone doesn't get a ring they didn't ask for.
+   The 2px offset is what keeps this visible on the solid accent buttons:
+   without it the green ring would sit directly on green. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Nothing here animates much yet, but the coverage bar does and more will.
+   Cheap to honour now; a retrofit once there is a lot of motion is not. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

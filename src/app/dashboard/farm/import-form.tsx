@@ -35,7 +35,7 @@ export function ImportForm() {
       <form ref={formRef} action={formAction} className="mt-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500" htmlFor="import-category">
+            <label className="text-xs text-muted-fg" htmlFor="import-category">
               Type
             </label>
             <select
@@ -67,7 +67,7 @@ export function ImportForm() {
           <span className="text-sm font-medium text-new-fg">
             {fileName ?? "Choose a CSV file"}
           </span>
-          <span className="text-xs text-gray-500">{fileName ? "Tap to change" : "or drop it here"}</span>
+          <span className="text-xs text-muted-fg">{fileName ? "Tap to change" : "or drop it here"}</span>
           <input
             id="import-file"
             name="file"
@@ -79,12 +79,12 @@ export function ImportForm() {
         </label>
       </form>
 
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-xs text-muted-fg">
         Expected columns — Livestock: {TEMPLATES.LIVESTOCK.split("\n")[0]} · Produce:{" "}
         {TEMPLATES.PRODUCE.split("\n")[0]} · Equipment: {TEMPLATES.EQUIPMENT.split("\n")[0]}
       </p>
 
-      {state.success && <p className="mt-2 text-sm text-green-700">{state.success}</p>}
+      {state.success && <p className="mt-2 text-sm text-accent">{state.success}</p>}
       {state.error && (
         <p className="mt-2 text-sm text-red-600" role="alert">
           {state.error}

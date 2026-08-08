@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
-import { signupSchema } from "@/lib/validation";
+import { signupSchemaFor } from "@/lib/validation";
+import { regionFor } from "@/lib/regions";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import type { PartyRole, VehicleType } from "@/generated/prisma/client";
@@ -44,11 +45,16 @@ export async function signupAction(
     }
   }
 
-  const parsed = signupSchema.safeParse({
+  // Parsed with the labels of the country the farmer just picked, so a
+  // missing field is reported in their own vocabulary rather than the
+  // pilot's.
+  const countryCode = formData.get("countryCode")?.toString() || undefined;
+  const parsed = signupSchemaFor(regionFor(countryCode).labels).safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
     phone: formData.get("phone") || undefined,
+    countryCode,
     province: formData.get("province"),
     district: formData.get("district"),
     roles: formData.getAll("roles"),
@@ -88,6 +94,7 @@ export async function signupAction(
       data: {
         userId: createdUser.id,
         name: data.name,
+        countryCode: data.countryCode,
         roles: data.roles as PartyRole[],
         phone: data.phone,
         province: data.province,

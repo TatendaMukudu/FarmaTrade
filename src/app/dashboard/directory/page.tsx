@@ -51,7 +51,7 @@ export default async function DirectoryPage({
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Directory</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           Buyers, sellers, and transport providers, ranked by reputation.
         </p>
       </div>
@@ -86,14 +86,14 @@ export default async function DirectoryPage({
                     {p.verifiedBy && <VerifiedBadge source={p.verifiedBy} />}
                     {strength && strength >= 2 && <Badge tone="info">Preferred partner</Badge>}
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-fg">
                     {p.district}, {p.province} · {p.roles.join(", ")}
                   </p>
                   {p.farm && (
-                    <p className="text-sm text-gray-500">Farm: {p.farm.farmName}</p>
+                    <p className="text-sm text-muted-fg">Farm: {p.farm.farmName}</p>
                   )}
                   {p.transportProfile && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-fg">
                       {p.transportProfile.vehicleType}
                       {p.transportProfile.capacityKg
                         ? ` · ${p.transportProfile.capacityKg}kg capacity`
@@ -107,7 +107,7 @@ export default async function DirectoryPage({
           );
         })}
         {parties.length === 0 && (
-          <li className="text-sm text-gray-400">No parties found yet.</li>
+          <li className="text-sm text-subtle-fg">No parties found yet.</li>
         )}
       </ul>
     </div>
@@ -130,7 +130,7 @@ function ReputationBadge({ reputation }: { reputation: Reputation | null }) {
       >
         {summary.headline}
       </p>
-      {summary.hasHistory && <p className="mt-1 text-xs text-gray-500">{summary.completedLine}</p>}
+      {summary.hasHistory && <p className="mt-1 text-xs text-muted-fg">{summary.completedLine}</p>}
     </div>
   );
 }

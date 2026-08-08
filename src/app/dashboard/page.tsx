@@ -4,14 +4,25 @@ import { prisma } from "@/lib/prisma";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
+import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
+import { rankMatches } from "@/lib/match-rank";
 import { categoryEmoji } from "@/lib/categories";
+import { regionFor } from "@/lib/regions";
 import { Badge } from "@/components/badge";
 import type { Post, Party } from "@/generated/prisma/client";
 
-function greeting() {
+// How many recent suggestions the overview ranks before taking the top few.
+// Wide enough that ranking has a real choice to make, narrow enough that the
+// overview stays one small query.
+const TOP_MATCH_CANDIDATES = 40;
+const TOP_MATCHES_SHOWN = 3;
+
+// "Good morning" should mean morning where the farmer is. Judged against
+// their own region's timezone rather than the pilot's or the server's.
+function greeting(timeZone: string) {
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Africa/Harare",
+      timeZone,
       hour: "numeric",
       hour12: false,
     }).format(new Date()),
@@ -33,8 +44,15 @@ export default async function DashboardPage() {
   // new since the *previous* visit rather than immediately zeroing itself out.
   const since = party.opportunitiesLastSeenAt;
 
-  const [openPostCount, opportunityCount, newSinceLastVisit, draftCount, topMatches, topProduce] =
-    await Promise.all([
+  const [
+    openPostCount,
+    opportunityCount,
+    newSinceLastVisit,
+    draftCount,
+    matchCandidates,
+    topProduce,
+    matchingHistory,
+  ] = await Promise.all([
       prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
       prisma.match.count({
         where: {
@@ -52,17 +70,21 @@ export default async function DashboardPage() {
       party.farm
         ? prisma.post.count({ where: { partyId: party.id, status: "DRAFT" } })
         : Promise.resolve(0),
+      // Fetched unsorted-by-score and ranked in memory: `Match.score` is
+      // what was true the day the match was written, so ordering on it here
+      // would show a stale top three. Bounded by a recency window rather
+      // than `take: 3` — read-time ranking needs candidates to choose from.
       prisma.match.findMany({
         where: {
           status: "SUGGESTED",
           OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
         },
         include: {
-          postA: { include: { party: true } },
-          postB: { include: { party: true } },
+          postA: { include: { party: { include: { reputation: true } } } },
+          postB: { include: { party: { include: { reputation: true } } } },
         },
-        orderBy: { score: "desc" },
-        take: 3,
+        orderBy: { createdAt: "desc" },
+        take: TOP_MATCH_CANDIDATES,
       }),
       party.farm
         ? prisma.produceStock.findFirst({
@@ -70,22 +92,28 @@ export default async function DashboardPage() {
             orderBy: { quantity: "desc" },
           })
         : Promise.resolve(null),
-    ]);
+    loadMatchingHistory(),
+  ]);
 
   await prisma.party.update({
     where: { id: party.id },
     data: { opportunitiesLastSeenAt: new Date() },
   });
 
+  const region = regionFor(party.countryCode);
   const reputation = summarizeReputation(party.reputation);
+  const topMatches = rankMatches(
+    matchCandidates.map((m) => toRankableMatch(m, party.id)),
+    matchingHistory,
+  ).slice(0, TOP_MATCHES_SHOWN);
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">
-          {greeting()}, {party.name.split(" ")[0]} 👋
+          {greeting(region.timeZone)}, {party.name.split(" ")[0]} 👋
         </h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
         </p>
       </div>
@@ -136,12 +164,13 @@ export default async function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-medium">Today&rsquo;s opportunities</h2>
-          <Link href="/dashboard/opportunities" className="text-sm text-gray-500 underline">
+          <Link href="/dashboard/opportunities" className="text-sm text-muted-fg underline">
             See all
           </Link>
         </div>
         <ul className="flex flex-col gap-2">
-          {topMatches.map((m) => {
+          {topMatches.map(({ match }) => {
+            const m = match.source;
             const { theirs } = resolveMatchSides(m, party.id);
             const isNew = since ? m.createdAt > since : true;
             return (
@@ -151,7 +180,7 @@ export default async function DashboardPage() {
             );
           })}
           {topMatches.length === 0 && (
-            <li className="text-sm text-gray-400">
+            <li className="text-sm text-subtle-fg">
               No opportunities yet — post what you have or need to get matched.
             </li>
           )}
@@ -216,7 +245,7 @@ function QuickAction({ href, emoji, label }: { href: string; emoji: string; labe
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+      className="flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium hover:bg-new-bg"
     >
       <span>{emoji}</span>
       {label}

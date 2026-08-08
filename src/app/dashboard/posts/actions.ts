@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
-import { postSchema } from "@/lib/validation";
+import { postSchemaFor } from "@/lib/validation";
+import { regionFor } from "@/lib/regions";
 import { generateMatchesForPost } from "@/lib/matching";
 import { uploadPhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
@@ -39,7 +40,7 @@ export async function createPost(
     }
   }
 
-  const parsed = postSchema.safeParse({
+  const parsed = postSchemaFor(regionFor(party.countryCode).labels).safeParse({
     type: formData.get("type"),
     category: formData.get("category"),
     title: formData.get("title"),
@@ -52,6 +53,7 @@ export async function createPost(
     urgent: formData.get("urgent") === "on",
     neededBy: formData.get("neededBy") || undefined,
     recurring: formData.get("recurring") === "on",
+    openToCrossBorder: formData.get("openToCrossBorder") === "on",
     destinationProvince: formData.get("destinationProvince") || undefined,
     destinationDistrict: formData.get("destinationDistrict") || undefined,
     travelDate: formData.get("travelDate") || undefined,
@@ -66,6 +68,9 @@ export async function createPost(
   const post = await prisma.post.create({
     data: {
       partyId: party.id,
+      // Denormalized from the party, exactly as province/district are: a
+      // post belongs to wherever its poster is.
+      countryCode: party.countryCode,
       type: data.type as PostType,
       category: data.category as PostCategory,
       title: data.title,
@@ -78,6 +83,7 @@ export async function createPost(
       urgent: data.urgent ?? false,
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,
+      openToCrossBorder: data.openToCrossBorder ?? false,
       destinationProvince: data.destinationProvince,
       destinationDistrict: data.destinationDistrict,
       travelDate: data.travelDate,

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { updateProfile, type ProfileActionState } from "./actions";
-import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { LocationFields } from "@/components/location-fields";
 import type { getCurrentParty } from "@/lib/auth";
 
 const initialState: ProfileActionState = {};
@@ -35,25 +35,11 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium" htmlFor="province">
-            Province
-          </label>
-          <select
-            id="province"
-            name="province"
-            required
-            defaultValue={party.province}
-            className="rounded-lg border border-border px-3 py-2 text-sm"
-          >
-            {ZIMBABWE_PROVINCES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Field label="District" name="district" defaultValue={party.district} required />
+        <LocationFields
+          countryCode={party.countryCode}
+          defaultProvince={party.province}
+          defaultDistrict={party.district}
+        />
       </div>
 
       {party.farm && (
@@ -112,7 +98,7 @@ export function ProfileForm({ party }: { party: PartyWithFacets }) {
         </p>
       )}
       {state.success && (
-        <p className="text-sm text-green-700" role="status">
+        <p className="text-sm text-accent" role="status">
           Saved.
         </p>
       )}

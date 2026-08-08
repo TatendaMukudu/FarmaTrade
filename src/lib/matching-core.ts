@@ -1,4 +1,6 @@
 import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
+import type { ReasonKind } from "@/lib/reason-reliability";
+import { regionFor } from "@/lib/regions";
 
 // Deterministic, rules-based scoring — no ML, no history to learn from yet.
 // Geography and category are the qualifying filters; reputation only ever
@@ -12,60 +14,116 @@ import type { Post, Reputation, VerificationSource } from "@/generated/prisma/cl
 // worth unit-testing directly, so it lives apart from `matching.ts` (which
 // pulls in Prisma) rather than behind a `server-only` import that would keep
 // a test runner from ever reaching it.
+
+// A single scored claim: the points it contributed, the sentence a human
+// reads, and the stable kind those points were awarded under.
+//
+// The kind is what makes the score *re-weightable*. `Match.score` and
+// `Match.reasons` are the stored evidence of what was true when the match
+// fired, and they stay exactly as they were; but a reason whose kind is
+// known can be re-priced later against what actually happened when it was
+// cited (see reason-reliability.ts) instead of being stuck at the constant
+// picked here on day one.
+export type MatchSignal = {
+  kind: ReasonKind;
+  points: number;
+  reason: string;
+};
+
+export type MatchScore = {
+  score: number;
+  reasons: string[];
+  signals: MatchSignal[];
+};
+
+// The floor every match starts from — it qualified on category, type and
+// geography before scoring ever ran, so it is not a zero.
+export const BASE_SCORE = 50;
+
 export function scoreMatch(
   candidate: Post,
   newPost: Post,
   reputation: Reputation | null,
   verifiedBy: VerificationSource | null,
-): { score: number; reasons: string[] } {
-  let score = 50;
-  const reasons: string[] = [];
+): MatchScore {
+  const signals: MatchSignal[] = [];
 
-  const sameProvince = candidate.province === newPost.province;
+  const sameCountry = candidate.countryCode === newPost.countryCode;
+  const sameProvince = sameCountry && candidate.province === newPost.province;
   const sameDistrict = sameProvince && candidate.district === newPost.district;
   // TRANSPORT only: a HAVE post's destination is a transporter's route, a
   // NEED post's destination is where goods need to end up. A candidate
   // qualifies on the route even when pickup provinces differ, as long as
   // one side's destination overlaps the other's location.
   const onRoute =
+    sameCountry &&
     !sameProvince &&
     newPost.category === "TRANSPORT" &&
     ((candidate.destinationProvince != null && candidate.destinationProvince === newPost.province) ||
       (newPost.destinationProvince != null && newPost.destinationProvince === candidate.province));
 
   if (sameProvince) {
-    reasons.push("same province");
+    signals.push({ kind: "same_province", points: 0, reason: "same province" });
     if (sameDistrict) {
-      score += 20;
-      reasons.push("same district");
+      signals.push({ kind: "same_district", points: 20, reason: "same district" });
     }
   } else if (onRoute) {
-    score += 15;
-    reasons.push("on your route");
+    signals.push({ kind: "on_your_route", points: 15, reason: "on your route" });
+  } else if (!sameCountry) {
+    // Zero points: an international counterparty is neither better nor worse
+    // than a local one, and FarmaTrade has no basis to say which. But it is
+    // never allowed to be a surprise — a farmer must be able to see, before
+    // they message anyone, that this trade crosses a border and everything
+    // that comes with one.
+    signals.push({
+      kind: "cross_border",
+      points: 0,
+      reason: `cross-border: ${regionFor(candidate.countryCode).country || candidate.countryCode} (both sides opted in)`,
+    });
   }
 
   if (reputation?.averageRating && reputation.ratingCount >= 3) {
-    score += (reputation.averageRating / 5) * 20;
-    reasons.push(
-      `counterparty: ${reputation.completedCount} completed, ${reputation.averageRating.toFixed(1)}★ (${reputation.ratingCount} ratings)`,
-    );
+    signals.push({
+      kind: "counterparty_rated",
+      points: (reputation.averageRating / 5) * 20,
+      reason: `counterparty: ${reputation.completedCount} completed, ${reputation.averageRating.toFixed(1)}★ (${reputation.ratingCount} ratings)`,
+    });
   } else if (reputation?.completedCount) {
-    score += Math.min(reputation.completedCount, 10);
-    reasons.push(`counterparty: ${reputation.completedCount} completed (still building rating history)`);
+    signals.push({
+      kind: "counterparty_building",
+      points: Math.min(reputation.completedCount, 10),
+      reason: `counterparty: ${reputation.completedCount} completed (still building rating history)`,
+    });
   } else {
-    reasons.push("counterparty: new, no history yet");
+    signals.push({ kind: "counterparty_new", points: 0, reason: "counterparty: new, no history yet" });
   }
 
   if (verifiedBy) {
-    score += 10;
-    reasons.push(
-      verifiedBy === "FOUNDER" ? "founder-vouched" : "network-referred",
-    );
+    signals.push({
+      kind: verifiedBy === "FOUNDER" ? "founder_vouched" : "network_referred",
+      points: 10,
+      reason: verifiedBy === "FOUNDER" ? "founder-vouched" : "network-referred",
+    });
   }
 
   if (candidate.urgent || newPost.urgent) {
-    reasons.push("time-sensitive");
+    signals.push({ kind: "time_sensitive", points: 0, reason: "time-sensitive" });
   }
 
-  return { score: Math.round(Math.min(score, 100)), reasons };
+  return {
+    score: totalFromSignals(signals),
+    reasons: signals.map((s) => s.reason),
+    signals,
+  };
+}
+
+// The one place signal points become a score, so a re-weighted read (see
+// match-rank.ts) and the stored write can never drift apart on the base or
+// the cap.
+export function totalFromSignals(
+  signals: MatchSignal[],
+  weightFor: (kind: ReasonKind) => number = () => 1,
+): number {
+  const total = signals.reduce((sum, s) => sum + s.points * weightFor(s.kind), BASE_SCORE);
+  return Math.round(Math.min(total, 100));
 }

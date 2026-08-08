@@ -8,16 +8,47 @@ import {
   EQUIPMENT_CATEGORY,
   VEHICLE_TYPE,
 } from "@/lib/enums";
+import { isSupportedCountry, PILOT_COUNTRY, REGIONS, type RegionLabels } from "@/lib/regions";
 
-export const signupSchema = z
+// "Province is required" is the right sentence in Zimbabwe and the wrong one
+// in Kenya, where the word is County. The two location messages are the only
+// strings whose wording depends on who is filling the form in, so the
+// schemas that carry them are built per region rather than once at import.
+//
+// The bare `postSchema` / `profileSchema` / `signupSchema` exports keep the
+// pilot's wording, so anything that has no region to hand still parses
+// correctly — the labels change the message, never the validation.
+const PILOT_LABELS = REGIONS[PILOT_COUNTRY].labels;
+
+function locationShape(labels: RegionLabels) {
+  return {
+    province: z.string().trim().min(1, `${labels.level1} is required`),
+    district: z.string().trim().min(1, `${labels.level2} is required`),
+  };
+}
+
+// Absent means the pilot — the same assumption the column default makes, so
+// a form or client that never learned to send it still works. But a country
+// that *is* sent and isn't one we support is rejected rather than quietly
+// rewritten: a party we place wrongly is one we'd format prices, dates and
+// place names wrongly for ever after.
+const countryCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine(isSupportedCountry, "Select a country FarmaTrade supports")
+  .default(PILOT_COUNTRY);
+
+export const signupSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
+  z
   .object({
     name: z.string().trim().min(1, "Name is required"),
     email: z.string().trim().email("Enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     phone: z.string().trim().optional(),
     contactDetails: z.string().trim().optional(),
-    province: z.string().trim().min(1, "Province is required"),
-    district: z.string().trim().min(1, "District is required"),
+    countryCode,
+    ...locationShape(labels),
     roles: z.array(z.enum(PARTY_ROLES)).min(1, "Pick at least one role"),
     farmName: z.string().trim().optional(),
     sizeHectares: z.coerce.number().positive().optional(),
@@ -37,23 +68,27 @@ export const signupSchema = z
     },
   );
 
+export const signupSchema = signupSchemaFor();
+
 export const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
 
-export const profileSchema = z.object({
+export const profileSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
+  z.object({
   name: z.string().trim().min(1, "Name is required"),
   phone: z.string().trim().optional(),
   contactDetails: z.string().trim().optional(),
-  province: z.string().trim().min(1, "Province is required"),
-  district: z.string().trim().min(1, "District is required"),
+  ...locationShape(labels),
   farmName: z.string().trim().optional(),
   sizeHectares: z.coerce.number().positive().optional(),
   vehicleType: z.enum(VEHICLE_TYPE).optional(),
   capacityKg: z.coerce.number().positive().optional(),
   serviceRegion: z.string().trim().optional(),
 });
+
+export const profileSchema = profileSchemaFor();
 
 export const confirmationSchema = z.object({
   matchId: z.string().min(1),
@@ -81,23 +116,26 @@ export const produceSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
-export const postSchema = z.object({
+export const postSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
+  z.object({
   type: z.enum(["HAVE", "NEED"]),
   category: z.enum(POST_CATEGORIES),
   title: z.string().trim().min(1, "Title is required"),
   description: z.string().trim().optional(),
   quantity: z.coerce.number().positive().optional(),
   unit: z.string().trim().optional(),
-  province: z.string().trim().min(1, "Province is required"),
-  district: z.string().trim().min(1, "District is required"),
+  ...locationShape(labels),
   askingPrice: z.coerce.number().positive().optional(),
   urgent: z.coerce.boolean().optional(),
   neededBy: z.coerce.date().optional(),
   recurring: z.coerce.boolean().optional(),
+  openToCrossBorder: z.coerce.boolean().optional(),
   destinationProvince: z.string().trim().optional(),
   destinationDistrict: z.string().trim().optional(),
   travelDate: z.coerce.date().optional(),
 });
+
+export const postSchema = postSchemaFor();
 
 export const equipmentSchema = z.object({
   id: z.string().optional(),

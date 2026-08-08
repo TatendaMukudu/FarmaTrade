@@ -42,7 +42,7 @@ export default async function PartyProfilePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/dashboard/directory" className="text-sm text-gray-500 underline">
+      <Link href="/dashboard/directory" className="text-sm text-muted-fg underline">
         ← Back to directory
       </Link>
 
@@ -59,7 +59,7 @@ export default async function PartyProfilePage({
               <Badge tone="info">Preferred partner · {relation.strength} completed</Badge>
             )}
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-fg">
             {party.district}, {party.province} · {party.roles.join(", ")}
           </p>
         </div>
@@ -72,7 +72,7 @@ export default async function PartyProfilePage({
           >
             {reputation.headline}
           </p>
-          {reputation.hasHistory && <p className="mt-1 text-xs text-gray-500">{reputation.completedLine}</p>}
+          {reputation.hasHistory && <p className="mt-1 text-xs text-muted-fg">{reputation.completedLine}</p>}
         </div>
       </div>
 
@@ -80,9 +80,9 @@ export default async function PartyProfilePage({
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="font-medium">{party.farm.farmName}</p>
           {party.farm.sizeHectares && (
-            <p className="text-sm text-gray-500">{party.farm.sizeHectares} ha</p>
+            <p className="text-sm text-muted-fg">{party.farm.sizeHectares} ha</p>
           )}
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-muted-fg">
             {party.farm._count.livestock} livestock record{party.farm._count.livestock === 1 ? "" : "s"} ·{" "}
             {party.farm._count.produce} produce record{party.farm._count.produce === 1 ? "" : "s"} ·{" "}
             {party.farm._count.equipment} equipment record{party.farm._count.equipment === 1 ? "" : "s"}
@@ -91,7 +91,7 @@ export default async function PartyProfilePage({
       )}
 
       {party.transportProfile && (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-gray-600">
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-fg">
           {party.transportProfile.vehicleType}
           {party.transportProfile.capacityKg ? ` · ${party.transportProfile.capacityKg}kg capacity` : ""}
           {party.transportProfile.serviceRegion ? ` · serves ${party.transportProfile.serviceRegion}` : ""}
@@ -100,10 +100,10 @@ export default async function PartyProfilePage({
 
       {(party.phone || party.contactDetails) && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-gray-500">Contact</p>
+          <p className="text-xs text-muted-fg">Contact</p>
           {party.phone && <p className="font-medium">{party.phone}</p>}
           {party.contactDetails && (
-            <p className="mt-1 text-sm whitespace-pre-line text-gray-600">{party.contactDetails}</p>
+            <p className="mt-1 text-sm whitespace-pre-line text-muted-fg">{party.contactDetails}</p>
           )}
         </div>
       )}

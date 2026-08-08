@@ -52,7 +52,7 @@ export default async function ConversationPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/dashboard/opportunities" className="text-sm text-gray-500 underline">
+      <Link href="/dashboard/opportunities" className="text-sm text-muted-fg underline">
         ← Back to opportunities
       </Link>
 
@@ -62,10 +62,10 @@ export default async function ConversationPage({
             {theirs.party.name}
           </Link>
         </h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           Your post: {yours.title} ↔ Their post: {theirs.title}
         </p>
-        <p className="mt-1 text-xs text-gray-400">Status: {match.status}</p>
+        <p className="mt-1 text-xs text-subtle-fg">Status: {match.status}</p>
         {theirs.photos.length > 0 && (
           <div className="mt-2 flex gap-2">
             {theirs.photos.map((photo) => (
@@ -88,7 +88,7 @@ export default async function ConversationPage({
             type="submit"
             name="decision"
             value="ACCEPTED"
-            className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white"
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
           >
             Accept
           </button>
@@ -105,7 +105,7 @@ export default async function ConversationPage({
 
       <div className="flex min-h-[240px] flex-col gap-2 rounded border p-4">
         {messages.length === 0 && (
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-subtle-fg">
             No messages yet — say hello and agree on price, quantity, and pickup.
           </p>
         )}
@@ -114,8 +114,8 @@ export default async function ConversationPage({
             key={m.id}
             className={`max-w-[75%] rounded px-3 py-2 text-sm ${
               m.authorId === party.id
-                ? "self-end bg-black text-white"
-                : "self-start bg-gray-100 text-gray-900"
+                ? "self-end bg-accent text-accent-foreground"
+                : "self-start bg-new-bg text-foreground"
             }`}
           >
             {m.body}
@@ -128,7 +128,7 @@ export default async function ConversationPage({
       {transporters.length > 0 && (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
           <p className="text-sm font-medium">Need transport for this?</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-fg">
             These transporters&apos; routes cover{" "}
             {havePost.district === needPost.district
               ? havePost.district
@@ -152,7 +152,7 @@ export default async function ConversationPage({
                     >
                       {t.party.name}
                     </Link>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-fg">
                       {t.province}
                       {t.destinationProvince ? ` → ${t.destinationProvince}` : ""}
                     </p>
@@ -174,7 +174,7 @@ export default async function ConversationPage({
       {match.status === "ACCEPTED" && (
         <div className="border-t pt-4">
           {myConfirmation ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-fg">
               You reported: {myConfirmation.outcome.replace(/_/g, " ")}. Waiting on{" "}
               {theirs.party.name} to confirm their side.
             </p>

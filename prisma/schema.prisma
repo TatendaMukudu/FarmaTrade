@@ -66,6 +66,12 @@ model Party {
   // Modeling every business's contact structure as separate fields would
   // fit neither end of that range.
   contactDetails String?
+  // ISO 3166-1 alpha-2. Decides how FarmaTrade talks to this party — what
+  // its administrative levels are called, which currency prices are in,
+  // which timezone "good morning" is judged against (see lib/regions.ts).
+  // It does NOT decide who they may trade with: cross-border trade is a
+  // per-post opt-in, not a nationality.
+  countryCode String  @default("ZW")
   province   String
   district   String
   latitude   Float?
@@ -268,8 +274,18 @@ model Post {
   description String?
   quantity    Float?
   unit        String?
+  // Denormalized from the party at post time, exactly as province/district
+  // already are, so the matching query can filter on it without a join.
+  countryCode String       @default("ZW")
   province    String
   district    String
+  // Matching is local-first by default: a smallholder with two tonnes of
+  // tomatoes should not wade through buyers on another continent. But a
+  // larger farm exporting into the region is a real and wanted case, so
+  // reach is the poster's choice rather than ours. Opting in ADDS
+  // international candidates; it never removes local ones, and a match only
+  // ever crosses a border when BOTH sides asked for it.
+  openToCrossBorder Boolean @default(false)
   askingPrice Decimal?     @db.Decimal(12, 2)
   status      PostStatus   @default(OPEN)
   // Urgency drives display/ordering today; it's the seam for the delivery
@@ -307,9 +323,12 @@ model Post {
   matchesAsB Match[] @relation("MatchPostB")
   photos     Photo[]
 
-  @@index([category, status, province, district])
+  @@index([category, status, countryCode, province, district])
   @@index([partyId])
   @@index([produceId])
+  // The cross-border arm of the matching query looks up opted-in posts
+  // without a country or province to narrow on, so it needs its own index.
+  @@index([category, status, openToCrossBorder])
 }
 
 // Was stored inline in Postgres (bytea) at pilot scale; now uploaded to R2.
@@ -439,6 +458,12 @@ model Reputation {
   completedCount      Int      @default(0)
   completedGoodCount  Int      @default(0)
   completedIssueCount Int      @default(0)
+  // Deliberately outside completedCount: a trade that never happened is not
+  // a completed one, and averaging it into a "trades done" figure would
+  // erase the single most informative negative signal the schema collects.
+  // Kept as its own count so ranking can read it without it ever touching a
+  // rating average it didn't earn.
+  didNotHappenCount   Int      @default(0)
   averageRating       Float?
   ratingCount         Int      @default(0)
   updatedAt           DateTime @updatedAt

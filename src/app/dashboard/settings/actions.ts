@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
-import { profileSchema } from "@/lib/validation";
+import { profileSchemaFor } from "@/lib/validation";
+import { regionFor } from "@/lib/regions";
 import type { VehicleType } from "@/generated/prisma/client";
 
 export type ProfileActionState = { error?: string; success?: boolean };
@@ -15,7 +16,7 @@ export async function updateProfile(
   const party = await getCurrentParty();
   if (!party) return { error: "Not signed in" };
 
-  const parsed = profileSchema.safeParse({
+  const parsed = profileSchemaFor(regionFor(party.countryCode).labels).safeParse({
     name: formData.get("name"),
     phone: formData.get("phone") || undefined,
     contactDetails: formData.get("contactDetails") || undefined,

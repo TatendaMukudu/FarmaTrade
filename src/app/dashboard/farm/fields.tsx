@@ -11,7 +11,7 @@ export function TextField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500" htmlFor={name}>
+      <label className="text-xs text-muted-fg" htmlFor={name}>
         {label}
       </label>
       <input
@@ -36,7 +36,7 @@ export function NumberField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500" htmlFor={name}>
+      <label className="text-xs text-muted-fg" htmlFor={name}>
         {label}
       </label>
       <input
@@ -67,7 +67,7 @@ export function SelectField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500" htmlFor={name}>
+      <label className="text-xs text-muted-fg" htmlFor={name}>
         {label}
       </label>
       <select

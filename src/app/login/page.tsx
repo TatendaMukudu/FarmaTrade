@@ -51,13 +51,13 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? "Logging in…" : "Log in"}
         </button>
       </form>
 
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted-fg">
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="underline">
           Sign up

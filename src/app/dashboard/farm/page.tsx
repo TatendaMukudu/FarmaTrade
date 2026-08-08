@@ -33,7 +33,7 @@ export default async function FarmPage() {
     <div className="flex flex-col gap-10">
       <div>
         <h1 className="text-2xl font-semibold">{party.farm.farmName}</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-fg">
           {party.district}, {party.province}
           {party.farm.sizeHectares ? ` · ${party.farm.sizeHectares} ha` : ""}
         </p>
@@ -47,7 +47,7 @@ export default async function FarmPage() {
             <LivestockRow key={l.id} item={l} />
           ))}
           {livestock.length === 0 && (
-            <li className="text-sm text-gray-400">No livestock recorded yet.</li>
+            <li className="text-sm text-subtle-fg">No livestock recorded yet.</li>
           )}
         </ul>
         <AddToggle label="Add livestock">
@@ -61,7 +61,7 @@ export default async function FarmPage() {
             <ProduceRow key={p.id} item={p} />
           ))}
           {produce.length === 0 && (
-            <li className="text-sm text-gray-400">No produce recorded yet.</li>
+            <li className="text-sm text-subtle-fg">No produce recorded yet.</li>
           )}
         </ul>
         <AddToggle label="Add produce">
@@ -75,7 +75,7 @@ export default async function FarmPage() {
             <EquipmentRow key={e.id} item={e} />
           ))}
           {equipment.length === 0 && (
-            <li className="text-sm text-gray-400">No equipment recorded yet.</li>
+            <li className="text-sm text-subtle-fg">No equipment recorded yet.</li>
           )}
         </ul>
         <AddToggle label="Add equipment">
