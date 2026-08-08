@@ -1,5 +1,6 @@
 import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
 import type { ReasonKind } from "@/lib/reason-reliability";
+import { regionFor } from "@/lib/regions";
 
 // Deterministic, rules-based scoring — no ML, no history to learn from yet.
 // Geography and category are the qualifying filters; reputation only ever
@@ -47,13 +48,15 @@ export function scoreMatch(
 ): MatchScore {
   const signals: MatchSignal[] = [];
 
-  const sameProvince = candidate.province === newPost.province;
+  const sameCountry = candidate.countryCode === newPost.countryCode;
+  const sameProvince = sameCountry && candidate.province === newPost.province;
   const sameDistrict = sameProvince && candidate.district === newPost.district;
   // TRANSPORT only: a HAVE post's destination is a transporter's route, a
   // NEED post's destination is where goods need to end up. A candidate
   // qualifies on the route even when pickup provinces differ, as long as
   // one side's destination overlaps the other's location.
   const onRoute =
+    sameCountry &&
     !sameProvince &&
     newPost.category === "TRANSPORT" &&
     ((candidate.destinationProvince != null && candidate.destinationProvince === newPost.province) ||
@@ -66,6 +69,17 @@ export function scoreMatch(
     }
   } else if (onRoute) {
     signals.push({ kind: "on_your_route", points: 15, reason: "on your route" });
+  } else if (!sameCountry) {
+    // Zero points: an international counterparty is neither better nor worse
+    // than a local one, and FarmaTrade has no basis to say which. But it is
+    // never allowed to be a surprise — a farmer must be able to see, before
+    // they message anyone, that this trade crosses a border and everything
+    // that comes with one.
+    signals.push({
+      kind: "cross_border",
+      points: 0,
+      reason: `cross-border: ${regionFor(candidate.countryCode).country || candidate.countryCode} (both sides opted in)`,
+    });
   }
 
   if (reputation?.averageRating && reputation.ratingCount >= 3) {

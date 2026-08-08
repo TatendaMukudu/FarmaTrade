@@ -126,4 +126,91 @@ describe("generateMatchesForPost", () => {
     const matches = await prisma.match.findMany({ where: { postBId: need.id } });
     expect(matches).toHaveLength(1);
   });
+
+  // Cross-border trade: local-first is a default, not a wall. A large farm
+  // exporting into the region is a real case, so reach is the poster's
+  // choice — but only ever a mutual one.
+  describe("cross-border reach", () => {
+    async function crossBorderPair(opts: { haveOptsIn: boolean; needOptsIn: boolean }) {
+      const seller = await createTestParty({ countryCode: "ZM", province: "Lusaka", district: "Lusaka" });
+      const buyer = await createTestParty({ countryCode: "ZW", province: "Harare", district: "Harare" });
+      partyIds.push(seller.party.id, buyer.party.id);
+
+      const have = await createTestPost(seller.party.id, {
+        type: "HAVE",
+        category: "PRODUCE",
+        countryCode: "ZM",
+        province: "Lusaka",
+        district: "Lusaka",
+        openToCrossBorder: opts.haveOptsIn,
+      });
+      const need = await createTestPost(buyer.party.id, {
+        type: "NEED",
+        category: "PRODUCE",
+        countryCode: "ZW",
+        province: "Harare",
+        district: "Harare",
+        openToCrossBorder: opts.needOptsIn,
+      });
+      await generateMatchesForPost(need.id);
+      return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    }
+
+    it("matches across a border when both sides opted in, and says so", async () => {
+      const match = await crossBorderPair({ haveOptsIn: true, needOptsIn: true });
+      expect(match).not.toBeNull();
+      expect(match!.reasons.some((r) => r.startsWith("cross-border:"))).toBe(true);
+      expect(match!.reasons.join(" ")).toContain("Zambia");
+    });
+
+    it("does not match when only the poster opted in", async () => {
+      expect(await crossBorderPair({ haveOptsIn: false, needOptsIn: true })).toBeNull();
+    });
+
+    it("does not match when only the other side opted in", async () => {
+      expect(await crossBorderPair({ haveOptsIn: true, needOptsIn: false })).toBeNull();
+    });
+
+    it("leaves a smallholder who opted out seeing nothing international", async () => {
+      expect(await crossBorderPair({ haveOptsIn: false, needOptsIn: false })).toBeNull();
+    });
+
+    it("keeps local matches coming for a post that opted in", async () => {
+      const neighbour = await createTestParty({ province: "Harare", district: "Harare" });
+      const buyer = await createTestParty({ province: "Harare", district: "Harare" });
+      partyIds.push(neighbour.party.id, buyer.party.id);
+
+      const have = await createTestPost(neighbour.party.id, { type: "HAVE", category: "PRODUCE" });
+      const need = await createTestPost(buyer.party.id, {
+        type: "NEED",
+        category: "PRODUCE",
+        openToCrossBorder: true,
+      });
+      await generateMatchesForPost(need.id);
+
+      const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+      expect(match).not.toBeNull();
+      expect(match!.reasons).toContain("same district");
+    });
+
+    it("does not match two same-named provinces in different countries", async () => {
+      // Both Zimbabwe and Zambia have a province a farmer might call
+      // "Southern"; without the country guard these would look local to
+      // each other.
+      const zm = await createTestParty({ countryCode: "ZM", province: "Southern", district: "Choma" });
+      const zw = await createTestParty({ countryCode: "ZW", province: "Southern", district: "Choma" });
+      partyIds.push(zm.party.id, zw.party.id);
+
+      const have = await createTestPost(zm.party.id, {
+        type: "HAVE", category: "PRODUCE", countryCode: "ZM", province: "Southern", district: "Choma",
+      });
+      const need = await createTestPost(zw.party.id, {
+        type: "NEED", category: "PRODUCE", countryCode: "ZW", province: "Southern", district: "Choma",
+      });
+      await generateMatchesForPost(need.id);
+
+      expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).toBeNull();
+    });
+  });
+
 });

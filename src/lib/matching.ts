@@ -29,13 +29,28 @@ export async function generateMatchesForPost(postId: string) {
         }
       : { province: post.province };
 
+  // Local candidates: the same country, and near enough within it to be
+  // worth a farmer's attention. This is what almost every post gets, and
+  // adding the country guard is what stops two same-named provinces in
+  // different countries from silently matching each other.
+  const local = { countryCode: post.countryCode, ...geoFilter };
+
+  // Cross-border candidates, only when this post asked for them, and only
+  // posts that asked back. A farmer exporting into the region gets the
+  // international market; a smallholder listing two tonnes of tomatoes never
+  // sees it. Geography is deliberately not applied here — the whole point of
+  // opting in is that distance has stopped being the disqualifier.
+  const reach = post.openToCrossBorder
+    ? { OR: [local, { openToCrossBorder: true, partyId: { not: post.partyId } }] }
+    : local;
+
   const candidates = await prisma.post.findMany({
     where: {
       type: oppositeType,
       category: post.category,
       status: "OPEN",
       partyId: { not: post.partyId },
-      ...geoFilter,
+      ...reach,
     },
     include: { party: { include: { reputation: true } } },
   });

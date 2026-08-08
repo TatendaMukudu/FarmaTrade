@@ -13,6 +13,7 @@ import {
 } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
+import { formatMoney, regionFor } from "@/lib/regions";
 import { Badge } from "@/components/badge";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
@@ -162,7 +163,12 @@ export default async function OpportunitiesPage() {
                             <span>Evidence {ranked.confidence.replace(/_/g, " ")}</span>
                           </div>
                           <p className="mt-1 font-medium">Your post: {yours.title}</p>
-                          <MatchCounterpart post={theirs} myDistrict={party.district} myProvince={party.province} />
+                          <MatchCounterpart
+                            post={theirs}
+                            myDistrict={party.district}
+                            myProvince={party.province}
+                            countryCode={party.countryCode}
+                          />
                           {m.reasons.length > 0 && (
                             <p className="mt-2 text-sm font-medium text-foreground">
                               Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
@@ -266,10 +272,12 @@ function MatchCounterpart({
   post,
   myDistrict,
   myProvince,
+  countryCode,
 }: {
   post: CounterpartPost;
   myDistrict: string;
   myProvince: string;
+  countryCode: string;
 }) {
   const reputation = summarizeReputation(post.party.reputation);
   const estimatedValue = estimatedPostValue(post);
@@ -288,7 +296,8 @@ function MatchCounterpart({
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
-        {estimatedValue != null && ` · Est. value $${estimatedValue.toLocaleString()}`}
+        {estimatedValue != null &&
+          ` · Est. value ${formatMoney(estimatedValue, regionFor(countryCode))}`}
         {post.destinationDistrict &&
           post.destinationProvince &&
           ` · Route: ${post.district} → ${post.destinationDistrict}`}

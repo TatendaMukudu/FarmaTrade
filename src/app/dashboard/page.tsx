@@ -7,6 +7,7 @@ import { resolveMatchSides } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
 import { categoryEmoji } from "@/lib/categories";
+import { regionFor } from "@/lib/regions";
 import { Badge } from "@/components/badge";
 import type { Post, Party } from "@/generated/prisma/client";
 
@@ -16,10 +17,12 @@ import type { Post, Party } from "@/generated/prisma/client";
 const TOP_MATCH_CANDIDATES = 40;
 const TOP_MATCHES_SHOWN = 3;
 
-function greeting() {
+// "Good morning" should mean morning where the farmer is. Judged against
+// their own region's timezone rather than the pilot's or the server's.
+function greeting(timeZone: string) {
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Africa/Harare",
+      timeZone,
       hour: "numeric",
       hour12: false,
     }).format(new Date()),
@@ -97,6 +100,7 @@ export default async function DashboardPage() {
     data: { opportunitiesLastSeenAt: new Date() },
   });
 
+  const region = regionFor(party.countryCode);
   const reputation = summarizeReputation(party.reputation);
   const topMatches = rankMatches(
     matchCandidates.map((m) => toRankableMatch(m, party.id)),
@@ -107,7 +111,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold">
-          {greeting()}, {party.name.split(" ")[0]} 👋
+          {greeting(region.timeZone)}, {party.name.split(" ")[0]} 👋
         </h1>
         <p className="text-sm text-gray-500">
           {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}

@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { signupAction, type SignupState } from "./actions";
-import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { CountryAndLocationFields } from "@/components/location-fields";
 
 const initialState: SignupState = {};
 
@@ -36,28 +36,7 @@ export default function SignupPage() {
         <Field label="Phone" name="phone" />
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="province">
-              Province
-            </label>
-            <select
-              id="province"
-              name="province"
-              required
-              className="rounded border px-3 py-2 text-sm"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select province
-              </option>
-              {ZIMBABWE_PROVINCES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Field label="District" name="district" required />
+          <CountryAndLocationFields />
         </div>
 
         <fieldset className="flex flex-col gap-2">

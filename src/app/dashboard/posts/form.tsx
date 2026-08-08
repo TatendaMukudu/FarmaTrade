@@ -2,25 +2,28 @@
 
 import { useActionState, useRef, useState } from "react";
 import { createPost, type PostActionState } from "./actions";
-import { ZIMBABWE_PROVINCES } from "@/lib/zimbabwe";
+import { regionFor } from "@/lib/regions";
 import { CATEGORY_LABEL } from "@/lib/categories";
 import type { PostCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
 
 export function PostForm({
+  countryCode,
   defaultProvince,
   defaultDistrict,
   defaultType = "HAVE",
   defaultCategory = "PRODUCE",
   onDone,
 }: {
+  countryCode: string;
   defaultProvince: string;
   defaultDistrict: string;
   defaultType?: "HAVE" | "NEED";
   defaultCategory?: Category;
   onDone?: () => void;
 }) {
+  const region = regionFor(countryCode);
   const formRef = useRef<HTMLFormElement>(null);
   const [category, setCategory] = useState<Category>(defaultCategory);
   const [state, formAction, pending] = useActionState(
@@ -112,24 +115,24 @@ export function PostForm({
 
       {category === "TRANSPORT" && (
         <div className="flex flex-wrap gap-3 rounded-lg bg-new-bg p-3">
-          <Field label="Destination province (optional)">
+          <Field label={`Destination ${region.labels.level1.toLowerCase()} (optional)`}>
             <select
               name="destinationProvince"
               defaultValue=""
               className="rounded-lg border border-border px-2 py-1 text-sm"
             >
               <option value="">Not sure yet</option>
-              {ZIMBABWE_PROVINCES.map((p) => (
+              {region.level1.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Destination district (optional)">
+          <Field label={`Destination ${region.labels.level2.toLowerCase()} (optional)`}>
             <input
               name="destinationDistrict"
-              placeholder="e.g. Harare"
+              placeholder={region.labels.level2}
               className="rounded-lg border border-border px-2 py-1 text-sm"
             />
           </Field>
@@ -157,20 +160,41 @@ export function PostForm({
           </Field>
 
           <div className="flex flex-wrap gap-3">
-            <Field label={category === "TRANSPORT" ? "Starting province" : "Province"}>
-              <select
-                name="province"
-                defaultValue={defaultProvince}
-                className="rounded-lg border border-border px-2 py-1 text-sm"
-              >
-                {ZIMBABWE_PROVINCES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+            <Field
+              label={
+                category === "TRANSPORT"
+                  ? `Starting ${region.labels.level1.toLowerCase()}`
+                  : region.labels.level1
+              }
+            >
+              {region.level1.length > 0 ? (
+                <select
+                  name="province"
+                  defaultValue={defaultProvince}
+                  className="rounded-lg border border-border px-2 py-1 text-sm"
+                >
+                  {region.level1.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  name="province"
+                  defaultValue={defaultProvince}
+                  required
+                  className="rounded-lg border border-border px-2 py-1 text-sm"
+                />
+              )}
             </Field>
-            <Field label={category === "TRANSPORT" ? "Starting district" : "District"}>
+            <Field
+              label={
+                category === "TRANSPORT"
+                  ? `Starting ${region.labels.level2.toLowerCase()}`
+                  : region.labels.level2
+              }
+            >
               <input
                 name="district"
                 defaultValue={defaultDistrict}
@@ -191,6 +215,15 @@ export function PostForm({
           <label className="flex w-fit items-center gap-2 text-sm">
             <input type="checkbox" name="recurring" />
             Standing order (e.g. &ldquo;I buy this every month&rdquo;) — stays open and keeps matching
+          </label>
+
+          {/* Off by default. Local matches keep coming either way; this only
+              adds international ones, and only from posts that also ticked
+              it — so nobody is ever shown a border they didn't ask to cross. */}
+          <label className="flex w-fit items-center gap-2 text-sm">
+            <input type="checkbox" name="openToCrossBorder" />
+            Open to buyers and sellers in other countries — adds international
+            matches on top of your local ones
           </label>
         </div>
       </details>

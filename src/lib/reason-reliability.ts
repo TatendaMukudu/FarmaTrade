@@ -55,6 +55,7 @@ export type ReasonKind =
   | "same_province"
   | "same_district"
   | "on_your_route"
+  | "cross_border"
   | "counterparty_rated"
   | "counterparty_building"
   | "counterparty_new"
@@ -66,6 +67,7 @@ export const REASON_KINDS: ReasonKind[] = [
   "same_province",
   "same_district",
   "on_your_route",
+  "cross_border",
   "counterparty_rated",
   "counterparty_building",
   "counterparty_new",
@@ -147,6 +149,9 @@ export function reasonKind(reason: string): ReasonKind | null {
   if (text === "same province") return "same_province";
   if (text === "same district") return "same_district";
   if (text === "on your route") return "on_your_route";
+  // Carries a country name and so can't be matched whole — the prefix is
+  // the stable part.
+  if (text.startsWith("cross-border:")) return "cross_border";
   if (text === "founder-vouched") return "founder_vouched";
   if (text === "network-referred") return "network_referred";
   if (text === "time-sensitive") return "time_sensitive";

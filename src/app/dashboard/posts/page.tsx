@@ -92,6 +92,7 @@ export default async function PostsPage({
 
       <AddToggle label="New post" defaultOpen={!!(defaultType || defaultCategory)}>
         <PostForm
+          countryCode={party.countryCode}
           defaultProvince={party.province}
           defaultDistrict={party.district}
           defaultType={defaultType}
