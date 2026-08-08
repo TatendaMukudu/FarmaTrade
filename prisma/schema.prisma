@@ -439,6 +439,12 @@ model Reputation {
   completedCount      Int      @default(0)
   completedGoodCount  Int      @default(0)
   completedIssueCount Int      @default(0)
+  // Deliberately outside completedCount: a trade that never happened is not
+  // a completed one, and averaging it into a "trades done" figure would
+  // erase the single most informative negative signal the schema collects.
+  // Kept as its own count so ranking can read it without it ever touching a
+  // rating average it didn't earn.
+  didNotHappenCount   Int      @default(0)
   averageRating       Float?
   ratingCount         Int      @default(0)
   updatedAt           DateTime @updatedAt

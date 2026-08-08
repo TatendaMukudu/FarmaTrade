@@ -14,13 +14,22 @@ export type { ReputationSummary };
 // weak point until a payment aggregator gives a verified signal).
 // averageRating comes from Rating rows where this party is the *subject*,
 // i.e. what counterparties said about them — that's the peer-trust signal.
+//
+// didNotHappenCount is counted but held apart from completedCount — the
+// party said the trade fell through, which is not a completed trade and must
+// not be averaged into one. It was previously collected and discarded
+// entirely; read-time ranking now uses it, which is the only reason it needs
+// to be here rather than derived on demand.
 export async function recomputeReputation(partyId: string) {
-  const [completedGoodCount, completedIssueCount, ratingAgg] = await Promise.all([
+  const [completedGoodCount, completedIssueCount, didNotHappenCount, ratingAgg] = await Promise.all([
     prisma.transactionConfirmation.count({
       where: { partyId, outcome: "COMPLETED_GOOD" },
     }),
     prisma.transactionConfirmation.count({
       where: { partyId, outcome: "COMPLETED_ISSUE" },
+    }),
+    prisma.transactionConfirmation.count({
+      where: { partyId, outcome: "DID_NOT_HAPPEN" },
     }),
     prisma.rating.aggregate({
       where: { subjectId: partyId },
@@ -36,6 +45,7 @@ export async function recomputeReputation(partyId: string) {
       completedCount: completedGoodCount + completedIssueCount,
       completedGoodCount,
       completedIssueCount,
+      didNotHappenCount,
       averageRating: ratingAgg._avg.score,
       ratingCount: ratingAgg._count.score,
     },
@@ -43,6 +53,7 @@ export async function recomputeReputation(partyId: string) {
       completedCount: completedGoodCount + completedIssueCount,
       completedGoodCount,
       completedIssueCount,
+      didNotHappenCount,
       averageRating: ratingAgg._avg.score,
       ratingCount: ratingAgg._count.score,
     },

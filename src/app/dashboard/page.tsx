@@ -4,9 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
+import { loadReasonReliability, toRankableMatch } from "@/lib/match-ranking";
+import { rankMatches } from "@/lib/match-rank";
 import { categoryEmoji } from "@/lib/categories";
 import { Badge } from "@/components/badge";
 import type { Post, Party } from "@/generated/prisma/client";
+
+// How many recent suggestions the overview ranks before taking the top few.
+// Wide enough that ranking has a real choice to make, narrow enough that the
+// overview stays one small query.
+const TOP_MATCH_CANDIDATES = 40;
+const TOP_MATCHES_SHOWN = 3;
 
 function greeting() {
   const hour = Number(
@@ -33,8 +41,15 @@ export default async function DashboardPage() {
   // new since the *previous* visit rather than immediately zeroing itself out.
   const since = party.opportunitiesLastSeenAt;
 
-  const [openPostCount, opportunityCount, newSinceLastVisit, draftCount, topMatches, topProduce] =
-    await Promise.all([
+  const [
+    openPostCount,
+    opportunityCount,
+    newSinceLastVisit,
+    draftCount,
+    matchCandidates,
+    topProduce,
+    reliability,
+  ] = await Promise.all([
       prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
       prisma.match.count({
         where: {
@@ -52,17 +67,21 @@ export default async function DashboardPage() {
       party.farm
         ? prisma.post.count({ where: { partyId: party.id, status: "DRAFT" } })
         : Promise.resolve(0),
+      // Fetched unsorted-by-score and ranked in memory: `Match.score` is
+      // what was true the day the match was written, so ordering on it here
+      // would show a stale top three. Bounded by a recency window rather
+      // than `take: 3` — read-time ranking needs candidates to choose from.
       prisma.match.findMany({
         where: {
           status: "SUGGESTED",
           OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
         },
         include: {
-          postA: { include: { party: true } },
-          postB: { include: { party: true } },
+          postA: { include: { party: { include: { reputation: true } } } },
+          postB: { include: { party: { include: { reputation: true } } } },
         },
-        orderBy: { score: "desc" },
-        take: 3,
+        orderBy: { createdAt: "desc" },
+        take: TOP_MATCH_CANDIDATES,
       }),
       party.farm
         ? prisma.produceStock.findFirst({
@@ -70,7 +89,8 @@ export default async function DashboardPage() {
             orderBy: { quantity: "desc" },
           })
         : Promise.resolve(null),
-    ]);
+    loadReasonReliability(),
+  ]);
 
   await prisma.party.update({
     where: { id: party.id },
@@ -78,6 +98,10 @@ export default async function DashboardPage() {
   });
 
   const reputation = summarizeReputation(party.reputation);
+  const topMatches = rankMatches(
+    matchCandidates.map((m) => toRankableMatch(m, party.id)),
+    { reliability },
+  ).slice(0, TOP_MATCHES_SHOWN);
 
   return (
     <div className="flex flex-col gap-8">
@@ -141,7 +165,8 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <ul className="flex flex-col gap-2">
-          {topMatches.map((m) => {
+          {topMatches.map(({ match }) => {
+            const m = match.source;
             const { theirs } = resolveMatchSides(m, party.id);
             const isNew = since ? m.createdAt > since : true;
             return (
