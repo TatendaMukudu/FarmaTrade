@@ -52,6 +52,7 @@ export async function createTestPost(
     category: "PRODUCE" | "LIVESTOCK" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
     title: string;
     countryCode: string;
+    productId: string | null;
     province: string;
     district: string;
     openToCrossBorder: boolean;
@@ -65,6 +66,7 @@ export async function createTestPost(
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
       countryCode: overrides.countryCode ?? "ZW",
+      productId: overrides.productId ?? null,
       province: overrides.province ?? "Harare",
       district: overrides.district ?? "Harare",
       openToCrossBorder: overrides.openToCrossBorder ?? false,

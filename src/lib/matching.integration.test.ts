@@ -213,4 +213,73 @@ describe("generateMatchesForPost", () => {
     });
   });
 
+
+  // Commodity identity. Before Product existed, both of these were PRODUCE
+  // and matched each other happily.
+  describe("product identity", () => {
+    async function productPair(haveKey: string | null, needKey: string | null) {
+      const seller = await createTestParty();
+      const buyer = await createTestParty();
+      partyIds.push(seller.party.id, buyer.party.id);
+
+      const idFor = async (key: string | null) =>
+        key ? (await prisma.product.findUnique({ where: { key } }))!.id : null;
+
+      const have = await createTestPost(seller.party.id, {
+        type: "HAVE",
+        category: "PRODUCE",
+        productId: await idFor(haveKey),
+      });
+      const need = await createTestPost(buyer.party.id, {
+        type: "NEED",
+        category: "PRODUCE",
+        productId: await idFor(needKey),
+      });
+      await generateMatchesForPost(need.id);
+      return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    }
+
+    it("does not match maize against a tomato requirement", async () => {
+      expect(await productPair("maize", "tomato")).toBeNull();
+    });
+
+    it("matches the same commodity", async () => {
+      expect(await productPair("maize", "maize")).not.toBeNull();
+    });
+
+    it("matches a farmer's mhunga against a buyer's pearl millet", async () => {
+      // Both resolve to pearl_millet through different aliases, so by the
+      // time matching runs they are the same product id.
+      expect(await productPair("pearl_millet", "pearl_millet")).not.toBeNull();
+    });
+
+    it("still matches when neither side has a product, as it always did", async () => {
+      expect(await productPair(null, null)).not.toBeNull();
+    });
+
+    it("does not drop a match just because one side is unidentified", async () => {
+      expect(await productPair("maize", null)).not.toBeNull();
+      expect(await productPair(null, "maize")).not.toBeNull();
+    });
+
+    it("keeps the cross-border filter working alongside the product filter", async () => {
+      // Both clauses carry their own OR; combining them wrongly would drop
+      // one silently.
+      const zm = await createTestParty({ countryCode: "ZM", province: "Lusaka", district: "Lusaka" });
+      const zw = await createTestParty();
+      partyIds.push(zm.party.id, zw.party.id);
+      const maize = (await prisma.product.findUnique({ where: { key: "maize" } }))!.id;
+
+      const have = await createTestPost(zm.party.id, {
+        type: "HAVE", category: "PRODUCE", productId: maize,
+        countryCode: "ZM", province: "Lusaka", district: "Lusaka", openToCrossBorder: true,
+      });
+      const need = await createTestPost(zw.party.id, {
+        type: "NEED", category: "PRODUCE", productId: maize, openToCrossBorder: true,
+      });
+      await generateMatchesForPost(need.id);
+      expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).not.toBeNull();
+    });
+  });
+
 });

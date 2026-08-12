@@ -9,6 +9,7 @@ import {
   equipmentSchema,
 } from "@/lib/validation";
 import { parseCsv, normalizeRow } from "@/lib/csv";
+import { normalizeProductTerm } from "@/lib/products";
 import type {
   LivestockSpecies,
   LivestockSex,
@@ -91,7 +92,12 @@ export async function upsertProduce(
   const { id, ...data } = parsed.data;
 
   const values = {
+    // The farmer's own word, stored exactly as typed.
     cropType: data.cropType,
+    // What it resolves to. Null when we have no alias for it — the row is
+    // still perfectly good inventory, it just can't be commodity-matched
+    // until someone adds the alias.
+    productId: await resolveCropProduct(data.cropType),
     quantity: data.quantity,
     unit: data.unit as ProduceUnit,
     perishable: data.perishable ?? true,
@@ -165,6 +171,17 @@ export type ImportActionState = {
   success?: string;
   skipped?: string[];
 };
+
+// The canonical product a crop name refers to, or null when unknown.
+// Exact on the normalised form — no fuzzy matching, since guessing here
+// would mis-route a farmer's produce silently.
+async function resolveCropProduct(cropType: string): Promise<string | null> {
+  const alias = await prisma.productAlias.findUnique({
+    where: { normalized: normalizeProductTerm(cropType) },
+    select: { productId: true },
+  });
+  return alias?.productId ?? null;
+}
 
 const IMPORT_FIELDS = {
   LIVESTOCK: ["species", "breed", "sex", "quantity", "notes"],
@@ -249,7 +266,17 @@ export async function importInventory(
       values.push({ ...parsed.data, unit: parsed.data.unit as ProduceUnit });
     });
     if (values.length > 0) {
-      await prisma.produceStock.createMany({ data: values.map((v) => ({ ...v, farmId })) });
+      // Resolved per row rather than in bulk: an import is where a farmer's
+      // own vocabulary arrives in volume, and it is the single best moment
+      // to attach commodity identity to it.
+      const withProducts = await Promise.all(
+        values.map(async (v) => ({
+          ...v,
+          farmId,
+          productId: await resolveCropProduct(v.cropType),
+        })),
+      );
+      await prisma.produceStock.createMany({ data: withProducts });
     }
     revalidatePath("/dashboard/farm");
     return finishImport(values.length, skipped);

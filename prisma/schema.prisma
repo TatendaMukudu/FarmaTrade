@@ -168,7 +168,14 @@ model ProduceStock {
   id                  String      @id @default(cuid())
   farmId              String
   farm                Farm        @relation(fields: [farmId], references: [id])
+  // What the farmer calls it, exactly as they typed it. Never normalised,
+  // never overwritten — "Mhunga" stays "Mhunga" on their own records.
   cropType            String
+  // What it resolves to. Nullable: an unrecognised crop is still a perfectly
+  // good inventory row, it just can't be commodity-matched until someone
+  // adds the alias.
+  productId           String?
+  product             Product?    @relation(fields: [productId], references: [id])
   quantity            Float
   unit                ProduceUnit
   harvestDate         DateTime?
@@ -231,6 +238,69 @@ model TransportProfile {
 }
 
 // ---------------------------------------------------------------------------
+// Product identity: what a thing is, independent of what anyone calls it
+//
+// Matching had no commodity concept — two posts paired because both were
+// PRODUCE, so a maize seller and a tomato buyer matched. cropType was
+// recorded and never read by the matcher.
+//
+// A Product is the thing itself. A ProductAlias is any name it goes by,
+// including Shona and Ndebele. The farmer owns the language; this owns the
+// ontology underneath, so a buyer's "pearl millet" finds a farmer's "mhunga"
+// without either of them changing how they write.
+// ---------------------------------------------------------------------------
+
+enum ProductKind {
+  CROP
+  LIVESTOCK
+}
+
+model Product {
+  id       String      @id @default(cuid())
+  // Stable machine key ("pearl_millet"). Never shown to a farmer.
+  key      String      @unique
+  kind     ProductKind
+  // What FarmaTrade calls it when it has to speak for itself — a market
+  // summary, a requirement with no local wording of its own.
+  name     String
+  // Bridges to PostCategory so anything without a product identity
+  // (transport, services, inputs) still matches the way it always has.
+  category PostCategory
+
+  aliases  ProductAlias[]
+  posts    Post[]
+  produce  ProduceStock[]
+
+  @@index([category])
+}
+
+enum AliasSource {
+  // Shipped in the seed catalogue.
+  SEEDED
+  // Learned from what a farmer actually typed, once an admin confirmed it.
+  LEARNED
+}
+
+model ProductAlias {
+  id        String      @id @default(cuid())
+  productId String
+  product   Product     @relation(fields: [productId], references: [id])
+  // Lookup form: lowercased, accents folded, punctuation stripped. Unique
+  // across the whole table on purpose — one term resolves to at most one
+  // product, so ambiguity is settled deliberately rather than guessed at
+  // runtime.
+  normalized String     @unique
+  // Exactly as written, so a farmer's own spelling survives into the UI.
+  label     String
+  // BCP-47-ish: "en", "sn" (Shona), "nd" (Ndebele).
+  locale    String?
+  source    AliasSource @default(SEEDED)
+  createdAt DateTime    @default(now())
+
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
 // Posts: the symmetric "I have / I need" trading unit
 // ---------------------------------------------------------------------------
 
@@ -274,6 +344,12 @@ model Post {
   description String?
   quantity    Float?
   unit        String?
+  // What this is actually about. Nullable because it cannot be known for a
+  // transport or service post, and because existing rows predate it —
+  // matching treats "unknown" as "can't rule it out" and falls back to
+  // category, which is the behaviour that has always applied.
+  productId   String?
+  product     Product?     @relation(fields: [productId], references: [id])
   // Denormalized from the party at post time, exactly as province/district
   // already are, so the matching query can filter on it without a join.
   countryCode String       @default("ZW")
@@ -324,6 +400,9 @@ model Post {
   photos     Photo[]
 
   @@index([category, status, countryCode, province, district])
+  // The matching query narrows on product identity before geography once
+  // both sides are known.
+  @@index([productId, status, type])
   @@index([partyId])
   @@index([produceId])
   // The cross-border arm of the matching query looks up opted-in posts

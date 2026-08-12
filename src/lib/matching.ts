@@ -44,13 +44,31 @@ export async function generateMatchesForPost(postId: string) {
     ? { OR: [local, { openToCrossBorder: true, partyId: { not: post.partyId } }] }
     : local;
 
+  // Commodity identity, where both sides have one.
+  //
+  // This is a filter rather than a score: a maize seller and a tomato buyer
+  // are not a weak match, they are not a match. Until now they paired
+  // happily because both posts were PRODUCE.
+  //
+  // Unknown on either side means "can't rule it out" and falls through to
+  // the category check that has always governed matching — so posts that
+  // predate the product catalogue, and categories that have no product
+  // identity at all (transport, services, inputs), behave exactly as before.
+  const productFilter = post.productId
+    ? { OR: [{ productId: post.productId }, { productId: null }] }
+    : {};
+
+  // Combined under AND rather than spread into one object: both `reach` and
+  // `productFilter` can carry their own `OR`, and spreading them would let
+  // the second silently overwrite the first — dropping a filter without any
+  // error, which is the worst way for a matching constraint to fail.
   const candidates = await prisma.post.findMany({
     where: {
       type: oppositeType,
       category: post.category,
       status: "OPEN",
       partyId: { not: post.partyId },
-      ...reach,
+      AND: [productFilter, reach],
     },
     include: { party: { include: { reputation: true } } },
   });

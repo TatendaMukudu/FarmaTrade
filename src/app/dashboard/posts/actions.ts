@@ -6,9 +6,49 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { postSchemaFor } from "@/lib/validation";
 import { regionFor } from "@/lib/regions";
+import { normalizeProductTerm, subjectFromTitle } from "@/lib/products";
 import { generateMatchesForPost } from "@/lib/matching";
 import { uploadPhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
+
+// The canonical product a new post is about, or null when we can't tell.
+// Null is a normal outcome, not a failure: matching falls back to category,
+// which is what it always did.
+async function resolvePostProduct(
+  inventory: { produceId?: string; livestockId?: string },
+  title: string,
+): Promise<string | null> {
+  if (inventory.produceId) {
+    const row = await prisma.produceStock.findUnique({
+      where: { id: inventory.produceId },
+      select: { productId: true },
+    });
+    if (row?.productId) return row.productId;
+  }
+  if (inventory.livestockId) {
+    const row = await prisma.livestock.findUnique({
+      where: { id: inventory.livestockId },
+      select: { species: true },
+    });
+    if (row) {
+      const alias = await prisma.productAlias.findUnique({
+        where: { normalized: normalizeProductTerm(row.species) },
+        select: { productId: true },
+      });
+      if (alias) return alias.productId;
+    }
+  }
+  // Whole title first, then with a leading quantity stripped — "20 tonnes
+  // of maize" is a shape FarmaTrade writes itself.
+  for (const term of [title, subjectFromTitle(title)]) {
+    const alias = await prisma.productAlias.findUnique({
+      where: { normalized: normalizeProductTerm(term) },
+      select: { productId: true },
+    });
+    if (alias) return alias.productId;
+  }
+  return null;
+}
 
 // Verifies the referenced row is actually this party's before linking it —
 // the reference arrives from a form field, so it is a client-supplied id and
@@ -105,6 +145,11 @@ export async function createPost(
   // a free-text title, which is not something to group on.
   const inventory = await resolveInventoryRef(data.inventoryRef, party.id);
 
+  // What this post is actually about. The inventory row is the better
+  // source — the farmer already told us what that is — with the title as a
+  // fallback for a post typed from scratch.
+  const productId = await resolvePostProduct(inventory, data.title);
+
   const post = await prisma.post.create({
     data: {
       partyId: party.id,
@@ -124,6 +169,7 @@ export async function createPost(
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,
       openToCrossBorder: data.openToCrossBorder ?? false,
+      productId,
       ...inventory,
       destinationProvince: data.destinationProvince,
       destinationDistrict: data.destinationDistrict,
