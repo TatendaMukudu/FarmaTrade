@@ -325,6 +325,19 @@ enum PostCategory {
   INPUTS
 }
 
+// Why an intent exists. DERIVED is the path FarmaTrade is moving toward:
+// it already knows the farm has 26 tonnes of maize with a harvest date, so
+// it proposes the availability and the farmer confirms. DECLARED remains for
+// everything with no underlying record — a buyer's requirement, a
+// transporter's capacity, a need for something the farm does not have.
+//
+// See src/lib/intent.ts. The domain calls these rows Intent; the table is
+// still named Post until the physical rename lands separately.
+enum IntentOrigin {
+  DERIVED
+  DECLARED
+}
+
 enum PostStatus {
   // Auto-drafted (currently: from an approaching harvest date) and waiting
   // on the owner to confirm — never matched against while in this state.
@@ -338,6 +351,10 @@ model Post {
   id          String       @id @default(cuid())
   partyId     String
   party       Party        @relation(fields: [partyId], references: [id])
+  // Whether FarmaTrade proposed this from what it already knows, or the
+  // party stated it outright. Defaults to DECLARED because every row that
+  // predates this column was typed by hand.
+  origin      IntentOrigin @default(DECLARED)
   type        PostType
   category    PostCategory
   title       String

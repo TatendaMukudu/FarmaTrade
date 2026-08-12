@@ -1,15 +1,16 @@
-// Integration test: exercises generateMatchesForPost against a real
+// Integration test: exercises generateMatchesForIntent against a real
 // Postgres (the same one CI stands up), covering the DB query/candidate
 // selection that scoreMatch's unit tests (matching-core.test.ts) can't
-// reach on their own — geoFilter, skipDuplicates, and the opposite-type/
-// same-category constraints. No request-runtime mocking needed here:
-// generateMatchesForPost never touches cookies/headers/redirect.
+// reach on their own — geo reach, product identity, skipDuplicates, and the
+// opposite-direction/same-category constraints. No request-runtime mocking
+// needed here: generateMatchesForIntent never touches
+// cookies/headers/redirect.
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { generateMatchesForPost } from "@/lib/matching";
+import { generateMatchesForIntent } from "@/lib/matching";
 import { createTestParty, createTestPost, cleanupParties } from "@/test/factories";
 
-describe("generateMatchesForPost", () => {
+describe("generateMatchesForIntent", () => {
   const partyIds: string[] = [];
   afterEach(async () => {
     await cleanupParties(partyIds.splice(0));
@@ -23,7 +24,7 @@ describe("generateMatchesForPost", () => {
     const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
     const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
 
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
 
     const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     expect(match).not.toBeNull();
@@ -48,7 +49,7 @@ describe("generateMatchesForPost", () => {
       district: "Harare",
     });
 
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
 
     const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     expect(match).toBeNull();
@@ -61,7 +62,7 @@ describe("generateMatchesForPost", () => {
     const have = await createTestPost(party.party.id, { type: "HAVE", category: "PRODUCE" });
     const need = await createTestPost(party.party.id, { type: "NEED", category: "PRODUCE" });
 
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
 
     const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     expect(match).toBeNull();
@@ -75,7 +76,7 @@ describe("generateMatchesForPost", () => {
     const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE", status: "CLOSED" });
     const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
 
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
 
     const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     expect(match).toBeNull();
@@ -105,7 +106,7 @@ describe("generateMatchesForPost", () => {
       district: "Mutare",
     });
 
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
 
     const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     expect(match).not.toBeNull();
@@ -120,8 +121,8 @@ describe("generateMatchesForPost", () => {
     await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
     const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
 
-    await generateMatchesForPost(need.id);
-    await generateMatchesForPost(need.id);
+    await generateMatchesForIntent(need.id);
+    await generateMatchesForIntent(need.id);
 
     const matches = await prisma.match.findMany({ where: { postBId: need.id } });
     expect(matches).toHaveLength(1);
@@ -152,7 +153,7 @@ describe("generateMatchesForPost", () => {
         district: "Harare",
         openToCrossBorder: opts.needOptsIn,
       });
-      await generateMatchesForPost(need.id);
+      await generateMatchesForIntent(need.id);
       return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     }
 
@@ -186,7 +187,7 @@ describe("generateMatchesForPost", () => {
         category: "PRODUCE",
         openToCrossBorder: true,
       });
-      await generateMatchesForPost(need.id);
+      await generateMatchesForIntent(need.id);
 
       const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
       expect(match).not.toBeNull();
@@ -207,7 +208,7 @@ describe("generateMatchesForPost", () => {
       const need = await createTestPost(zw.party.id, {
         type: "NEED", category: "PRODUCE", countryCode: "ZW", province: "Southern", district: "Choma",
       });
-      await generateMatchesForPost(need.id);
+      await generateMatchesForIntent(need.id);
 
       expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).toBeNull();
     });
@@ -235,7 +236,7 @@ describe("generateMatchesForPost", () => {
         category: "PRODUCE",
         productId: await idFor(needKey),
       });
-      await generateMatchesForPost(need.id);
+      await generateMatchesForIntent(need.id);
       return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
     }
 
@@ -277,7 +278,7 @@ describe("generateMatchesForPost", () => {
       const need = await createTestPost(zw.party.id, {
         type: "NEED", category: "PRODUCE", productId: maize, openToCrossBorder: true,
       });
-      await generateMatchesForPost(need.id);
+      await generateMatchesForIntent(need.id);
       expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).not.toBeNull();
     });
   });

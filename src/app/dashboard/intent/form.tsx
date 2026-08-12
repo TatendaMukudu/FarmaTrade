@@ -60,14 +60,14 @@ export function PostForm({
       className="flex flex-col gap-3 rounded-card border border-border bg-card p-4"
     >
       <div className="flex flex-wrap gap-3">
-        <Field label="What?">
+        <Field label="Direction">
           <select
             name="type"
             defaultValue={defaultType}
             className="rounded-card border border-border px-2 py-1 text-sm"
           >
-            <option value="HAVE">I have</option>
-            <option value="NEED">I need</option>
+            <option value="HAVE">Offering</option>
+            <option value="NEED">Looking for</option>
           </select>
         </Field>
         <Field label="Category">
@@ -261,7 +261,7 @@ export function PostForm({
 
           <label className="flex w-fit items-center gap-2 text-sm">
             <input type="checkbox" name="recurring" />
-            Standing order (e.g. &ldquo;I buy this every month&rdquo;) — stays open and keeps matching
+            Recurring (e.g. &ldquo;every month&rdquo;) — stays available and keeps matching
           </label>
 
           {/* Off by default. Local matches keep coming either way; this only
@@ -286,7 +286,7 @@ export function PostForm({
         disabled={pending}
         className="w-fit rounded-card bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
-        {pending ? "Posting…" : "Post"}
+        {pending ? "Saving…" : "Save"}
       </button>
     </form>
   );

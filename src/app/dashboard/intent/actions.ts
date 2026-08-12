@@ -7,7 +7,7 @@ import { getCurrentParty } from "@/lib/auth";
 import { postSchemaFor } from "@/lib/validation";
 import { regionFor } from "@/lib/regions";
 import { normalizeProductTerm, subjectFromTitle } from "@/lib/products";
-import { generateMatchesForPost } from "@/lib/matching";
+import { generateMatchesForIntent } from "@/lib/matching";
 import { uploadPhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
 
@@ -190,9 +190,9 @@ export async function createPost(
     });
   }
 
-  await generateMatchesForPost(post.id);
+  await generateMatchesForIntent(post.id);
 
-  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard/opportunities");
   return {};
 }
@@ -207,7 +207,7 @@ export async function closePost(formData: FormData) {
     data: { status: "CLOSED" },
   });
 
-  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard/opportunities");
 }
 
@@ -220,9 +220,9 @@ export async function confirmDraftPost(formData: FormData) {
   if (!post) return;
 
   await prisma.post.update({ where: { id }, data: { status: "OPEN" } });
-  await generateMatchesForPost(id);
+  await generateMatchesForIntent(id);
 
-  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard/opportunities");
   revalidatePath("/dashboard");
 }
@@ -234,6 +234,6 @@ export async function discardDraftPost(formData: FormData) {
   const id = String(formData.get("id"));
   await prisma.post.deleteMany({ where: { id, partyId: party.id, status: "DRAFT" } });
 
-  revalidatePath("/dashboard/posts");
+  revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard");
 }

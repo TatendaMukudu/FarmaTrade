@@ -2,7 +2,7 @@
 // every page load rather than frozen into the row when the match was made.
 //
 // The problem this fixes: `Match.score` is computed once inside
-// `generateMatchesForPost` and never revisited. A counterparty who completes
+// `generateMatchesForIntent` and never revisited. A counterparty who completes
 // ten trades tomorrow does not move up. `neededBy` and `expiresAt` are
 // declared in the schema and read by nothing in the scoring path. A match
 // found six weeks ago outranks one found this morning purely because it
@@ -104,7 +104,7 @@ const PENALTY = {
 const STALENESS_PER_DAY = 1.5;
 const MAX_STALENESS_PENALTY = 24;
 
-export type RankablePost = {
+export type RankableIntent = {
   id: string;
   urgent: boolean;
   neededBy: Date | null;
@@ -125,8 +125,8 @@ export type RankableMatch = {
   // Freshly computed against today's posts and today's reputation — not the
   // signals frozen into the row when the match was written.
   signals: MatchSignal[];
-  yours: RankablePost;
-  theirs: RankablePost;
+  yours: RankableIntent;
+  theirs: RankableIntent;
   counterpartyReputation: RankableReputation;
   counterpartyVerifiedBy: VerificationSource | null;
   // Which category-and-route bucket this trade sits in, and how well known

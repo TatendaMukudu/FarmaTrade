@@ -24,7 +24,7 @@ function navItems(hasFarm: boolean): NavItem[] {
     { href: "/dashboard", label: "Home", Icon: HomeIcon },
     ...(hasFarm ? [{ href: "/dashboard/farm", label: "Farm", Icon: FarmIcon }] : []),
     { href: "/dashboard/directory", label: "Directory", Icon: DirectoryIcon },
-    { href: "/dashboard/posts", label: "Posts", Icon: ListingIcon },
+    { href: "/dashboard/intent", label: "Supply & needs", Icon: ListingIcon },
     { href: "/dashboard/opportunities", label: "Opportunities", Icon: MatchIcon },
   ];
 }

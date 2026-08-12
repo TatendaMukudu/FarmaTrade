@@ -6,10 +6,10 @@ import { ConfirmForm } from "./confirm-form";
 import { summarizeReputation } from "@/lib/reputation";
 import {
   resolveMatchSides,
-  groupMatchesByOwnPost,
+  groupMatchesByOwnIntent,
   combinedOfferedQuantity,
   distanceLabel,
-  estimatedPostValue,
+  estimatedIntentValue,
 } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
@@ -115,7 +115,7 @@ export default async function OpportunitiesPage() {
   // Coverage is computed over every active match, not per bucket — "how much
   // of my order is on the table" is a fact about the order, and slicing it
   // by how urgent each candidate happens to be would quietly understate it.
-  const coverage = groupMatchesByOwnPost<CounterpartPost, (typeof active)[number]>(
+  const coverage = groupMatchesByOwnIntent<CounterpartPost, (typeof active)[number]>(
     active,
     party.id,
   )
@@ -134,7 +134,7 @@ export default async function OpportunitiesPage() {
       <div>
         <h1 className="text-2xl font-semibold">Opportunities</h1>
         <p className="text-sm text-muted-fg">
-          Matches FarmaTrade found between your posts and the opposite side.
+          What FarmaTrade found between your supply and needs and the rest of the network.
         </p>
       </div>
 
@@ -142,8 +142,8 @@ export default async function OpportunitiesPage() {
         <EmptyState
           icon={<SproutIcon />}
           title="No opportunities yet"
-          hint="Post what you have or what you need, and FarmaTrade matches it against the opposite side."
-          action={{ href: "/dashboard/posts", label: "Create a post" }}
+          hint="Record what you have available and what you are looking for, and FarmaTrade matches it against the network."
+          action={{ href: "/dashboard/intent", label: "Add supply or a need" }}
         />
       )}
 
@@ -196,7 +196,7 @@ export default async function OpportunitiesPage() {
                             )}
                             <span>{CONFIDENCE_LABEL[ranked.confidence]}</span>
                           </div>
-                          <p className="mt-1 font-medium">Your post: {yours.title}</p>
+                          <p className="mt-1 font-medium">Yours: {yours.title}</p>
                           <MatchCounterpart
                             post={theirs}
                             myDistrict={party.district}
@@ -314,7 +314,7 @@ function MatchCounterpart({
   countryCode: string;
 }) {
   const reputation = summarizeReputation(post.party.reputation);
-  const estimatedValue = estimatedPostValue(post);
+  const estimatedValue = estimatedIntentValue(post);
 
   return (
     <div className="mt-1">

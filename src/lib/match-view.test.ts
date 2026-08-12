@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveMatchSides,
-  groupMatchesByOwnPost,
+  groupMatchesByOwnIntent,
   combinedOfferedQuantity,
   isPartyInMatch,
   distanceLabel,
-  estimatedPostValue,
+  estimatedIntentValue,
 } from "./match-view";
 
 type TestPost = { id: string; partyId: string; quantity: number | null };
@@ -31,7 +31,7 @@ describe("resolveMatchSides", () => {
   });
 });
 
-describe("groupMatchesByOwnPost", () => {
+describe("groupMatchesByOwnIntent", () => {
   it("groups multiple matches under the same own-post, preserving first-appearance order", () => {
     const mine = { id: "need-1", partyId: "me", quantity: 100 };
     const matches = [
@@ -39,7 +39,7 @@ describe("groupMatchesByOwnPost", () => {
       match("m2", { id: "have-2", partyId: "b", quantity: 40 }, mine),
       match("m3", { id: "need-2", partyId: "me", quantity: 50 }, { id: "have-3", partyId: "c", quantity: 20 }),
     ];
-    const groups = groupMatchesByOwnPost(matches, "me");
+    const groups = groupMatchesByOwnIntent(matches, "me");
     expect(groups.map((g) => g.yours.id)).toEqual(["need-1", "need-2"]);
     expect(groups[0].matches.map((m) => m.id)).toEqual(["m1", "m2"]);
     expect(groups[1].matches).toHaveLength(1);
@@ -79,17 +79,17 @@ describe("distanceLabel", () => {
   });
 });
 
-describe("estimatedPostValue", () => {
+describe("estimatedIntentValue", () => {
   it("is null when there is no asking price", () => {
-    expect(estimatedPostValue({ askingPrice: null, quantity: 10 })).toBeNull();
+    expect(estimatedIntentValue({ askingPrice: null, quantity: 10 })).toBeNull();
   });
   it("multiplies price by quantity when both are present", () => {
-    expect(estimatedPostValue({ askingPrice: 5, quantity: 10 })).toBe(50);
+    expect(estimatedIntentValue({ askingPrice: 5, quantity: 10 })).toBe(50);
   });
   it("is just the price when quantity is absent", () => {
-    expect(estimatedPostValue({ askingPrice: 5, quantity: null })).toBe(5);
+    expect(estimatedIntentValue({ askingPrice: 5, quantity: null })).toBe(5);
   });
   it("coerces a Prisma Decimal-like value via Number()", () => {
-    expect(estimatedPostValue({ askingPrice: { toString: () => "12.5" }, quantity: 2 })).toBe(25);
+    expect(estimatedIntentValue({ askingPrice: { toString: () => "12.5" }, quantity: 2 })).toBe(25);
   });
 });

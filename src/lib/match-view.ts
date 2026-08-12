@@ -3,7 +3,10 @@
 // page that renders a match (Opportunities, Overview, a Conversation) was
 // re-deriving "which side is mine" and "how far away is this" by hand.
 
-// A Match's postA/postB are interchangeable — "mine" depends on the viewer,
+// A Match's postA/postB are the Match table's own column names and stay
+// that way until the physical rename; the domain word for what they point
+// at is Intent (see lib/intent.ts). They are interchangeable — "mine"
+// depends on the viewer,
 // not on which side is A. Generic so each call site keeps whatever `include`
 // shape it fetched (party, photos, reputation, ...) on both sides.
 export function resolveMatchSides<P extends { partyId: string }>(
@@ -19,7 +22,7 @@ export function resolveMatchSides<P extends { partyId: string }>(
 // them scattered across separate cards hides that they might, together,
 // actually cover the order. Order of first appearance is preserved, so
 // grouping doesn't fight the existing score-desc sort.
-export function groupMatchesByOwnPost<P extends { id: string; partyId: string }, M extends { postA: P; postB: P }>(
+export function groupMatchesByOwnIntent<P extends { id: string; partyId: string }, M extends { postA: P; postB: P }>(
   matches: M[],
   partyId: string,
 ): { yours: P; matches: M[] }[] {
@@ -71,7 +74,7 @@ export function distanceLabel(
 
 // Decimal (Prisma) askingPrice × quantity when both are present, else just
 // the price, else nothing worth showing.
-export function estimatedPostValue(post: {
+export function estimatedIntentValue(post: {
   askingPrice: unknown;
   quantity: number | null;
 }): number | null {

@@ -1,18 +1,28 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "@/lib/matching-core";
+import { directionOf, typeForDirection } from "@/lib/intent";
 
 export { scoreMatch };
 
-// Called right after a Post is created. Finds OPEN posts of the opposite
-// type in the same category, and records a Match for each. postA is always
-// the pre-existing post, postB the one just created, so re-running this
-// never produces a duplicate pair.
-export async function generateMatchesForPost(postId: string) {
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+// Called right after an intent becomes active. Finds active intents facing
+// the opposite way, for a compatible product in a reachable place, and
+// records a Match for each.
+//
+// postA/postB on Match are persistence names — postA is always the
+// pre-existing intent, postB the one just activated, so re-running this
+// never produces a duplicate pair. See src/lib/intent.ts for why the domain
+// says Intent while the table still says Post.
+//
+// PROPOSED intents (stored status DRAFT) are deliberately excluded:
+// FarmaTrade suggested those and the farmer has not confirmed them, so
+// matching on one would be putting words in their mouth.
+export async function generateMatchesForIntent(intentId: string) {
+  const post = await prisma.post.findUnique({ where: { id: intentId } });
   if (!post || post.status !== "OPEN") return;
 
-  const oppositeType = post.type === "HAVE" ? "NEED" : "HAVE";
+  // The other side of the market from this one.
+  const oppositeType = typeForDirection(directionOf(post.type) === "SUPPLY" ? "DEMAND" : "SUPPLY");
 
   // Every other category is local-first: a match is only ever suggested
   // within the same province. TRANSPORT is the one exception — a
