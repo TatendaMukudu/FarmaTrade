@@ -10,6 +10,37 @@ import { generateMatchesForPost } from "@/lib/matching";
 import { uploadPhoto } from "@/lib/storage";
 import type { PostType, PostCategory } from "@/generated/prisma/client";
 
+// Verifies the referenced row is actually this party's before linking it —
+// the reference arrives from a form field, so it is a client-supplied id and
+// gets treated as one.
+async function resolveInventoryRef(
+  ref: string | undefined,
+  partyId: string,
+): Promise<{ produceId?: string; livestockId?: string; equipmentId?: string }> {
+  if (!ref) return {};
+  const [kind, id] = ref.split(":");
+
+  if (kind === "produce") {
+    const row = await prisma.produceStock.findFirst({
+      where: { id, farm: { partyId } },
+      select: { id: true },
+    });
+    return row ? { produceId: row.id } : {};
+  }
+  if (kind === "livestock") {
+    const row = await prisma.livestock.findFirst({
+      where: { id, farm: { partyId } },
+      select: { id: true },
+    });
+    return row ? { livestockId: row.id } : {};
+  }
+  const row = await prisma.equipment.findFirst({
+    where: { id, farm: { partyId } },
+    select: { id: true },
+  });
+  return row ? { equipmentId: row.id } : {};
+}
+
 export type PostActionState = { error?: string };
 
 const MAX_PHOTOS = 4;
@@ -54,6 +85,7 @@ export async function createPost(
     neededBy: formData.get("neededBy") || undefined,
     recurring: formData.get("recurring") === "on",
     openToCrossBorder: formData.get("openToCrossBorder") === "on",
+    inventoryRef: formData.get("inventoryRef") || undefined,
     destinationProvince: formData.get("destinationProvince") || undefined,
     destinationDistrict: formData.get("destinationDistrict") || undefined,
     travelDate: formData.get("travelDate") || undefined,
@@ -64,6 +96,14 @@ export async function createPost(
   }
 
   const data = parsed.data;
+
+  // Linking a post to the inventory row it came from is what lets the rest
+  // of the app use the farmer's own name for the thing. Price signals group
+  // on ProduceStock.cropType, which is free text — so a farmer who records
+  // their crop as "Mhunga" or "Nyimo" gets price lines in those words rather
+  // than a generic "Produce". Without the link there is nothing to read but
+  // a free-text title, which is not something to group on.
+  const inventory = await resolveInventoryRef(data.inventoryRef, party.id);
 
   const post = await prisma.post.create({
     data: {
@@ -84,6 +124,7 @@ export async function createPost(
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,
       openToCrossBorder: data.openToCrossBorder ?? false,
+      ...inventory,
       destinationProvince: data.destinationProvince,
       destinationDistrict: data.destinationDistrict,
       travelDate: data.travelDate,

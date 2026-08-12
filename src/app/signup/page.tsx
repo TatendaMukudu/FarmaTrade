@@ -64,7 +64,7 @@ export default function SignupPage() {
         </fieldset>
 
         {roles.includes("FARM") && (
-          <div className="flex flex-col gap-4 rounded border border-dashed p-4">
+          <div className="flex flex-col gap-4 rounded-control border border-dashed p-4">
             <Field label="Farm name" name="farmName" required />
             <Field
               label="Size (hectares, optional)"
@@ -76,7 +76,7 @@ export default function SignupPage() {
         )}
 
         {roles.includes("TRANSPORTER") && (
-          <div className="flex flex-col gap-4 rounded border border-dashed p-4">
+          <div className="flex flex-col gap-4 rounded-control border border-dashed p-4">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium" htmlFor="vehicleType">
                 Vehicle type
@@ -85,7 +85,7 @@ export default function SignupPage() {
                 id="vehicleType"
                 name="vehicleType"
                 required
-                className="rounded border px-3 py-2 text-sm"
+                className="rounded-control border px-3 py-2 text-sm"
                 defaultValue=""
               >
                 <option value="" disabled>
@@ -117,7 +117,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+          className="rounded-control bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? "Creating account…" : "Create account"}
         </button>
@@ -157,7 +157,7 @@ function Field({
         type={type}
         required={required}
         step={step}
-        className="rounded border px-3 py-2 text-sm"
+        className="rounded-control border px-3 py-2 text-sm"
       />
     </div>
   );

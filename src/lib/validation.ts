@@ -130,6 +130,14 @@ export const postSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
   neededBy: z.coerce.date().optional(),
   recurring: z.coerce.boolean().optional(),
   openToCrossBorder: z.coerce.boolean().optional(),
+  // "produce:<id>" / "livestock:<id>" / "equipment:<id>" — which of the
+  // farmer's own inventory rows this post is about, when it is about one.
+  // Ownership is checked server-side; this only validates the shape.
+  inventoryRef: z
+    .string()
+    .trim()
+    .regex(/^(produce|livestock|equipment):[a-z0-9]+$/i, "Unrecognised inventory item")
+    .optional(),
   destinationProvince: z.string().trim().optional(),
   destinationDistrict: z.string().trim().optional(),
   travelDate: z.coerce.date().optional(),

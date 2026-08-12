@@ -6,14 +6,6 @@ import { PostCategory } from "@/generated/prisma/enums";
 // category is a schema change plus one new line here, not five files.
 export const POST_CATEGORIES = Object.values(PostCategory);
 
-export const CATEGORY_EMOJI: Record<PostCategory, string> = {
-  LIVESTOCK: "🐄",
-  PRODUCE: "🍊",
-  EQUIPMENT: "🚜",
-  TRANSPORT: "🚛",
-  INPUTS: "🛒",
-};
-
 export const CATEGORY_LABEL: Record<PostCategory, string> = {
   LIVESTOCK: "Livestock",
   PRODUCE: "Produce",
@@ -22,6 +14,6 @@ export const CATEGORY_LABEL: Record<PostCategory, string> = {
   INPUTS: "Seed, fertilizer & supplies",
 };
 
-export function categoryEmoji(category: PostCategory): string {
-  return CATEGORY_EMOJI[category] ?? "📌";
-}
+// Icons live in components/icons.tsx — see CategoryIcon there. This module
+// stays free of JSX so it can be imported from server code, actions and
+// tests without dragging React in.

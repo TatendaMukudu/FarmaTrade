@@ -14,7 +14,10 @@ import {
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
 import { formatMoney, regionFor } from "@/lib/regions";
+import { pluralizeUnit } from "@/lib/units";
 import { Badge } from "@/components/badge";
+import { SproutIcon } from "@/components/icons";
+import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
 import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
 
 type PartyWithReputation = Party & { reputation: Reputation | null };
@@ -29,10 +32,32 @@ const BUCKET_LIMIT: Record<Bucket, number> = {
   worth_knowing: 3,
 };
 
-const SOLID_BUTTON =
-  "rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover";
-const OUTLINE_BUTTON =
-  "rounded-lg border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-accent-foreground";
+// Enums spelled for a human. "COMPLETED GOOD" and "MATCHED" were leaking
+// straight through to the page.
+const MATCH_STATUS_LABEL: Record<string, string> = {
+  SUGGESTED: "Suggested",
+  ACCEPTED: "Agreed",
+  DECLINED: "Declined",
+  COMPLETED: "Completed",
+};
+
+// How much is actually known about this counterparty, said plainly. The
+// tier names are ours; a farmer should read what they mean.
+const CONFIDENCE_LABEL: Record<string, string> = {
+  confirmed: "Well-established trader",
+  reliable: "Has traded before",
+  promising: "Vouched for, no trades yet",
+  calibrating: "New — no history yet",
+};
+
+const OUTCOME_LABEL: Record<string, string> = {
+  COMPLETED_GOOD: "Went well",
+  COMPLETED_ISSUE: "Completed, with an issue",
+  DID_NOT_HAPPEN: "Did not happen",
+};
+
+const SOLID_BUTTON = buttonClass("primary", "sm");
+const OUTLINE_BUTTON = buttonClass("secondary", "sm");
 
 export default async function OpportunitiesPage() {
   const party = await getCurrentParty();
@@ -113,19 +138,26 @@ export default async function OpportunitiesPage() {
         </p>
       </div>
 
-      {plan.empty && <p className="text-sm text-subtle-fg">{plan.message}</p>}
+      {plan.empty && (
+        <EmptyState
+          icon={<SproutIcon />}
+          title="No opportunities yet"
+          hint="Post what you have or what you need, and FarmaTrade matches it against the opposite side."
+          action={{ href: "/dashboard/posts", label: "Create a post" }}
+        />
+      )}
 
       {coverage.length > 0 && (
         <div className="flex flex-col gap-3">
           {coverage.map(({ yours, count, combined }) => {
             const needed = yours.quantity ?? 0;
             return (
-              <div key={yours.id} className="rounded-lg border border-border bg-new-bg p-3">
+              <div key={yours.id} className="rounded-card border border-border bg-new-bg p-3">
                 <p className="text-sm font-medium text-new-fg">
                   Combined available for &ldquo;{yours.title}&rdquo;: {combined.toLocaleString()} /{" "}
-                  {needed.toLocaleString()} {yours.unit ?? ""} across {count} matches
+                  {needed.toLocaleString()} {yours.unit ? pluralizeUnit(yours.unit, needed) : ""} across {count} matches
                 </p>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-pill bg-border">
                   <div
                     className="h-full bg-accent"
                     style={{ width: `${Math.min(100, (combined / needed) * 100)}%` }}
@@ -140,9 +172,11 @@ export default async function OpportunitiesPage() {
       {!plan.empty &&
         plan.groups.map((group) => (
           <div key={group.bucket} className="flex flex-col gap-3">
-            <h2 className="text-lg font-medium">{group.label}</h2>
+            <SectionHeading title={group.label} count={group.matches.length} />
             {group.empty ? (
-              <p className="text-sm text-subtle-fg">{group.message}</p>
+              <p className="rounded-card border border-dashed border-border px-4 py-3 text-sm text-muted-fg">
+                {group.message}
+              </p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {group.matches.map((ranked) => {
@@ -151,16 +185,16 @@ export default async function OpportunitiesPage() {
                   const myConfirmation = m.confirmations.find((c) => c.partyId === party.id);
                   const strength = strengthByCounterparty.get(theirs.party.id);
                   return (
-                    <li key={m.id} className="rounded-lg border border-border bg-card p-4">
-                      <div className="flex items-start justify-between gap-4">
+                    <li id={`match-${m.id}`} className="scroll-mt-4 rounded-card border border-border bg-card p-4" key={m.id}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-subtle-fg">
-                            <span>{m.status}</span>
+                            <span>{MATCH_STATUS_LABEL[m.status] ?? m.status}</span>
                             {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
                             {strength && strength >= 2 && (
                               <Badge tone="info">Preferred partner · {strength} completed</Badge>
                             )}
-                            <span>Evidence {ranked.confidence.replace(/_/g, " ")}</span>
+                            <span>{CONFIDENCE_LABEL[ranked.confidence]}</span>
                           </div>
                           <p className="mt-1 font-medium">Your post: {yours.title}</p>
                           <MatchCounterpart
@@ -195,7 +229,7 @@ export default async function OpportunitiesPage() {
                             </p>
                           )}
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-2">
+                        <div className="flex flex-wrap gap-2 sm:shrink-0 sm:flex-col sm:items-end">
                           {m.status === "SUGGESTED" && (
                             <form action={respondToMatch} className="flex gap-2">
                               <input type="hidden" name="id" value={m.id} />
@@ -221,7 +255,7 @@ export default async function OpportunitiesPage() {
                         <div className="mt-4 border-t border-border pt-4">
                           {myConfirmation ? (
                             <p className="text-sm text-muted-fg">
-                              You reported: {myConfirmation.outcome.replace(/_/g, " ")}.
+                              You reported: {OUTCOME_LABEL[myConfirmation.outcome].toLowerCase()}.
                               Waiting on {theirs.party.name} to confirm their side.
                             </p>
                           ) : (
@@ -254,10 +288,10 @@ export default async function OpportunitiesPage() {
               return (
                 <li
                   key={m.id}
-                  className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-fg"
+                  className="rounded-card border border-border bg-card px-4 py-2 text-sm text-muted-fg"
                 >
                   {yours.title} ↔ {theirs.party.name} ({theirs.title}) ·{" "}
-                  {myConfirmation?.outcome.replace(/_/g, " ") ?? "—"}
+                  {myConfirmation ? OUTCOME_LABEL[myConfirmation.outcome] : "Not confirmed"}
                 </li>
               );
             })}
@@ -310,7 +344,7 @@ function MatchCounterpart({
               key={photo.id}
               src={`/api/photos/${photo.id}`}
               alt=""
-              className="h-16 w-16 rounded object-cover"
+              className="h-16 w-16 rounded-control object-cover"
             />
           ))}
         </div>

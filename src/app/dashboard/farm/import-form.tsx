@@ -28,7 +28,7 @@ export function ImportForm() {
   );
 
   return (
-    <details className="rounded-lg border border-border bg-card px-4 py-3">
+    <details className="rounded-card border border-border bg-card px-4 py-3">
       <summary className="cursor-pointer select-none text-sm font-medium">
         Import from a spreadsheet (CSV)
       </summary>
@@ -41,7 +41,7 @@ export function ImportForm() {
             <select
               id="import-category"
               name="category"
-              className="rounded-lg border border-border px-2 py-1 text-sm"
+              className="rounded-card border border-border px-2 py-1 text-sm"
               defaultValue="PRODUCE"
             >
               <option value="LIVESTOCK">Livestock</option>
@@ -52,7 +52,7 @@ export function ImportForm() {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-card bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
           >
             {pending ? "Importing…" : "Import"}
           </button>
@@ -62,7 +62,7 @@ export function ImportForm() {
             place "drop a file here" is actually the right convention. */}
         <label
           htmlFor="import-file"
-          className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-border bg-new-bg px-4 py-6 text-center hover:border-accent"
+          className="flex cursor-pointer flex-col items-center gap-1 rounded-card border-2 border-dashed border-border bg-new-bg px-4 py-6 text-center hover:border-accent"
         >
           <span className="text-sm font-medium text-new-fg">
             {fileName ?? "Choose a CSV file"}

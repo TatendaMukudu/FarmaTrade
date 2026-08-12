@@ -32,7 +32,7 @@ export function LivestockForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"
+      className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-card p-4"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <SelectField

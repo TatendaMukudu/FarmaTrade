@@ -84,7 +84,7 @@ function Row({
   id: string;
 }) {
   return (
-    <li className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2 text-sm">
+    <li className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-2 text-sm">
       <span>{summary}</span>
       <div className="flex items-center gap-3">
         <button type="button" onClick={onEdit} className="text-xs underline">

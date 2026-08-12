@@ -26,7 +26,7 @@ export default function LoginPage() {
             name="email"
             type="email"
             required
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-control border px-3 py-2 text-sm"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -38,7 +38,7 @@ export default function LoginPage() {
             name="password"
             type="password"
             required
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-control border px-3 py-2 text-sm"
           />
         </div>
 
@@ -51,7 +51,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+          className="rounded-control bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? "Logging in…" : "Log in"}
         </button>

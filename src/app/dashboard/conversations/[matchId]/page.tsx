@@ -74,7 +74,7 @@ export default async function ConversationPage({
                 key={photo.id}
                 src={`/api/photos/${photo.id}`}
                 alt=""
-                className="h-20 w-20 rounded object-cover"
+                className="h-20 w-20 rounded-control object-cover"
               />
             ))}
           </div>
@@ -88,7 +88,7 @@ export default async function ConversationPage({
             type="submit"
             name="decision"
             value="ACCEPTED"
-            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+            className="rounded-control bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
           >
             Accept
           </button>
@@ -96,14 +96,14 @@ export default async function ConversationPage({
             type="submit"
             name="decision"
             value="DECLINED"
-            className="rounded border px-3 py-1.5 text-xs"
+            className="rounded-control border px-3 py-1.5 text-xs"
           >
             Decline
           </button>
         </form>
       )}
 
-      <div className="flex min-h-[240px] flex-col gap-2 rounded border p-4">
+      <div className="flex min-h-[240px] flex-col gap-2 rounded-control border p-4">
         {messages.length === 0 && (
           <p className="text-sm text-subtle-fg">
             No messages yet — say hello and agree on price, quantity, and pickup.
@@ -112,7 +112,7 @@ export default async function ConversationPage({
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`max-w-[75%] rounded px-3 py-2 text-sm ${
+            className={`max-w-[75%] rounded-control px-3 py-2 text-sm ${
               m.authorId === party.id
                 ? "self-end bg-accent text-accent-foreground"
                 : "self-start bg-new-bg text-foreground"
@@ -126,7 +126,7 @@ export default async function ConversationPage({
       <MessageForm matchId={match.id} />
 
       {transporters.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-card p-4">
           <p className="text-sm font-medium">Need transport for this?</p>
           <p className="text-xs text-muted-fg">
             These transporters&apos; routes cover{" "}
@@ -143,7 +143,7 @@ export default async function ConversationPage({
               return (
                 <li
                   key={t.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-card border border-border px-3 py-2"
                 >
                   <div className="min-w-0">
                     <Link
@@ -158,7 +158,7 @@ export default async function ConversationPage({
                     </p>
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+                    className={`shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
                       rep.tone === "success" ? "bg-success-bg text-success-fg" : "bg-new-bg text-new-fg"
                     }`}
                   >

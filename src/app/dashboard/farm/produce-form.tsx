@@ -32,7 +32,7 @@ export function ProduceForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"
+      className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-card p-4"
     >
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <TextField label="Crop type" name="cropType" defaultValue={initial?.cropType} />
@@ -65,7 +65,7 @@ export function ProduceForm({
           name="expectedHarvestDate"
           type="date"
           defaultValue={initial?.expectedHarvestDate ? toDateInputValue(initial.expectedHarvestDate) : undefined}
-          className="rounded-lg border border-border px-2 py-1 text-sm"
+          className="rounded-card border border-border px-2 py-1 text-sm"
         />
       </div>
       <TextField label="Notes (optional)" name="notes" defaultValue={initial?.notes ?? undefined} />

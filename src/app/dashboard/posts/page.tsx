@@ -1,12 +1,20 @@
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { PostForm } from "./form";
+import { PostForm, type InventoryOption } from "./form";
 import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
 import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
 import { CATEGORY_LABEL, POST_CATEGORIES } from "@/lib/categories";
 import type { PostCategory } from "@/generated/prisma/enums";
+
+// Raw enum names were rendering straight to the farmer ("MATCHED", "OPEN").
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  OPEN: "Live",
+  MATCHED: "Matched",
+  CLOSED: "Closed",
+};
 
 const VALID_TYPES = new Set(["HAVE", "NEED"]);
 const VALID_CATEGORIES = new Set<string>(POST_CATEGORIES);
@@ -28,6 +36,54 @@ export default async function PostsPage({
   const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
     ? (categoryParam as PostCategory)
     : undefined;
+
+  // What this farmer has actually recorded, in their own words. Livestock
+  // has no free-text name of its own, so it is described from the fields
+  // that do carry the farmer's wording (breed) plus the species.
+  const farm = party.farm
+    ? await prisma.farm.findUnique({
+        where: { id: party.farm.id },
+        select: {
+          produce: {
+            where: { quantity: { gt: 0 } },
+            select: { id: true, cropType: true, quantity: true, unit: true },
+          },
+          livestock: {
+            select: { id: true, species: true, breed: true, quantity: true },
+          },
+          equipment: {
+            where: { available: true },
+            select: { id: true, name: true },
+          },
+        },
+      })
+    : null;
+
+  const inventory: InventoryOption[] = farm
+    ? [
+        ...farm.produce.map((r) => ({
+          ref: `produce:${r.id}`,
+          category: "PRODUCE" as const,
+          label: r.cropType,
+          quantity: r.quantity,
+          unit: r.unit,
+        })),
+        ...farm.livestock.map((r) => ({
+          ref: `livestock:${r.id}`,
+          category: "LIVESTOCK" as const,
+          label: r.breed ? `${r.breed} ${r.species.toLowerCase()}` : r.species.toLowerCase(),
+          quantity: r.quantity,
+          unit: null,
+        })),
+        ...farm.equipment.map((r) => ({
+          ref: `equipment:${r.id}`,
+          category: "EQUIPMENT" as const,
+          label: r.name,
+          quantity: null,
+          unit: null,
+        })),
+      ]
+    : [];
 
   const posts = await prisma.post.findMany({
     where: { partyId: party.id },
@@ -52,7 +108,7 @@ export default async function PostsPage({
       </div>
 
       {drafts.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-warning-bg p-4">
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-warning-bg p-4">
           <p className="text-sm font-medium text-warning-fg">
             Drafted from your upcoming harvest — confirm to publish
           </p>
@@ -60,7 +116,7 @@ export default async function PostsPage({
             {drafts.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-3 py-2"
+                className="flex items-center justify-between gap-4 rounded-card border border-border bg-card px-3 py-2"
               >
                 <span className="text-sm">{p.title}</span>
                 <div className="flex gap-2">
@@ -72,14 +128,14 @@ export default async function PostsPage({
                     />
                     <button
                       type="submit"
-                      className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+                      className="rounded-card bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
                     >
                       Confirm &amp; publish
                     </button>
                   </form>
                   <form action={discardDraftPost}>
                     <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className="rounded-lg border border-border px-3 py-1 text-xs">
+                    <button type="submit" className="rounded-card border border-border px-3 py-1 text-xs">
                       Discard
                     </button>
                   </form>
@@ -92,6 +148,7 @@ export default async function PostsPage({
 
       <AddToggle label="New post" defaultOpen={!!(defaultType || defaultCategory)}>
         <PostForm
+          inventory={inventory}
           countryCode={party.countryCode}
           defaultProvince={party.province}
           defaultDistrict={party.district}
@@ -104,7 +161,7 @@ export default async function PostsPage({
         {rest.map((p) => {
           const matchCount = p._count.matchesAsA + p._count.matchesAsB;
           return (
-            <li key={p.id} className="rounded-lg border border-border bg-card p-4">
+            <li key={p.id} className="rounded-card border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-medium">
@@ -125,7 +182,7 @@ export default async function PostsPage({
                       p.destinationProvince &&
                       ` → ${p.destinationDistrict}, ${p.destinationProvince}`}
                     {" · "}
-                    {p.status}
+                    {STATUS_LABEL[p.status] ?? p.status}
                     {p.urgent && (
                       <Badge tone="warning" className="ml-2">
                         Time-sensitive
@@ -150,7 +207,7 @@ export default async function PostsPage({
                           key={photo.id}
                           src={`/api/photos/${photo.id}`}
                           alt=""
-                          className="h-16 w-16 rounded object-cover"
+                          className="h-16 w-16 rounded-control object-cover"
                         />
                       ))}
                     </div>

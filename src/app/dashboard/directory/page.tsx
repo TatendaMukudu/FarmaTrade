@@ -61,7 +61,7 @@ export default async function DirectoryPage({
           <Link
             key={f.value}
             href={f.value === "ALL" ? "/dashboard/directory" : `/dashboard/directory?role=${f.value}`}
-            className={`rounded-full border px-3 py-1 text-sm ${
+            className={`rounded-pill border px-3 py-1 text-sm ${
               (f.value === "ALL" && !role) || f.value === role
                 ? "bg-accent text-accent-foreground border-accent"
                 : "border-border"
@@ -76,7 +76,7 @@ export default async function DirectoryPage({
         {parties.map((p) => {
           const strength = strengthByCounterparty.get(p.id);
           return (
-            <li key={p.id} className="rounded-lg border border-border bg-card p-4">
+            <li key={p.id} className="rounded-card border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -124,7 +124,7 @@ function ReputationBadge({ reputation }: { reputation: Reputation | null }) {
   return (
     <div className="shrink-0 text-right">
       <p
-        className={`inline-block rounded-full whitespace-nowrap font-semibold ${toneClasses} ${
+        className={`inline-block rounded-pill whitespace-nowrap font-semibold ${toneClasses} ${
           summary.hasStars ? "px-3 py-1 text-lg" : "px-2 py-0.5 text-xs font-medium"
         }`}
       >

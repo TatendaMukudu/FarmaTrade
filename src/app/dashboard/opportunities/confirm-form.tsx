@@ -28,7 +28,7 @@ export function ConfirmForm({
           id={`outcome-${matchId}`}
           name="outcome"
           defaultValue="COMPLETED_GOOD"
-          className="rounded border px-2 py-1 text-sm"
+          className="rounded-control border px-2 py-1 text-sm"
         >
           <option value="COMPLETED_GOOD">Yes, went well</option>
           <option value="COMPLETED_ISSUE">Happened, but had an issue</option>
@@ -43,7 +43,7 @@ export function ConfirmForm({
           id={`score-${matchId}`}
           name="score"
           defaultValue=""
-          className="rounded border px-2 py-1 text-sm"
+          className="rounded-control border px-2 py-1 text-sm"
         >
           <option value="">No rating</option>
           {[5, 4, 3, 2, 1].map((n) => (
@@ -60,13 +60,13 @@ export function ConfirmForm({
         <input
           id={`comment-${matchId}`}
           name="comment"
-          className="rounded border px-2 py-1 text-sm"
+          className="rounded-control border px-2 py-1 text-sm"
         />
       </div>
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
+        className="rounded-control bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? "Saving…" : "Log outcome"}
       </button>
