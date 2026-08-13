@@ -20,7 +20,7 @@ describe("pluralizeUnit", () => {
   });
 
   it("leaves a unit we don't know exactly as the farmer typed it", () => {
-    // Post.unit is free text. Guessing a plural risks inventing something
+    // Intent.unit is free text. Guessing a plural risks inventing something
     // wrong inside a listing title other farmers read.
     expect(pluralizeUnit("punnet", 5)).toBe("punnet");
     expect(pluralizeUnit("Sack", 5)).toBe("sack");

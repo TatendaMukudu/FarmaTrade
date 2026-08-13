@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { generateMatchesForIntent } from "@/lib/matching";
-import { createTestParty, createTestPost, cleanupParties } from "@/test/factories";
+import { createTestParty, createTestIntent, cleanupParties } from "@/test/factories";
 
 describe("generateMatchesForIntent", () => {
   const partyIds: string[] = [];
@@ -21,12 +21,12 @@ describe("generateMatchesForIntent", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
+    const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
 
     await generateMatchesForIntent(need.id);
 
-    const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     expect(match).not.toBeNull();
     expect(match!.reasons).toContain("same district");
   });
@@ -36,14 +36,14 @@ describe("generateMatchesForIntent", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    const have = await createTestPost(seller.party.id, {
-      type: "HAVE",
+    const have = await createTestIntent(seller.party.id, {
+      side: "SUPPLY",
       category: "PRODUCE",
       province: "Manicaland",
       district: "Mutare",
     });
-    const need = await createTestPost(buyer.party.id, {
-      type: "NEED",
+    const need = await createTestIntent(buyer.party.id, {
+      side: "DEMAND",
       category: "PRODUCE",
       province: "Harare",
       district: "Harare",
@@ -51,7 +51,7 @@ describe("generateMatchesForIntent", () => {
 
     await generateMatchesForIntent(need.id);
 
-    const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     expect(match).toBeNull();
   });
 
@@ -59,12 +59,12 @@ describe("generateMatchesForIntent", () => {
     const party = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(party.party.id);
 
-    const have = await createTestPost(party.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(party.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestIntent(party.party.id, { side: "SUPPLY", category: "PRODUCE" });
+    const need = await createTestIntent(party.party.id, { side: "DEMAND", category: "PRODUCE" });
 
     await generateMatchesForIntent(need.id);
 
-    const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     expect(match).toBeNull();
   });
 
@@ -73,12 +73,12 @@ describe("generateMatchesForIntent", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE", status: "CLOSED" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    const have = await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE", status: "WITHDRAWN" });
+    const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
 
     await generateMatchesForIntent(need.id);
 
-    const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     expect(match).toBeNull();
   });
 
@@ -87,20 +87,20 @@ describe("generateMatchesForIntent", () => {
     const shipper = await createTestParty({ province: "Manicaland", district: "Mutare" });
     partyIds.push(transporter.party.id, shipper.party.id);
 
-    const have = await prisma.post.create({
+    const have = await prisma.intent.create({
       data: {
         partyId: transporter.party.id,
-        type: "HAVE",
+        side: "SUPPLY",
         category: "TRANSPORT",
         title: "Truck available",
         province: "Harare",
         district: "Harare",
         destinationProvince: "Manicaland",
-        status: "OPEN",
+        status: "ACTIVE",
       },
     });
-    const need = await createTestPost(shipper.party.id, {
-      type: "NEED",
+    const need = await createTestIntent(shipper.party.id, {
+      side: "DEMAND",
       category: "TRANSPORT",
       province: "Manicaland",
       district: "Mutare",
@@ -108,7 +108,7 @@ describe("generateMatchesForIntent", () => {
 
     await generateMatchesForIntent(need.id);
 
-    const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+    const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     expect(match).not.toBeNull();
     expect(match!.reasons).toContain("on your route");
   });
@@ -118,13 +118,13 @@ describe("generateMatchesForIntent", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-    const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+    await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
+    const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
 
     await generateMatchesForIntent(need.id);
     await generateMatchesForIntent(need.id);
 
-    const matches = await prisma.match.findMany({ where: { postBId: need.id } });
+    const matches = await prisma.match.findMany({ where: { intentBId: need.id } });
     expect(matches).toHaveLength(1);
   });
 
@@ -137,16 +137,16 @@ describe("generateMatchesForIntent", () => {
       const buyer = await createTestParty({ countryCode: "ZW", province: "Harare", district: "Harare" });
       partyIds.push(seller.party.id, buyer.party.id);
 
-      const have = await createTestPost(seller.party.id, {
-        type: "HAVE",
+      const have = await createTestIntent(seller.party.id, {
+        side: "SUPPLY",
         category: "PRODUCE",
         countryCode: "ZM",
         province: "Lusaka",
         district: "Lusaka",
         openToCrossBorder: opts.haveOptsIn,
       });
-      const need = await createTestPost(buyer.party.id, {
-        type: "NEED",
+      const need = await createTestIntent(buyer.party.id, {
+        side: "DEMAND",
         category: "PRODUCE",
         countryCode: "ZW",
         province: "Harare",
@@ -154,7 +154,7 @@ describe("generateMatchesForIntent", () => {
         openToCrossBorder: opts.needOptsIn,
       });
       await generateMatchesForIntent(need.id);
-      return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+      return prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     }
 
     it("matches across a border when both sides opted in, and says so", async () => {
@@ -181,15 +181,15 @@ describe("generateMatchesForIntent", () => {
       const buyer = await createTestParty({ province: "Harare", district: "Harare" });
       partyIds.push(neighbour.party.id, buyer.party.id);
 
-      const have = await createTestPost(neighbour.party.id, { type: "HAVE", category: "PRODUCE" });
-      const need = await createTestPost(buyer.party.id, {
-        type: "NEED",
+      const have = await createTestIntent(neighbour.party.id, { side: "SUPPLY", category: "PRODUCE" });
+      const need = await createTestIntent(buyer.party.id, {
+        side: "DEMAND",
         category: "PRODUCE",
         openToCrossBorder: true,
       });
       await generateMatchesForIntent(need.id);
 
-      const match = await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+      const match = await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
       expect(match).not.toBeNull();
       expect(match!.reasons).toContain("same district");
     });
@@ -202,15 +202,15 @@ describe("generateMatchesForIntent", () => {
       const zw = await createTestParty({ countryCode: "ZW", province: "Southern", district: "Choma" });
       partyIds.push(zm.party.id, zw.party.id);
 
-      const have = await createTestPost(zm.party.id, {
-        type: "HAVE", category: "PRODUCE", countryCode: "ZM", province: "Southern", district: "Choma",
+      const have = await createTestIntent(zm.party.id, {
+        side: "SUPPLY", category: "PRODUCE", countryCode: "ZM", province: "Southern", district: "Choma",
       });
-      const need = await createTestPost(zw.party.id, {
-        type: "NEED", category: "PRODUCE", countryCode: "ZW", province: "Southern", district: "Choma",
+      const need = await createTestIntent(zw.party.id, {
+        side: "DEMAND", category: "PRODUCE", countryCode: "ZW", province: "Southern", district: "Choma",
       });
       await generateMatchesForIntent(need.id);
 
-      expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).toBeNull();
+      expect(await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } })).toBeNull();
     });
   });
 
@@ -226,18 +226,18 @@ describe("generateMatchesForIntent", () => {
       const idFor = async (key: string | null) =>
         key ? (await prisma.product.findUnique({ where: { key } }))!.id : null;
 
-      const have = await createTestPost(seller.party.id, {
-        type: "HAVE",
+      const have = await createTestIntent(seller.party.id, {
+        side: "SUPPLY",
         category: "PRODUCE",
         productId: await idFor(haveKey),
       });
-      const need = await createTestPost(buyer.party.id, {
-        type: "NEED",
+      const need = await createTestIntent(buyer.party.id, {
+        side: "DEMAND",
         category: "PRODUCE",
         productId: await idFor(needKey),
       });
       await generateMatchesForIntent(need.id);
-      return prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } });
+      return prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } });
     }
 
     it("does not match maize against a tomato requirement", async () => {
@@ -271,15 +271,15 @@ describe("generateMatchesForIntent", () => {
       partyIds.push(zm.party.id, zw.party.id);
       const maize = (await prisma.product.findUnique({ where: { key: "maize" } }))!.id;
 
-      const have = await createTestPost(zm.party.id, {
-        type: "HAVE", category: "PRODUCE", productId: maize,
+      const have = await createTestIntent(zm.party.id, {
+        side: "SUPPLY", category: "PRODUCE", productId: maize,
         countryCode: "ZM", province: "Lusaka", district: "Lusaka", openToCrossBorder: true,
       });
-      const need = await createTestPost(zw.party.id, {
-        type: "NEED", category: "PRODUCE", productId: maize, openToCrossBorder: true,
+      const need = await createTestIntent(zw.party.id, {
+        side: "DEMAND", category: "PRODUCE", productId: maize, openToCrossBorder: true,
       });
       await generateMatchesForIntent(need.id);
-      expect(await prisma.match.findFirst({ where: { postAId: have.id, postBId: need.id } })).not.toBeNull();
+      expect(await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } })).not.toBeNull();
     });
   });
 

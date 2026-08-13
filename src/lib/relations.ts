@@ -11,8 +11,8 @@ export async function recomputeRelation(partyId1: string, partyId2: string) {
     where: {
       status: "COMPLETED",
       OR: [
-        { postA: { partyId: partyAId }, postB: { partyId: partyBId } },
-        { postA: { partyId: partyBId }, postB: { partyId: partyAId } },
+        { intentA: { partyId: partyAId }, intentB: { partyId: partyBId } },
+        { intentA: { partyId: partyBId }, intentB: { partyId: partyAId } },
       ],
     },
   });

@@ -6,7 +6,7 @@
 // Postgres, not just asserted against mocked Prisma calls.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeCookies, resetNextRuntime } from "@/test/next-runtime-stub";
-import { createTestParty, createTestPost, createTestMatch, cleanupParties } from "@/test/factories";
+import { createTestParty, createTestIntent, createTestMatch, cleanupParties } from "@/test/factories";
 
 vi.mock("next/headers", () => ({
   cookies: async () => fakeCookies,
@@ -32,8 +32,8 @@ async function loginAs(userId: string) {
 async function setUpMatchedPair(matchStatus: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
   const seller = await createTestParty({ province: "Harare", district: "Harare" });
   const buyer = await createTestParty({ province: "Harare", district: "Harare" });
-  const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-  const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+  const have = await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
+  const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
   const match = await createTestMatch(have.id, need.id, matchStatus);
   return { seller, buyer, match };
 }

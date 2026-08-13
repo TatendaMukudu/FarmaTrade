@@ -28,23 +28,23 @@ export async function ensureDerivedIntent(farmId: string, party: { id: string; p
       farmId,
       quantity: { gt: 0 },
       expectedHarvestDate: { not: null, lte: windowEnd },
-      posts: { none: { status: { not: "CLOSED" } } },
+      intents: { none: { status: { not: "WITHDRAWN" } } },
     },
   });
 
   if (dueProduce.length === 0) return;
 
-  await prisma.post.createMany({
+  await prisma.intent.createMany({
     data: dueProduce.map((item) => ({
       partyId: party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "PRODUCE",
       title: `${formatQuantity(item.quantity, item.unit)} of ${item.cropType}`,
       quantity: item.quantity,
       unit: item.unit,
       province: party.province,
       district: party.district,
-      status: "DRAFT",
+      status: "PROPOSED",
       // FarmaTrade proposed this; the farmer did not write it.
       origin: "DERIVED",
       urgent: item.perishable,

@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
-import { postSchemaFor } from "@/lib/validation";
+import { intentSchemaFor } from "@/lib/validation";
 import { regionFor } from "@/lib/regions";
 import { normalizeProductTerm, subjectFromTitle } from "@/lib/products";
 import { generateMatchesForIntent } from "@/lib/matching";
 import { uploadPhoto } from "@/lib/storage";
-import type { PostType, PostCategory } from "@/generated/prisma/client";
+import type { IntentSide, CommerceCategory } from "@/generated/prisma/client";
 
 // The canonical product a new post is about, or null when we can't tell.
 // Null is a normal outcome, not a failure: matching falls back to category,
@@ -111,8 +111,8 @@ export async function createPost(
     }
   }
 
-  const parsed = postSchemaFor(regionFor(party.countryCode).labels).safeParse({
-    type: formData.get("type"),
+  const parsed = intentSchemaFor(regionFor(party.countryCode).labels).safeParse({
+    side: formData.get("side"),
     category: formData.get("category"),
     title: formData.get("title"),
     description: formData.get("description") || undefined,
@@ -150,14 +150,14 @@ export async function createPost(
   // fallback for a post typed from scratch.
   const productId = await resolvePostProduct(inventory, data.title);
 
-  const post = await prisma.post.create({
+  const intent = await prisma.intent.create({
     data: {
       partyId: party.id,
       // Denormalized from the party, exactly as province/district are: a
       // post belongs to wherever its poster is.
       countryCode: party.countryCode,
-      type: data.type as PostType,
-      category: data.category as PostCategory,
+      side: data.side as IntentSide,
+      category: data.category as CommerceCategory,
       title: data.title,
       description: data.description,
       quantity: data.quantity,
@@ -181,16 +181,19 @@ export async function createPost(
     await prisma.photo.createMany({
       data: await Promise.all(
         photoFiles.map(async (file) => {
-          const storageKey = `posts/${post.id}/${randomUUID()}`;
+          // Key prefix stays "posts/" deliberately. Every photo already in
+          // R2 lives under it, and renaming the prefix would orphan them
+          // all — the bucket has no idea the concept was renamed.
+          const storageKey = `posts/${intent.id}/${randomUUID()}`;
           const bytes = Buffer.from(await file.arrayBuffer());
           await uploadPhoto(storageKey, bytes, file.type);
-          return { postId: post.id, mimeType: file.type, storageKey };
+          return { intentId: intent.id, mimeType: file.type, storageKey };
         }),
       ),
     });
   }
 
-  await generateMatchesForIntent(post.id);
+  await generateMatchesForIntent(intent.id);
 
   revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard/opportunities");
@@ -202,24 +205,24 @@ export async function closePost(formData: FormData) {
   if (!party) return;
 
   const id = String(formData.get("id"));
-  await prisma.post.updateMany({
+  await prisma.intent.updateMany({
     where: { id, partyId: party.id },
-    data: { status: "CLOSED" },
+    data: { status: "WITHDRAWN" },
   });
 
   revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard/opportunities");
 }
 
-export async function confirmDraftPost(formData: FormData) {
+export async function confirmProposedIntent(formData: FormData) {
   const party = await getCurrentParty();
   if (!party) return;
 
   const id = String(formData.get("id"));
-  const post = await prisma.post.findFirst({ where: { id, partyId: party.id, status: "DRAFT" } });
-  if (!post) return;
+  const intent = await prisma.intent.findFirst({ where: { id, partyId: party.id, status: "PROPOSED" } });
+  if (!intent) return;
 
-  await prisma.post.update({ where: { id }, data: { status: "OPEN" } });
+  await prisma.intent.update({ where: { id }, data: { status: "ACTIVE" } });
   await generateMatchesForIntent(id);
 
   revalidatePath("/dashboard/intent");
@@ -227,12 +230,12 @@ export async function confirmDraftPost(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function discardDraftPost(formData: FormData) {
+export async function discardProposedIntent(formData: FormData) {
   const party = await getCurrentParty();
   if (!party) return;
 
   const id = String(formData.get("id"));
-  await prisma.post.deleteMany({ where: { id, partyId: party.id, status: "DRAFT" } });
+  await prisma.intent.deleteMany({ where: { id, partyId: party.id, status: "PROPOSED" } });
 
   revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard");

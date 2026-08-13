@@ -45,10 +45,10 @@ export async function createTestParty(
   return { user, party, email, password };
 }
 
-export async function createTestPost(
+export async function createTestIntent(
   partyId: string,
   overrides: Partial<{
-    type: "HAVE" | "NEED";
+    side: "SUPPLY" | "DEMAND";
     category: "PRODUCE" | "LIVESTOCK" | "EQUIPMENT" | "TRANSPORT" | "INPUTS";
     title: string;
     countryCode: string;
@@ -56,13 +56,13 @@ export async function createTestPost(
     province: string;
     district: string;
     openToCrossBorder: boolean;
-    status: "OPEN" | "DRAFT" | "CLOSED";
+    status: "ACTIVE" | "PROPOSED" | "WITHDRAWN";
   }> = {},
 ) {
-  return prisma.post.create({
+  return prisma.intent.create({
     data: {
       partyId,
-      type: overrides.type ?? "HAVE",
+      side: overrides.side ?? "SUPPLY",
       category: overrides.category ?? "PRODUCE",
       title: overrides.title ?? unique("Test post"),
       countryCode: overrides.countryCode ?? "ZW",
@@ -70,14 +70,14 @@ export async function createTestPost(
       province: overrides.province ?? "Harare",
       district: overrides.district ?? "Harare",
       openToCrossBorder: overrides.openToCrossBorder ?? false,
-      status: overrides.status ?? "OPEN",
+      status: overrides.status ?? "ACTIVE",
     },
   });
 }
 
-export async function createTestMatch(postAId: string, postBId: string, status: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
+export async function createTestMatch(intentAId: string, intentBId: string, status: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
   return prisma.match.create({
-    data: { postAId, postBId, score: 80, reasons: ["test fixture"], status },
+    data: { intentAId, intentBId, score: 80, reasons: ["test fixture"], status },
   });
 }
 
@@ -87,12 +87,12 @@ export async function createTestMatch(postAId: string, postBId: string, status: 
 export async function cleanupParties(partyIds: string[]) {
   if (partyIds.length === 0) return;
 
-  const posts = await prisma.post.findMany({ where: { partyId: { in: partyIds } }, select: { id: true } });
-  const postIds = posts.map((p) => p.id);
+  const intents = await prisma.intent.findMany({ where: { partyId: { in: partyIds } }, select: { id: true } });
+  const intentIds = intents.map((p) => p.id);
 
-  const matches = postIds.length
+  const matches = intentIds.length
     ? await prisma.match.findMany({
-        where: { OR: [{ postAId: { in: postIds } }, { postBId: { in: postIds } }] },
+        where: { OR: [{ intentAId: { in: intentIds } }, { intentBId: { in: intentIds } }] },
         select: { id: true },
       })
     : [];
@@ -105,8 +105,8 @@ export async function cleanupParties(partyIds: string[]) {
     await prisma.match.deleteMany({ where: { id: { in: matchIds } } });
   }
   await prisma.rating.deleteMany({ where: { OR: [{ authorId: { in: partyIds } }, { subjectId: { in: partyIds } }] } });
-  await prisma.photo.deleteMany({ where: { postId: { in: postIds } } });
-  await prisma.post.deleteMany({ where: { partyId: { in: partyIds } } });
+  await prisma.photo.deleteMany({ where: { intentId: { in: intentIds } } });
+  await prisma.intent.deleteMany({ where: { partyId: { in: partyIds } } });
   await prisma.relation.deleteMany({ where: { OR: [{ partyAId: { in: partyIds } }, { partyBId: { in: partyIds } }] } });
   await prisma.reputation.deleteMany({ where: { partyId: { in: partyIds } } });
   const parties = await prisma.party.findMany({ where: { id: { in: partyIds } }, select: { id: true, userId: true } });

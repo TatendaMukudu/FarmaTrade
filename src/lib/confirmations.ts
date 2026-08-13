@@ -18,11 +18,11 @@ export async function loadPendingStamps(partyId: string, now = new Date()) {
   const accepted = await prisma.match.findMany({
     where: {
       status: "ACCEPTED",
-      OR: [{ postA: { partyId } }, { postB: { partyId } }],
+      OR: [{ intentA: { partyId } }, { intentB: { partyId } }],
     },
     include: {
-      postA: { include: { party: { select: { id: true, name: true } } } },
-      postB: { include: { party: { select: { id: true, name: true } } } },
+      intentA: { include: { party: { select: { id: true, name: true } } } },
+      intentB: { include: { party: { select: { id: true, name: true } } } },
       confirmations: { select: { partyId: true } },
     },
   });
@@ -45,7 +45,7 @@ export async function loadPendingStamps(partyId: string, now = new Date()) {
   return pendingStamps(stampable, now);
 }
 
-// Asking prices near this party, from posts that carry both a price and a
+// Asking prices near this party, from intents that carry both a price and a
 // quantity to divide it by.
 //
 // Scoped to the party's own province rather than the whole network: a price
@@ -58,14 +58,14 @@ export async function loadPriceSignals(
 ): Promise<PriceSignal[]> {
   const since = new Date(now.getTime() - PRICE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const posts = await prisma.post.findMany({
+  const intents = await prisma.intent.findMany({
     where: {
       countryCode: party.countryCode,
       province: party.province,
       askingPrice: { not: null },
       quantity: { gt: 0 },
       createdAt: { gte: since },
-      status: { in: ["OPEN", "MATCHED", "CLOSED"] },
+      status: { in: ["ACTIVE", "ENGAGED", "WITHDRAWN"] },
     },
     select: {
       askingPrice: true,
@@ -79,7 +79,7 @@ export async function loadPriceSignals(
     take: 2000,
   });
 
-  const listings: PricedListing[] = posts.flatMap((p) => {
+  const listings: PricedListing[] = intents.flatMap((p) => {
     const quantity = p.quantity ?? 0;
     if (quantity <= 0 || p.askingPrice == null) return [];
     const unit = p.unit?.trim();

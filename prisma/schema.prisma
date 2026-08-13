@@ -5,8 +5,8 @@
 // and/or a TransportProfile (hauling capacity) — these aren't separate
 // systems, just optional facets of the same node.
 //
-// Trading is symmetric: a Party posts what it HAS or what it NEEDS, and
-// the matching engine pairs HAVE posts against NEED posts. No payment
+// Trading is symmetric: a Party records SUPPLY intent or DEMAND intent, and
+// the matching engine pairs the two sides. No payment
 // rails — settlement happens off-platform (cash, EcoCash, bank transfer).
 // Reputation is seeded by self-reported transaction confirmations from
 // both sides of a match, not by verified payment data (that's a known,
@@ -70,7 +70,7 @@ model Party {
   // its administrative levels are called, which currency prices are in,
   // which timezone "good morning" is judged against (see lib/regions.ts).
   // It does NOT decide who they may trade with: cross-border trade is a
-  // per-post opt-in, not a nationality.
+  // per-intent opt-in, not a nationality.
   countryCode String  @default("ZW")
   province   String
   district   String
@@ -86,7 +86,7 @@ model Party {
 
   farm             Farm?
   transportProfile TransportProfile?
-  posts            Post[]
+  intents          Intent[]
   reputation       Reputation?
 
   ratingsAuthored Rating[] @relation("RatingAuthor")
@@ -150,7 +150,7 @@ model Livestock {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  posts Post[]
+  intents Intent[]
 
   @@index([farmId])
 }
@@ -185,7 +185,7 @@ model ProduceStock {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
-  posts Post[]
+  intents Intent[]
 
   @@index([farmId])
 }
@@ -210,7 +210,7 @@ model Equipment {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  posts Post[]
+  intents Intent[]
 
   @@index([farmId])
 }
@@ -240,7 +240,7 @@ model TransportProfile {
 // ---------------------------------------------------------------------------
 // Product identity: what a thing is, independent of what anyone calls it
 //
-// Matching had no commodity concept — two posts paired because both were
+// Matching had no commodity concept — two intents paired because both were
 // PRODUCE, so a maize seller and a tomato buyer matched. cropType was
 // recorded and never read by the matcher.
 //
@@ -263,12 +263,12 @@ model Product {
   // What FarmaTrade calls it when it has to speak for itself — a market
   // summary, a requirement with no local wording of its own.
   name     String
-  // Bridges to PostCategory so anything without a product identity
+  // Bridges to CommerceCategory so anything without a product identity
   // (transport, services, inputs) still matches the way it always has.
-  category PostCategory
+  category CommerceCategory
 
   aliases  ProductAlias[]
-  posts    Post[]
+  intents  Intent[]
   produce  ProduceStock[]
 
   @@index([category])
@@ -301,18 +301,32 @@ model ProductAlias {
 }
 
 // ---------------------------------------------------------------------------
-// Posts: the symmetric "I have / I need" trading unit
+// Intent: what a party is willing to do, and why FarmaTrade believes it
+//
+// Not a listing. An intent references farm state without being it: a farmer
+// holding 26 tonnes who offers 20 has one inventory row saying 26 and one
+// intent saying 20. Creating, matching or withdrawing an intent never
+// touches inventory — only fulfilment does.
+//
+// See src/lib/intent.ts.
 // ---------------------------------------------------------------------------
 
-enum PostType {
-  HAVE
-  NEED
+// The two sides of a market. Not "kinds" of intent — a supply intent and a
+// demand intent are the same object facing opposite ways.
+enum IntentSide {
+  SUPPLY
+  DEMAND
 }
 
 // Extensible on purpose: v1 ships four categories, but new verticals
 // (mechanics, vets, inputs, storage, ...) are future enum values, not new
-// subsystems — the Post/Match/Reputation graph doesn't change shape.
-enum PostCategory {
+// subsystems — the Intent/Match/Reputation graph doesn't change shape.
+// The kind of commerce, used by both Intent and Product. Named for neither
+// owner because it belongs to both: Product carries it so a catalogue entry
+// knows where it trades, and Intent carries it because transport, equipment
+// and inputs have no product identity at all and category is the only thing
+// matching can narrow on for them.
+enum CommerceCategory {
   LIVESTOCK
   PRODUCE
   EQUIPMENT
@@ -321,7 +335,7 @@ enum PostCategory {
   // farmers rather than trades WITH them. Structurally no different from
   // any other category: a shop is a TRADER-role Party (already meant to
   // cover "a buyer/seller with no farm of their own") posting HAVE, a
-  // farmer posts NEED, the existing matching engine does the rest.
+  // farmer records DEMAND, the existing matching engine does the rest.
   INPUTS
 }
 
@@ -331,23 +345,31 @@ enum PostCategory {
 // everything with no underlying record — a buyer's requirement, a
 // transporter's capacity, a need for something the farm does not have.
 //
-// See src/lib/intent.ts. The domain calls these rows Intent; the table is
-// still named Post until the physical rename lands separately.
+// See src/lib/intent.ts.
 enum IntentOrigin {
   DERIVED
   DECLARED
 }
 
-enum PostStatus {
-  // Auto-drafted (currently: from an approaching harvest date) and waiting
-  // on the owner to confirm — never matched against while in this state.
-  DRAFT
-  OPEN
-  MATCHED
-  CLOSED
+// Where an intent sits commercially.
+//
+// ENGAGED is explicitly NOT terminal and must not become a synonym for
+// "done". It means commercial interaction has started around this intent —
+// which is compatible with the intent being partially committed, carrying
+// several matches at once, or returning to ACTIVE when a negotiation falls
+// through. Fulfilment semantics are a later layer; nothing here should be
+// read as closing anything.
+enum IntentStatus {
+  // Derived by FarmaTrade and waiting on its owner to confirm. Never matched
+  // against while in this state — matching on something nobody has agreed to
+  // would be putting words in their mouth.
+  PROPOSED
+  ACTIVE
+  ENGAGED
+  WITHDRAWN
 }
 
-model Post {
+model Intent {
   id          String       @id @default(cuid())
   partyId     String
   party       Party        @relation(fields: [partyId], references: [id])
@@ -355,8 +377,8 @@ model Post {
   // party stated it outright. Defaults to DECLARED because every row that
   // predates this column was typed by hand.
   origin      IntentOrigin @default(DECLARED)
-  type        PostType
-  category    PostCategory
+  side        IntentSide
+  category    CommerceCategory
   title       String
   description String?
   quantity    Float?
@@ -380,15 +402,15 @@ model Post {
   // ever crosses a border when BOTH sides asked for it.
   openToCrossBorder Boolean @default(false)
   askingPrice Decimal?     @db.Decimal(12, 2)
-  status      PostStatus   @default(OPEN)
+  status      IntentStatus @default(ACTIVE)
   // Urgency drives display/ordering today; it's the seam for the delivery
   // layer's pacing rules later — perishables and deadlines shouldn't wait
   // behind a uniform notification cap the way a routine listing can.
   urgent      Boolean      @default(false)
   neededBy    DateTime?
   // A standing order ("I buy 20 tonnes a month") rather than a one-off ask.
-  // Purely a declared-intent label today — an open Post already keeps
-  // matching against new opposite-type posts for as long as it stays open,
+  // Purely a declared-intent label today — an active intent already keeps
+  // matching against opposite-side intents for as long as it stays active,
   // so this doesn't change matching behavior, only how it's surfaced.
   recurring   Boolean      @default(false)
 
@@ -412,17 +434,17 @@ model Post {
   createdAt DateTime  @default(now())
   expiresAt DateTime?
 
-  matchesAsA Match[] @relation("MatchPostA")
-  matchesAsB Match[] @relation("MatchPostB")
+  matchesAsA Match[] @relation("MatchIntentA")
+  matchesAsB Match[] @relation("MatchIntentB")
   photos     Photo[]
 
   @@index([category, status, countryCode, province, district])
   // The matching query narrows on product identity before geography once
   // both sides are known.
-  @@index([productId, status, type])
+  @@index([productId, status, side])
   @@index([partyId])
   @@index([produceId])
-  // The cross-border arm of the matching query looks up opted-in posts
+  // The cross-border arm of the matching query looks up opted-in intents
   // without a country or province to narrow on, so it needs its own index.
   @@index([category, status, openToCrossBorder])
 }
@@ -434,14 +456,14 @@ model Post {
 // `data` — exactly the seam this model was built to allow.
 model Photo {
   id         String   @id @default(cuid())
-  postId     String
-  post       Post     @relation(fields: [postId], references: [id])
+  intentId   String
+  intent     Intent   @relation(fields: [intentId], references: [id])
   data       Bytes?
   storageKey String?
   mimeType   String
   createdAt  DateTime @default(now())
 
-  @@index([postId])
+  @@index([intentId])
 }
 
 // ---------------------------------------------------------------------------
@@ -457,10 +479,10 @@ enum MatchStatus {
 
 model Match {
   id        String      @id @default(cuid())
-  postAId   String
-  postA     Post        @relation("MatchPostA", fields: [postAId], references: [id])
-  postBId   String
-  postB     Post        @relation("MatchPostB", fields: [postBId], references: [id])
+  intentAId String
+  intentA   Intent      @relation("MatchIntentA", fields: [intentAId], references: [id])
+  intentBId String
+  intentB   Intent      @relation("MatchIntentB", fields: [intentBId], references: [id])
   score     Float
   // The kernel's score is never a bare number a projection layer has to
   // trust blindly — it's cited. Each entry is a plain-language reason the
@@ -476,8 +498,8 @@ model Match {
   ratings       Rating[]
   conversation  Conversation?
 
-  @@unique([postAId, postBId])
-  @@index([postBId])
+  @@unique([intentAId, intentBId])
+  @@index([intentBId])
 }
 
 // A conversation only exists once a match is ACCEPTED — it's the transaction

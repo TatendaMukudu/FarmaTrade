@@ -16,7 +16,7 @@ import {
 } from "./trade-outcomes";
 import { scoreMatch } from "./matching-core";
 import { BUCKET_EMPTY, BUCKET_LABEL, CALM_MESSAGE } from "./match-rank";
-import type { Post, Reputation } from "@/generated/prisma/client";
+import type { Intent, Reputation } from "@/generated/prisma/client";
 
 function record(overrides: Partial<TradeRecord> = {}): TradeRecord {
   return {
@@ -226,11 +226,11 @@ describe("assertSafeReasonText", () => {
 // The guard is only worth having if it actually runs over the text
 // FarmaTrade ships. These are the sentences a farmer reads.
 describe("every line FarmaTrade shows stays a report, not a forecast", () => {
-  function post(overrides: Partial<Post> = {}): Post {
+  function post(overrides: Partial<Intent> = {}): Intent {
     return {
       id: "post-1",
       partyId: "party-1",
-      type: "HAVE",
+      side: "SUPPLY",
       category: "PRODUCE",
       title: "Maize",
       description: null,
@@ -239,7 +239,7 @@ describe("every line FarmaTrade shows stays a report, not a forecast", () => {
       province: "Mashonaland East",
       district: "Marondera",
       askingPrice: null,
-      status: "OPEN",
+      status: "ACTIVE",
       urgent: false,
       neededBy: null,
       recurring: false,
@@ -252,7 +252,7 @@ describe("every line FarmaTrade shows stays a report, not a forecast", () => {
       createdAt: new Date(),
       expiresAt: null,
       ...overrides,
-    } as Post;
+    } as Intent;
   }
 
   const reputation = {

@@ -22,7 +22,7 @@ import { promptsWorthSurfacing } from "@/lib/confirmations-core";
 import { signalForSubject } from "@/lib/price-signals";
 import { Badge } from "@/components/badge";
 import { Card, EmptyState, LinkCard, SectionHeading, StatTile, buttonClass } from "@/components/ui";
-import type { Post, Party } from "@/generated/prisma/client";
+import type { Intent, Party } from "@/generated/prisma/client";
 
 // How many recent suggestions the overview ranks before taking the top few.
 // Wide enough that ranking has a real choice to make, narrow enough that the
@@ -68,22 +68,22 @@ export default async function DashboardPage() {
     pending,
     priceSignals,
   ] = await Promise.all([
-      prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
+      prisma.intent.count({ where: { partyId: party.id, status: "ACTIVE" } }),
       prisma.match.count({
         where: {
           status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
       }),
       prisma.match.count({
         where: {
           status: "SUGGESTED",
           createdAt: since ? { gt: since } : undefined,
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
       }),
       party.farm
-        ? prisma.post.count({ where: { partyId: party.id, status: "DRAFT" } })
+        ? prisma.intent.count({ where: { partyId: party.id, status: "PROPOSED" } })
         : Promise.resolve(0),
       // Fetched unsorted-by-score and ranked in memory: `Match.score` is
       // what was true the day the match was written, so ordering on it here
@@ -92,11 +92,11 @@ export default async function DashboardPage() {
       prisma.match.findMany({
         where: {
           status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
         include: {
-          postA: { include: { party: { include: { reputation: true } } } },
-          postB: { include: { party: { include: { reputation: true } } } },
+          intentA: { include: { party: { include: { reputation: true } } } },
+          intentB: { include: { party: { include: { reputation: true } } } },
         },
         orderBy: { createdAt: "desc" },
         take: TOP_MATCH_CANDIDATES,
@@ -312,11 +312,11 @@ export default async function DashboardPage() {
   );
 }
 
-function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew: boolean }) {
+function OpportunityLine({ post, isNew }: { post: Intent & { party: Party }; isNew: boolean }) {
   return (
     <span>
       <CategoryIcon category={post.category} className="inline-block align-text-bottom" />{" "}
-      {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
+      {post.party.name} {post.side === "SUPPLY" ? "is offering" : "is looking for"}:{" "}
       {post.title}
       {isNew && (
         <Badge tone="success" className="ml-2">

@@ -7,7 +7,7 @@ import {
   median,
   medianAbsoluteDeviation,
   ownRhythmNudge,
-} from "./posting-rhythm";
+} from "./intent-cadence";
 
 const NOW = new Date("2026-08-08T09:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -16,7 +16,7 @@ function daysAgo(days: number): Date {
   return new Date(NOW.getTime() - days * DAY);
 }
 
-// A party who posts every `every` days, `count` times, most recent
+// A party who records every `every` days, `count` times, most recent
 // `lastPostedDaysAgo` ago.
 function postedEvery(every: number, count: number, lastPostedDaysAgo = 0): Date[] {
   return Array.from({ length: count }, (_, i) => daysAgo(lastPostedDaysAgo + i * every));
@@ -43,7 +43,7 @@ describe("median / medianAbsoluteDeviation", () => {
 });
 
 describe("gapsBetween", () => {
-  it("returns days between consecutive posts, oldest first", () => {
+  it("returns days between consecutive records, oldest first", () => {
     expect(gapsBetween([daysAgo(30), daysAgo(20), daysAgo(5)])).toEqual([10, 15]);
   });
 
@@ -101,7 +101,7 @@ describe("detectQuiet", () => {
   it("notices a regular poster who has stopped", () => {
     const read = detectQuiet(postedEvery(20, 8, 90), NOW);
     expect(read.quiet).toBe(true);
-    expect(read.line).toBe("Usually posts about every 20 days — it has been 90.");
+    expect(read.line).toBe("Usually records something about every 20 days — it has been 90.");
   });
 
   it("never fires on a party whose rhythm we have not learned", () => {

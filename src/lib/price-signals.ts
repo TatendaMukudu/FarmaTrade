@@ -1,6 +1,6 @@
 // What things are actually going for, near you.
 //
-// `Post.askingPrice` has been collected since launch and read by exactly one
+// `Intent.askingPrice` has been collected since launch and read by exactly one
 // thing: a single card's "Est. value" line. Nothing ever aggregated it. For
 // a smallholder deciding whether to accept an offer, "maize is going for
 // $280-320 a tonne in your district this week" is plausibly the most useful

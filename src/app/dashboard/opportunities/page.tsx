@@ -18,10 +18,10 @@ import { pluralizeUnit } from "@/lib/units";
 import { Badge } from "@/components/badge";
 import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
-import type { Post, Party, Reputation, Photo } from "@/generated/prisma/client";
+import type { Intent, Party, Reputation, Photo } from "@/generated/prisma/client";
 
 type PartyWithReputation = Party & { reputation: Reputation | null };
-type CounterpartPost = Post & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
+type CounterpartPost = Intent & { party: PartyWithReputation; photos: Pick<Photo, "id">[] };
 
 // Buckets a farmer has to act on lead; "worth knowing" is context, so it
 // gets a smaller allowance rather than competing for the same attention.
@@ -67,13 +67,13 @@ export default async function OpportunitiesPage() {
     prisma.match.findMany({
       where: {
         status: { in: ["SUGGESTED", "ACCEPTED"] },
-        OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+        OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
       },
       include: {
-        postA: {
+        intentA: {
           include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
         },
-        postB: {
+        intentB: {
           include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
         },
         confirmations: true,
@@ -83,11 +83,11 @@ export default async function OpportunitiesPage() {
     prisma.match.findMany({
       where: {
         status: "COMPLETED",
-        OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+        OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
       },
       include: {
-        postA: { include: { party: true } },
-        postB: { include: { party: true } },
+        intentA: { include: { party: true } },
+        intentB: { include: { party: true } },
         confirmations: true,
       },
       orderBy: { updatedAt: "desc" },
@@ -119,7 +119,7 @@ export default async function OpportunitiesPage() {
     active,
     party.id,
   )
-    .filter((g) => g.yours.type === "NEED" && g.yours.quantity != null && g.matches.length >= 2)
+    .filter((g) => g.yours.side === "DEMAND" && g.yours.quantity != null && g.matches.length >= 2)
     .map((g) => ({
       yours: g.yours,
       count: g.matches.length,
@@ -319,7 +319,7 @@ function MatchCounterpart({
   return (
     <div className="mt-1">
       <p className="text-sm text-muted-fg">
-        {post.party.name} {post.type === "HAVE" ? "has" : "needs"}: {post.title}
+        {post.party.name} {post.side === "SUPPLY" ? "has" : "needs"}: {post.title}
         {post.recurring && (
           <Badge tone="info" className="ml-2">
             Standing order

@@ -3,18 +3,18 @@
 // page that renders a match (Opportunities, Overview, a Conversation) was
 // re-deriving "which side is mine" and "how far away is this" by hand.
 
-// A Match's postA/postB are the Match table's own column names and stay
+// A Match's intentA/intentB are the Match table's own column names and stay
 // that way until the physical rename; the domain word for what they point
 // at is Intent (see lib/intent.ts). They are interchangeable — "mine"
 // depends on the viewer,
 // not on which side is A. Generic so each call site keeps whatever `include`
 // shape it fetched (party, photos, reputation, ...) on both sides.
 export function resolveMatchSides<P extends { partyId: string }>(
-  match: { postA: P; postB: P },
+  match: { intentA: P; intentB: P },
   partyId: string,
 ): { yours: P; theirs: P } {
-  const mine = match.postA.partyId === partyId;
-  return { yours: mine ? match.postA : match.postB, theirs: mine ? match.postB : match.postA };
+  const mine = match.intentA.partyId === partyId;
+  return { yours: mine ? match.intentA : match.intentB, theirs: mine ? match.intentB : match.intentA };
 }
 
 // Groups matches by *your* post rather than listing every match flatly —
@@ -22,7 +22,7 @@ export function resolveMatchSides<P extends { partyId: string }>(
 // them scattered across separate cards hides that they might, together,
 // actually cover the order. Order of first appearance is preserved, so
 // grouping doesn't fight the existing score-desc sort.
-export function groupMatchesByOwnIntent<P extends { id: string; partyId: string }, M extends { postA: P; postB: P }>(
+export function groupMatchesByOwnIntent<P extends { id: string; partyId: string }, M extends { intentA: P; intentB: P }>(
   matches: M[],
   partyId: string,
 ): { yours: P; matches: M[] }[] {
@@ -43,7 +43,7 @@ export function groupMatchesByOwnIntent<P extends { id: string; partyId: string 
 // once matches are grouped by your own NEED post (see above).
 export function combinedOfferedQuantity<
   P extends { id: string; partyId: string; quantity: number | null },
-  M extends { postA: P; postB: P },
+  M extends { intentA: P; intentB: P },
 >(matches: M[], partyId: string): number {
   return matches.reduce((sum, m) => {
     const { theirs } = resolveMatchSides<P>(m, partyId);
@@ -52,10 +52,10 @@ export function combinedOfferedQuantity<
 }
 
 export function isPartyInMatch(
-  match: { postA: { partyId: string }; postB: { partyId: string } },
+  match: { intentA: { partyId: string }; intentB: { partyId: string } },
   partyId: string,
 ): boolean {
-  return match.postA.partyId === partyId || match.postB.partyId === partyId;
+  return match.intentA.partyId === partyId || match.intentB.partyId === partyId;
 }
 
 // district match beats province match beats "just the province name" — a

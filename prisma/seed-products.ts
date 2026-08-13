@@ -84,19 +84,19 @@ async function main() {
     produceMatched++;
   }
 
-  // Backfill posts. A post linked to produce inherits that row's product;
+  // Backfill intents. One linked to produce inherits that row's product;
   // otherwise fall back to resolving the title, which is weaker but is all
-  // an unlinked post has.
-  const posts = await prisma.post.findMany({
+  // an unlinked intent has.
+  const intents = await prisma.intent.findMany({
     where: { productId: null },
     select: { id: true, title: true, produce: { select: { productId: true } } },
   });
-  let postMatched = 0;
-  for (const post of posts) {
-    const productId = post.produce?.productId ?? resolveProductFromTitle(post.title, index);
+  let intentMatched = 0;
+  for (const intent of intents) {
+    const productId = intent.produce?.productId ?? resolveProductFromTitle(intent.title, index);
     if (!productId) continue;
-    await prisma.post.update({ where: { id: post.id }, data: { productId } });
-    postMatched++;
+    await prisma.intent.update({ where: { id: intent.id }, data: { productId } });
+    intentMatched++;
   }
 
   const unresolved = produce
@@ -106,7 +106,7 @@ async function main() {
   console.log(`Products:        ${SEED_PRODUCTS.length}`);
   console.log(`Aliases:         ${aliases.length}`);
   console.log(`Produce matched: ${produceMatched}/${produce.length}`);
-  console.log(`Posts matched:   ${postMatched}/${posts.length}`);
+  console.log(`Intents matched: ${intentMatched}/${intents.length}`);
   if (unresolved.length) {
     // Not a failure. These are farmers' own words we don't have an alias
     // for yet, and they are the highest-value input to the next catalogue

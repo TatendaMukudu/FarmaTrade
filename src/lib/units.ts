@@ -23,7 +23,7 @@ const PLURALS: Record<string, string> = {
   head: "head",
 };
 
-// Post.unit is free text — a farmer can type "punnet", "bale", "sack",
+// Intent.unit is free text — a farmer can type "punnet", "bale", "sack",
 // whatever their trade actually uses. Guessing a plural for a word we don't
 // know risks inventing something wrong in a listing title, so an unknown
 // unit is left exactly as the farmer wrote it.

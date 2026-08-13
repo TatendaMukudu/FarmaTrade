@@ -21,12 +21,12 @@ export async function respondToMatch(formData: FormData) {
 
   const match = await prisma.match.findUnique({
     where: { id },
-    select: { postA: { select: { partyId: true } }, postB: { select: { partyId: true } } },
+    select: { intentA: { select: { partyId: true } }, intentB: { select: { partyId: true } } },
   });
   if (!match) return;
 
   const ownsMatch =
-    match.postA.partyId === party.id || match.postB.partyId === party.id;
+    match.intentA.partyId === party.id || match.intentB.partyId === party.id;
   if (!ownsMatch) return;
 
   await prisma.match.update({
@@ -59,8 +59,8 @@ export async function confirmMatch(
     where: { id: matchId },
     select: {
       status: true,
-      postA: { select: { partyId: true } },
-      postB: { select: { partyId: true } },
+      intentA: { select: { partyId: true } },
+      intentB: { select: { partyId: true } },
     },
   });
   if (!match || match.status !== "ACCEPTED") {
@@ -68,8 +68,8 @@ export async function confirmMatch(
   }
 
   const counterpartyId =
-    match.postA.partyId === party.id ? match.postB.partyId : match.postA.partyId;
-  if (match.postA.partyId !== party.id && match.postB.partyId !== party.id) {
+    match.intentA.partyId === party.id ? match.intentB.partyId : match.intentA.partyId;
+  if (match.intentA.partyId !== party.id && match.intentB.partyId !== party.id) {
     return { error: "Not part of this match" };
   }
 

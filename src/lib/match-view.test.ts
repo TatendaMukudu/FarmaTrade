@@ -9,21 +9,21 @@ import {
 } from "./match-view";
 
 type TestPost = { id: string; partyId: string; quantity: number | null };
-type TestMatch = { id: string; postA: TestPost; postB: TestPost };
+type TestMatch = { id: string; intentA: TestPost; intentB: TestPost };
 
-function match(id: string, postA: TestPost, postB: TestPost): TestMatch {
-  return { id, postA, postB };
+function match(id: string, intentA: TestPost, intentB: TestPost): TestMatch {
+  return { id, intentA, intentB };
 }
 
 describe("resolveMatchSides", () => {
-  it("returns postA as 'yours' when the viewer owns postA", () => {
+  it("returns intentA as 'yours' when the viewer owns intentA", () => {
     const m = match("m1", { id: "p1", partyId: "me", quantity: 5 }, { id: "p2", partyId: "them", quantity: 3 });
     const { yours, theirs } = resolveMatchSides(m, "me");
     expect(yours.id).toBe("p1");
     expect(theirs.id).toBe("p2");
   });
 
-  it("returns postB as 'yours' when the viewer owns postB", () => {
+  it("returns intentB as 'yours' when the viewer owns intentB", () => {
     const m = match("m1", { id: "p1", partyId: "them", quantity: 5 }, { id: "p2", partyId: "me", quantity: 3 });
     const { yours, theirs } = resolveMatchSides(m, "me");
     expect(yours.id).toBe("p2");
@@ -60,7 +60,7 @@ describe("combinedOfferedQuantity", () => {
 
 describe("isPartyInMatch", () => {
   it("is true when the party is on either side", () => {
-    const m = { postA: { partyId: "a" }, postB: { partyId: "b" } };
+    const m = { intentA: { partyId: "a" }, intentB: { partyId: "b" } };
     expect(isPartyInMatch(m, "a")).toBe(true);
     expect(isPartyInMatch(m, "b")).toBe(true);
     expect(isPartyInMatch(m, "c")).toBe(false);

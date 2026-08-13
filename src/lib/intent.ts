@@ -1,81 +1,40 @@
 // Commercial intent: what a party is willing to do, and why FarmaTrade
 // believes it.
 //
-// This is the domain vocabulary. The physical table is still called `Post`
-// and will be for one more checkpoint — renaming a table with live foreign
-// keys from Match, Photo and Conversation is a separate, mechanical piece of
-// work, and doing it in the same change as the conceptual one would make
-// both unreviewable. Everything above persistence speaks Intent; the mapping
-// to the old names lives here and nowhere else.
+// As of the physical rename this is no longer a translation seam — the
+// table, the enums and the domain all say the same words, so the mapping
+// functions that used to live here are gone rather than left as identity
+// wrappers. What remains is the vocabulary itself and the rules that go with
+// it.
 //
-// The distinction that matters, and the reason this exists at all:
+// The distinction that matters, and the reason this module exists:
 //
 //   Farm state    what physically exists — 26 tonnes in the shed
 //   Intent        what is commercially available — up to 20 of them
 //
 // Those are different numbers about different things. A farmer holding back
 // six tonnes for their own use has not "listed 20 of 26"; they have 26 and
-// are offering 20. Intent never decrements inventory, and creating one is
-// not a reservation of anything.
+// are offering 20. An intent *references* state; it is not the state.
+// Creating, matching or withdrawing an intent never touches inventory —
+// only fulfilment does.
 //
 // Pure and DB-free.
 
-import type { Post, PostType } from "@/generated/prisma/client";
+import type { Intent as IntentRow, IntentOrigin, IntentSide, IntentStatus } from "@/generated/prisma/client";
 
-// Which way the value flows. Replaces HAVE/NEED as the word the domain
-// uses — "have" and "need" describe a listing someone wrote, SUPPLY and
-// DEMAND describe a position in a market.
-export type IntentDirection = "SUPPLY" | "DEMAND";
+export type { IntentOrigin, IntentSide, IntentStatus };
 
-// Why this intent exists.
-//
-// DERIVED is meant to become the normal path: FarmaTrade already knows the
-// farm has 26 tonnes of maize with a harvest date, so it proposes the
-// availability and the farmer confirms. DECLARED remains for everything with
-// no underlying record — a buyer's requirement, a transporter's capacity, a
-// need for something the farm does not have.
-export type IntentOrigin = "DERIVED" | "DECLARED";
-
-// How far along an intent is. Same values the storage enum has carried,
-// named for what they mean commercially rather than for a publishing
-// lifecycle.
-export type IntentStatus = "PROPOSED" | "ACTIVE" | "ENGAGED" | "WITHDRAWN";
-
-const DIRECTION_FROM_TYPE: Record<PostType, IntentDirection> = {
-  HAVE: "SUPPLY",
-  NEED: "DEMAND",
-};
-
-const TYPE_FROM_DIRECTION: Record<IntentDirection, PostType> = {
-  SUPPLY: "HAVE",
-  DEMAND: "NEED",
-};
-
-const STATUS_FROM_STORED: Record<string, IntentStatus> = {
-  // Proposed by FarmaTrade, waiting on the farmer. Never matched against.
-  DRAFT: "PROPOSED",
-  ACTIVE: "ACTIVE",
-  OPEN: "ACTIVE",
-  // Being acted on by at least one match.
-  MATCHED: "ENGAGED",
-  CLOSED: "WITHDRAWN",
-};
-
-export function directionOf(type: PostType): IntentDirection {
-  return DIRECTION_FROM_TYPE[type];
-}
-
-export function typeForDirection(direction: IntentDirection): PostType {
-  return TYPE_FROM_DIRECTION[direction];
-}
-
-export function statusOf(stored: string): IntentStatus {
-  return STATUS_FROM_STORED[stored] ?? "ACTIVE";
+// The other side of the market. Named as a function rather than written
+// inline at the one call site because "the opposite of supply is demand" is
+// a domain fact, not a ternary.
+export function oppositeSide(side: IntentSide): IntentSide {
+  return side === "SUPPLY" ? "DEMAND" : "SUPPLY";
 }
 
 // What a farmer reads. Deliberately not "I have" / "I need" — that is the
-// grammar of writing an advert. This is the grammar of a standing position.
-export const DIRECTION_LABEL: Record<IntentDirection, string> = {
+// grammar of writing an advert. This is the grammar of a standing position:
+// a party can hold 26 tonnes and be offering none of it.
+export const SIDE_LABEL: Record<IntentSide, string> = {
   SUPPLY: "Offering",
   DEMAND: "Looking for",
 };
@@ -92,19 +51,34 @@ export const ORIGIN_LABEL: Record<IntentOrigin, string> = {
   DECLARED: "You added this",
 };
 
-// The shape the domain passes around. A projection of the stored row, not a
-// new table — every field here already exists, it is only named and grouped
-// for what it means.
+// Whether an intent is currently open to being matched.
+//
+// PROPOSED is excluded because FarmaTrade derived it and its owner has not
+// agreed to it — matching on one would be putting words in their mouth.
+//
+// ENGAGED is excluded *for now* and only because that is exactly what the
+// old MATCHED status did; this is a rename, not a behaviour change. It is
+// not because engagement is terminal. An intent under discussion may still
+// be partly available, may carry several matches, and returns to ACTIVE when
+// a negotiation falls through. When quantity semantics land, this predicate
+// becomes a question about remaining availability rather than about status,
+// and ENGAGED will stop being a blanket exclusion.
+export function isMatchable(intent: { status: IntentStatus }): boolean {
+  return intent.status === "ACTIVE";
+}
+
+// The shape the domain passes around: a projection of the stored row, named
+// and grouped for what each field means commercially.
 export type Intent = {
   id: string;
   partyId: string;
-  direction: IntentDirection;
+  side: IntentSide;
   origin: IntentOrigin;
   status: IntentStatus;
   // What it is about, canonically. Null for services and for anything
   // predating the product catalogue.
   productId: string | null;
-  // What the party calls it.
+  // What the party calls it, exactly as they wrote it.
   label: string;
   // How much is commercially available under this intent — NOT how much
   // physically exists. See the note at the top of this file.
@@ -122,16 +96,13 @@ export type Intent = {
   createdAt: Date;
 };
 
-// Reads a stored row as an Intent. The single translation point between the
-// persistence name and the domain name — when the table is finally renamed,
-// this function changes and nothing above it does.
-export function asIntent(row: Post): Intent {
+export function asIntent(row: IntentRow): Intent {
   return {
     id: row.id,
     partyId: row.partyId,
-    direction: directionOf(row.type),
-    origin: (row.origin ?? "DECLARED") as IntentOrigin,
-    status: statusOf(row.status),
+    side: row.side,
+    origin: row.origin,
+    status: row.status,
     productId: row.productId,
     label: row.title,
     quantity: row.quantity,
@@ -147,12 +118,4 @@ export function asIntent(row: Post): Intent {
     openToCrossBorder: row.openToCrossBorder,
     createdAt: row.createdAt,
   };
-}
-
-// Whether an intent is currently open to being matched. PROPOSED is
-// deliberately excluded: FarmaTrade suggested it, the farmer has not yet
-// agreed, and matching something nobody has confirmed would be putting
-// words in their mouth.
-export function isMatchable(intent: Pick<Intent, "status">): boolean {
-  return intent.status === "ACTIVE";
 }

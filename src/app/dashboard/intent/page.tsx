@@ -1,13 +1,13 @@
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PostForm, type InventoryOption } from "./form";
-import { closePost, confirmDraftPost, discardDraftPost } from "./actions";
+import { closePost, confirmProposedIntent, discardProposedIntent } from "./actions";
 import { ensureDerivedIntent } from "@/lib/derived-intent";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
-import { CATEGORY_LABEL, POST_CATEGORIES } from "@/lib/categories";
-import { DIRECTION_LABEL, directionOf } from "@/lib/intent";
-import type { PostCategory } from "@/generated/prisma/enums";
+import { CATEGORY_LABEL, COMMERCE_CATEGORIES } from "@/lib/categories";
+import { SIDE_LABEL } from "@/lib/intent";
+import type { CommerceCategory } from "@/generated/prisma/enums";
 
 // Stored status spelled as what it means commercially. See
 // src/lib/intent.ts — the domain says PROPOSED/ACTIVE/ENGAGED/WITHDRAWN and
@@ -19,8 +19,8 @@ const STATUS_LABEL: Record<string, string> = {
   CLOSED: "Closed",
 };
 
-const VALID_TYPES = new Set(["HAVE", "NEED"]);
-const VALID_CATEGORIES = new Set<string>(POST_CATEGORIES);
+const VALID_SIDES = new Set(["SUPPLY", "DEMAND"]);
+const VALID_CATEGORIES = new Set<string>(COMMERCE_CATEGORIES);
 
 export default async function PostsPage({
   searchParams,
@@ -33,11 +33,11 @@ export default async function PostsPage({
   }
 
   const params = await searchParams;
-  const typeParam = Array.isArray(params.type) ? params.type[0] : params.type;
+  const sideParam = Array.isArray(params.side) ? params.side[0] : params.side;
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
-  const defaultType = VALID_TYPES.has(typeParam ?? "") ? (typeParam as "HAVE" | "NEED") : undefined;
+  const defaultSide = VALID_SIDES.has(sideParam ?? "") ? (sideParam as "SUPPLY" | "DEMAND") : undefined;
   const defaultCategory = VALID_CATEGORIES.has(categoryParam ?? "")
-    ? (categoryParam as PostCategory)
+    ? (categoryParam as CommerceCategory)
     : undefined;
 
   // What this farmer has actually recorded, in their own words. Livestock
@@ -88,7 +88,7 @@ export default async function PostsPage({
       ]
     : [];
 
-  const posts = await prisma.post.findMany({
+  const intents = await prisma.intent.findMany({
     where: { partyId: party.id },
     orderBy: { createdAt: "desc" },
     include: {
@@ -97,8 +97,8 @@ export default async function PostsPage({
     },
   });
 
-  const drafts = posts.filter((p) => p.status === "DRAFT");
-  const rest = posts.filter((p) => p.status !== "DRAFT");
+  const proposed = intents.filter((p) => p.status === "PROPOSED");
+  const rest = intents.filter((p) => p.status !== "PROPOSED");
 
   return (
     <div className="flex flex-col gap-8">
@@ -111,20 +111,20 @@ export default async function PostsPage({
         </p>
       </div>
 
-      {drafts.length > 0 && (
+      {proposed.length > 0 && (
         <div className="flex flex-col gap-3 rounded-card border border-border bg-warning-bg p-4">
           <p className="text-sm font-medium text-warning-fg">
 From your farm records — confirm to make available
           </p>
           <ul className="flex flex-col gap-2">
-            {drafts.map((p) => (
+            {proposed.map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between gap-4 rounded-card border border-border bg-card px-3 py-2"
               >
                 <span className="text-sm">{p.title}</span>
                 <div className="flex gap-2">
-                  <form action={confirmDraftPost}>
+                  <form action={confirmProposedIntent}>
                     <input
                       type="hidden"
                       name="id"
@@ -137,7 +137,7 @@ From your farm records — confirm to make available
                       Confirm
                     </button>
                   </form>
-                  <form action={discardDraftPost}>
+                  <form action={discardProposedIntent}>
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className="rounded-card border border-border px-3 py-1 text-xs">
                       Discard
@@ -150,13 +150,13 @@ From your farm records — confirm to make available
         </div>
       )}
 
-      <AddToggle label="Add" defaultOpen={!!(defaultType || defaultCategory)}>
+      <AddToggle label="Add" defaultOpen={!!(defaultSide || defaultCategory)}>
         <PostForm
           inventory={inventory}
           countryCode={party.countryCode}
           defaultProvince={party.province}
           defaultDistrict={party.district}
-          defaultType={defaultType}
+          defaultSide={defaultSide}
           defaultCategory={defaultCategory}
         />
       </AddToggle>
@@ -171,12 +171,12 @@ From your farm records — confirm to make available
                   <p className="font-medium">
                     <span
                       className={
-                        p.type === "HAVE"
+                        p.side === "SUPPLY"
                           ? "text-green-700 dark:text-green-400"
                           : "text-blue-700 dark:text-blue-400"
                       }
                     >
-                      {DIRECTION_LABEL[directionOf(p.type)]}
+                      {SIDE_LABEL[p.side]}
                     </span>{" "}
                     · {p.title}
                   </p>
@@ -221,7 +221,7 @@ From your farm records — confirm to make available
                   <span className="text-xs whitespace-nowrap text-subtle-fg">
                     {matchCount} match{matchCount === 1 ? "" : "es"}
                   </span>
-                  {p.status === "OPEN" && (
+                  {p.status === "ACTIVE" && (
                     <form action={closePost}>
                       <input type="hidden" name="id" value={p.id} />
                       <button
@@ -237,7 +237,7 @@ From your farm records — confirm to make available
             </li>
           );
         })}
-        {rest.length === 0 && drafts.length === 0 && (
+        {rest.length === 0 && proposed.length === 0 && (
           <li className="text-sm text-subtle-fg">Nothing recorded yet.</li>
         )}
       </ul>

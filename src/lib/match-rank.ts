@@ -122,7 +122,7 @@ export type RankableMatch = {
   id: string;
   status: MatchStatus;
   createdAt: Date;
-  // Freshly computed against today's posts and today's reputation — not the
+  // Freshly computed against today's intents and today's reputation — not the
   // signals frozen into the row when the match was written.
   signals: MatchSignal[];
   yours: RankableIntent;

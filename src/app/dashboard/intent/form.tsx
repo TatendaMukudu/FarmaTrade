@@ -5,7 +5,7 @@ import { createPost, type PostActionState } from "./actions";
 import { regionFor } from "@/lib/regions";
 import { formatQuantity } from "@/lib/units";
 import { CATEGORY_LABEL } from "@/lib/categories";
-import type { PostCategory as Category } from "@/generated/prisma/enums";
+import type { CommerceCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
 
@@ -24,7 +24,7 @@ export function PostForm({
   countryCode,
   defaultProvince,
   defaultDistrict,
-  defaultType = "HAVE",
+  defaultSide = "SUPPLY",
   defaultCategory = "PRODUCE",
   onDone,
 }: {
@@ -32,7 +32,7 @@ export function PostForm({
   countryCode: string;
   defaultProvince: string;
   defaultDistrict: string;
-  defaultType?: "HAVE" | "NEED";
+  defaultSide?: "SUPPLY" | "DEMAND";
   defaultCategory?: Category;
   onDone?: () => void;
 }) {
@@ -62,12 +62,12 @@ export function PostForm({
       <div className="flex flex-wrap gap-3">
         <Field label="Direction">
           <select
-            name="type"
-            defaultValue={defaultType}
+            name="side"
+            defaultValue={defaultSide}
             className="rounded-card border border-border px-2 py-1 text-sm"
           >
-            <option value="HAVE">Offering</option>
-            <option value="NEED">Looking for</option>
+            <option value="SUPPLY">Offering</option>
+            <option value="DEMAND">Looking for</option>
           </select>
         </Field>
         <Field label="Category">

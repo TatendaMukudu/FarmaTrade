@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { POST_CATEGORIES } from "@/lib/categories";
+import { COMMERCE_CATEGORIES } from "@/lib/categories";
 import {
   PARTY_ROLES,
   LIVESTOCK_SPECIES,
@@ -15,7 +15,7 @@ import { isSupportedCountry, PILOT_COUNTRY, REGIONS, type RegionLabels } from "@
 // strings whose wording depends on who is filling the form in, so the
 // schemas that carry them are built per region rather than once at import.
 //
-// The bare `postSchema` / `profileSchema` / `signupSchema` exports keep the
+// The bare `intentSchema` / `profileSchema` / `signupSchema` exports keep the
 // pilot's wording, so anything that has no region to hand still parses
 // correctly — the labels change the message, never the validation.
 const PILOT_LABELS = REGIONS[PILOT_COUNTRY].labels;
@@ -116,10 +116,10 @@ export const produceSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
-export const postSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
+export const intentSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
   z.object({
-  type: z.enum(["HAVE", "NEED"]),
-  category: z.enum(POST_CATEGORIES),
+  side: z.enum(["SUPPLY", "DEMAND"]),
+  category: z.enum(COMMERCE_CATEGORIES),
   title: z.string().trim().min(1, "Title is required"),
   description: z.string().trim().optional(),
   quantity: z.coerce.number().positive().optional(),
@@ -131,7 +131,7 @@ export const postSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
   recurring: z.coerce.boolean().optional(),
   openToCrossBorder: z.coerce.boolean().optional(),
   // "produce:<id>" / "livestock:<id>" / "equipment:<id>" — which of the
-  // farmer's own inventory rows this post is about, when it is about one.
+  // farmer's own inventory rows this intent is about, when it is about one.
   // Ownership is checked server-side; this only validates the shape.
   inventoryRef: z
     .string()
@@ -143,7 +143,7 @@ export const postSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
   travelDate: z.coerce.date().optional(),
 });
 
-export const postSchema = postSchemaFor();
+export const intentSchema = intentSchemaFor();
 
 export const equipmentSchema = z.object({
   id: z.string().optional(),

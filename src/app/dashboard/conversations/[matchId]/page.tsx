@@ -19,8 +19,8 @@ export default async function ConversationPage({
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
-      postA: { include: { party: true, photos: { select: { id: true } } } },
-      postB: { include: { party: true, photos: { select: { id: true } } } },
+      intentA: { include: { party: true, photos: { select: { id: true } } } },
+      intentB: { include: { party: true, photos: { select: { id: true } } } },
       confirmations: true,
       conversation: {
         include: { messages: { include: { author: true }, orderBy: { createdAt: "asc" } } },
@@ -41,9 +41,9 @@ export default async function ConversationPage({
   // have no way to find a transporter without separately posting a
   // TRANSPORT NEED. Surface it directly instead of leaving it as a gap.
   let transporters: Awaited<ReturnType<typeof findTransportersForRoute>> = [];
-  const havePost = match.postA.type === "HAVE" ? match.postA : match.postB;
-  const needPost = match.postA.type === "NEED" ? match.postA : match.postB;
-  if (match.status === "ACCEPTED" && match.postA.category !== "TRANSPORT") {
+  const havePost = match.intentA.side === "SUPPLY" ? match.intentA : match.intentB;
+  const needPost = match.intentA.side === "DEMAND" ? match.intentA : match.intentB;
+  if (match.status === "ACCEPTED" && match.intentA.category !== "TRANSPORT") {
     transporters = await findTransportersForRoute(
       { province: havePost.province, district: havePost.district },
       { province: needPost.province, district: needPost.district },

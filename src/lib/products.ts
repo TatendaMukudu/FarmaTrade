@@ -1,6 +1,6 @@
 // What a thing actually is, independent of what anyone calls it.
 //
-// Matching had no concept of a commodity. Two posts paired because both were
+// Matching had no concept of a commodity. Two intents paired because both were
 // `PRODUCE` — so a maize seller and a tomato buyer in the same district
 // matched, and nothing in the system could tell they shouldn't. `cropType`
 // was recorded on ProduceStock and never read by the matcher at all.
@@ -34,7 +34,7 @@
 
 export type ProductKind = "CROP" | "LIVESTOCK";
 
-// Bridges to the existing PostCategory enum so matching can fall back to
+// Bridges to the existing CommerceCategory enum so matching can fall back to
 // category for anything with no product identity (transport, services,
 // inputs).
 export type ProductCategory = "PRODUCE" | "LIVESTOCK";

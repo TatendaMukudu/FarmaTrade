@@ -1,4 +1,4 @@
-import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
+import type { Intent, Reputation, VerificationSource } from "@/generated/prisma/client";
 import type { ReasonKind } from "@/lib/reason-reliability";
 import { regionFor } from "@/lib/regions";
 
@@ -41,11 +41,11 @@ export type MatchScore = {
 export const BASE_SCORE = 50;
 
 // `candidate` is the pre-existing intent, `incoming` the one that just
-// became active. Both are stored rows — the Post type is the persistence
+// became active. Both are stored rows — the Intent type is the persistence
 // name and stays until the table rename lands.
 export function scoreMatch(
-  candidate: Post,
-  incoming: Post,
+  candidate: Intent,
+  incoming: Intent,
   reputation: Reputation | null,
   verifiedBy: VerificationSource | null,
 ): MatchScore {
