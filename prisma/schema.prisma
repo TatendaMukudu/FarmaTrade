@@ -377,6 +377,16 @@ model Intent {
   // party stated it outright. Defaults to DECLARED because every row that
   // predates this column was typed by hand.
   origin      IntentOrigin @default(DECLARED)
+  // A fingerprint of the farm state a DERIVED intent came from — quantity,
+  // timing, product and unit. Null on anything DECLARED.
+  //
+  // Two jobs, both needing exactness. A proposal whose key still matches its
+  // source hasn't gone stale. And a proposal the farmer declined stays
+  // declined while the key is unchanged — the withdrawn row IS the
+  // suppression, which is why "not selling this" withdraws rather than
+  // deletes. If the harvest genuinely changes, that's a different commercial
+  // question and asking again is fair.
+  derivationKey String?
   side        IntentSide
   category    CommerceCategory
   title       String
@@ -442,6 +452,9 @@ model Intent {
   // The matching query narrows on product identity before geography once
   // both sides are known.
   @@index([productId, status, side])
+  // The derivation engine looks up everything already derived from one
+  // source, whatever its status.
+  @@index([partyId, derivationKey])
   @@index([partyId])
   @@index([produceId])
   // The cross-border arm of the matching query looks up opted-in intents

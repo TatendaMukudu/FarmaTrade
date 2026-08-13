@@ -170,6 +170,11 @@ export async function createPost(
       recurring: data.recurring ?? false,
       openToCrossBorder: data.openToCrossBorder ?? false,
       productId,
+      // Authored by hand, so it is ACTIVE immediately. Asking someone to
+      // approve what they just wrote is friction with no purpose — the
+      // PROPOSED step exists only for things FarmaTrade inferred.
+      origin: "DECLARED",
+      status: "ACTIVE",
       ...inventory,
       destinationProvince: data.destinationProvince,
       destinationDistrict: data.destinationDistrict,
@@ -219,9 +224,14 @@ export async function confirmProposedIntent(formData: FormData) {
   if (!party) return;
 
   const id = String(formData.get("id"));
-  const intent = await prisma.intent.findFirst({ where: { id, partyId: party.id, status: "PROPOSED" } });
+  const intent = await prisma.intent.findFirst({
+    where: { id, partyId: party.id, status: "PROPOSED" },
+  });
   if (!intent) return;
 
+  // The moment ownership transfers. From here the derivation engine will
+  // not revise this intent again — if the source moves, the farmer is told
+  // rather than overruled.
   await prisma.intent.update({ where: { id }, data: { status: "ACTIVE" } });
   await generateMatchesForIntent(id);
 
@@ -230,12 +240,27 @@ export async function confirmProposedIntent(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function discardProposedIntent(formData: FormData) {
+// "Not selling this."
+//
+// Withdraws rather than deletes, and that is the whole mechanism: the
+// withdrawn row keeps its derivationKey, and the derivation engine refuses
+// to re-propose anything whose key still matches. Deleting it would leave
+// nothing to remember the refusal by, and the next page load would cheerfully
+// suggest the same thing again — which is how "proactive" becomes "nagging"
+// within about a day.
+//
+// If the underlying harvest genuinely changes, the key changes with it, and
+// asking again is then a fair question rather than a repeat of one already
+// answered.
+export async function declineProposedIntent(formData: FormData) {
   const party = await getCurrentParty();
   if (!party) return;
 
   const id = String(formData.get("id"));
-  await prisma.intent.deleteMany({ where: { id, partyId: party.id, status: "PROPOSED" } });
+  await prisma.intent.updateMany({
+    where: { id, partyId: party.id, status: "PROPOSED", origin: "DERIVED" },
+    data: { status: "WITHDRAWN" },
+  });
 
   revalidatePath("/dashboard/intent");
   revalidatePath("/dashboard");

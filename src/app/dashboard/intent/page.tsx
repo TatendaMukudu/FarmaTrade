@@ -1,11 +1,15 @@
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PostForm, type InventoryOption } from "./form";
-import { closePost, confirmProposedIntent, discardProposedIntent } from "./actions";
+import { closePost, confirmProposedIntent, declineProposedIntent } from "./actions";
 import { ensureDerivedIntent } from "@/lib/derived-intent";
 import { Badge } from "@/components/badge";
 import { AddToggle } from "@/components/add-toggle";
+import Link from "next/link";
 import { CATEGORY_LABEL, COMMERCE_CATEGORIES } from "@/lib/categories";
+import { CategoryIcon } from "@/components/icons";
+import { SectionHeading, buttonClass } from "@/components/ui";
+import { formatQuantity } from "@/lib/units";
 import { SIDE_LABEL } from "@/lib/intent";
 import type { CommerceCategory } from "@/generated/prisma/enums";
 
@@ -94,6 +98,11 @@ export default async function PostsPage({
     include: {
       _count: { select: { matchesAsA: true, matchesAsB: true } },
       photos: { select: { id: true } },
+      // A proposal has to be able to explain itself from the record that
+      // produced it.
+      produce: {
+        select: { cropType: true, quantity: true, unit: true, expectedHarvestDate: true },
+      },
     },
   });
 
@@ -111,38 +120,54 @@ export default async function PostsPage({
         </p>
       </div>
 
+      {/* Not "draft listings". FarmaTrade watched the farm's state and
+          found a moment where it could be useful to somebody else; the
+          farmer decides whether it takes part. Each one explains itself
+          from the record that produced it. */}
       {proposed.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-card border border-border bg-warning-bg p-4">
-          <p className="text-sm font-medium text-warning-fg">
-From your farm records — confirm to make available
+        <div className="flex flex-col gap-3">
+          <SectionHeading title="Possible supply" count={proposed.length} />
+          <p className="text-sm text-muted-fg">
+            Found in your farm records. Nothing here is visible to anyone else
+            until you make it available.
           </p>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-3">
             {proposed.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between gap-4 rounded-card border border-border bg-card px-3 py-2"
-              >
-                <span className="text-sm">{p.title}</span>
-                <div className="flex gap-2">
-                  <form action={confirmProposedIntent}>
-                    <input
-                      type="hidden"
-                      name="id"
-                      value={p.id}
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-card bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
-                    >
-                      Confirm
-                    </button>
-                  </form>
-                  <form action={discardProposedIntent}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className="rounded-card border border-border px-3 py-1 text-xs">
-                      Discard
-                    </button>
-                  </form>
+              <li key={p.id} className="rounded-card border border-border bg-card p-4">
+                <div className="flex items-start gap-3">
+                  <CategoryIcon category={p.category} className="mt-0.5 text-muted-fg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">
+                      Up to {formatQuantity(p.quantity ?? 0, p.unit)} of {p.produce?.cropType ?? p.title}
+                      {p.neededBy && ` from ${p.neededBy.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                    </p>
+                    {p.produce && (
+                      <p className="mt-1 text-sm text-muted-fg">
+                        Based on your recorded {p.produce.cropType.toLowerCase()}:{" "}
+                        {formatQuantity(p.produce.quantity, p.produce.unit)} expected
+                        {p.produce.expectedHarvestDate &&
+                          ` around ${p.produce.expectedHarvestDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                        .
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <form action={confirmProposedIntent}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button type="submit" className={buttonClass("primary", "sm")}>
+                          Make available
+                        </button>
+                      </form>
+                      <Link href={`/dashboard/intent#adjust-${p.id}`} className={buttonClass("secondary", "sm")}>
+                        Adjust
+                      </Link>
+                      <form action={declineProposedIntent}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button type="submit" className={buttonClass("quiet", "sm")}>
+                          Not selling this
+                        </button>
+                      </form>
+                    </div>
+                  </div>
                 </div>
               </li>
             ))}
