@@ -47,7 +47,7 @@ export type MatchingHistory = {
 
 export async function loadMatchingHistory(): Promise<MatchingHistory> {
   const settled = await prisma.match.findMany({
-    where: { status: { in: ["ACCEPTED", "DECLINED", "COMPLETED"] } },
+    where: { status: { in: ["AGREED", "ACCEPTED", "DECLINED", "COMPLETED"] } },
     select: {
       reasons: true,
       status: true,

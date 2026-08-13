@@ -4,6 +4,7 @@ import {
   combinedRemaining,
   consumesCapacity,
   hasRemainingCapacity,
+  overcommitment,
   pairwiseQuantity,
   pairwiseUnit,
   remainingCapacity,
@@ -11,29 +12,21 @@ import {
   type Allocation,
 } from "./capacity";
 
+// A reservation held by a bilateral agreement. Whether an engagement
+// reserves at all is agreement-core's judgement, tested there; this module
+// only does the arithmetic over the answer.
 function allocation(overrides: Partial<Allocation> = {}): Allocation {
-  return { status: "ACCEPTED", quantity: 8, unit: "tonne", ...overrides };
+  return { reserves: true, quantity: 8, unit: "tonne", basis: "mutual_agreement", ...overrides };
 }
 
 const supply20 = { quantity: 20, unit: "tonne" };
 
 describe("consumesCapacity", () => {
-  it("counts an agreed engagement and a completed one", () => {
-    expect(consumesCapacity({ status: "ACCEPTED" })).toBe(true);
-    expect(consumesCapacity({ status: "COMPLETED" })).toBe(true);
-  });
-
-  it("does not count a suggestion nobody answered", () => {
-    // Forty suggestions against an intent have sold nothing.
-    expect(consumesCapacity({ status: "SUGGESTED" })).toBe(false);
-  });
-
-  it("does not count a declined one, which is how capacity comes back", () => {
-    expect(consumesCapacity({ status: "DECLINED" })).toBe(false);
-  });
-
-  it("does not count a trade someone said never happened", () => {
-    expect(consumesCapacity({ status: "COMPLETED", fellThrough: true })).toBe(false);
+  it("reads the reservation rather than re-deciding it", () => {
+    // The bilateral-consent rule lives in exactly one place. A second copy
+    // of it here would be a second thing to keep in step.
+    expect(consumesCapacity({ reserves: true })).toBe(true);
+    expect(consumesCapacity({ reserves: false })).toBe(false);
   });
 });
 
@@ -44,10 +37,10 @@ describe("allocatedQuantity", () => {
     ).toBe(13);
   });
 
-  it("ignores engagements that do not consume", () => {
+  it("ignores engagements that reserve nothing", () => {
     expect(
       allocatedQuantity(
-        [allocation({ status: "SUGGESTED" }), allocation({ status: "DECLINED" })],
+        [allocation({ reserves: false }), allocation({ reserves: false })],
         "tonne",
       ),
     ).toBe(0);
@@ -71,7 +64,7 @@ describe("unquantifiedAllocations", () => {
       allocation({ quantity: null }),
       allocation({ quantity: 1, unit: "kg" }),
       allocation({ quantity: 8 }),
-      allocation({ status: "DECLINED", quantity: null }),
+      allocation({ reserves: false, quantity: null }),
     ];
     // The null one and the incomparable one. Not the counted 8, and not the
     // declined one, which is not live at all.
@@ -92,21 +85,9 @@ describe("remainingCapacity", () => {
     ).toBe(7);
   });
 
-  // C. Allocation and commitment are the same number at different statuses.
-  it("does not deduct the same quantity twice when it becomes a commitment", () => {
-    const allocated = remainingCapacity(supply20, [
-      allocation({ status: "ACCEPTED", quantity: 8 }),
-    ]);
-    const committed = remainingCapacity(supply20, [
-      allocation({ status: "COMPLETED", quantity: 8 }),
-    ]);
-    expect(allocated).toBe(12);
-    expect(committed).toBe(12);
-  });
-
-  // L.
-  it("gives capacity back when an engagement is released", () => {
-    expect(remainingCapacity(supply20, [allocation({ status: "DECLINED", quantity: 8 })])).toBe(20);
+  // I. Release.
+  it("gives capacity back when an engagement stops reserving", () => {
+    expect(remainingCapacity(supply20, [allocation({ reserves: false, quantity: 8 })])).toBe(20);
   });
 
   it("is unbounded, not empty, when nobody stated a quantity", () => {
@@ -118,6 +99,24 @@ describe("remainingCapacity", () => {
     // A number below zero would read as "less than nothing available"
     // everywhere downstream. Fully spoken for is the honest floor.
     expect(remainingCapacity({ quantity: 10, unit: "tonne" }, [allocation({ quantity: 18 })])).toBe(0);
+  });
+});
+
+describe("overcommitment", () => {
+  // O. The divergence signal.
+  it("is silent while agreements fit inside what was authorized", () => {
+    expect(overcommitment(supply20, [allocation({ quantity: 8 })])).toBe(0);
+  });
+
+  it("reports the gap when an owner authorizes less than they already agreed", () => {
+    // Authorized 20, agreed 26, then edited down to 15. Remaining clamps to
+    // zero and would say nothing is available, which is true but hides that
+    // eleven tonnes are promised to people who are counting on them.
+    expect(overcommitment({ quantity: 15, unit: "tonne" }, [allocation({ quantity: 26 })])).toBe(11);
+  });
+
+  it("says nothing about an intent with no stated ceiling", () => {
+    expect(overcommitment({ quantity: null, unit: "tonne" }, [allocation({ quantity: 26 })])).toBe(0);
   });
 });
 

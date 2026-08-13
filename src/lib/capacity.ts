@@ -21,51 +21,24 @@
 //
 // Pure and DB-free.
 
-import type { MatchStatus } from "@/generated/prisma/client";
 import { normalizeUnit, unitsComparable } from "@/lib/units";
+import type { Reservation } from "@/lib/agreement-core";
 
 // One engagement's claim on an intent's capacity.
-export type Allocation = {
-  status: MatchStatus;
-  // Null where no amount was ever agreed. See consumesCapacity().
-  quantity: number | null;
-  unit: string | null;
-  // Someone reported the trade never happened. Same rule the rest of the
-  // app uses — one side saying so is enough (see match-ranking.ts,
-  // trade-outcomes.ts).
-  fellThrough?: boolean;
-};
+//
+// This is a Reservation — the output of agreement-core's one authoritative
+// predicate, which decides whether an engagement reserves anything and how
+// much. Nothing in this module re-derives that from a status, so there is
+// no second copy of the bilateral-consent rule to drift out of step with
+// the first.
+export type Allocation = Reservation;
 
-// Which engagements actually take capacity off the market.
+// Whether an engagement's claim counts against capacity at all.
 //
-// ACCEPTED is allocation: both sides are pursuing this trade, so promising
-// the same tonnes to somebody else would be FarmaTrade double-selling on a
-// farmer's behalf. COMPLETED is commitment: the trade was reported as done,
-// so the capacity is spent rather than freed.
-//
-// The same eight tonnes therefore move from allocated to committed without
-// ever being counted twice — one row, one number, a changing status. There
-// is no second record for a commitment to live in, so there is nothing for
-// the arithmetic to double.
-//
-// SUGGESTED does not consume. A suggestion nobody has answered is
-// FarmaTrade's opinion, and an intent with forty suggestions against it has
-// not thereby sold anything.
-//
-// DECLINED does not consume, which is the whole release mechanism: a
-// declined engagement simply stops appearing in the sum, and the capacity is
-// available again on the next read. Nothing has to remember to give it back.
-//
-// Neither does an engagement someone reported as never having happened. It
-// reaches COMPLETED because both sides filed a report and the reports are
-// what "completed" means, but a trade that fell through has not consumed a
-// single tonne, and leaving it holding capacity would quietly strand a
-// farmer's supply behind a deal that never occurred.
-export function consumesCapacity(
-  allocation: { status: MatchStatus; fellThrough?: boolean },
-): boolean {
-  if (allocation.fellThrough) return false;
-  return allocation.status === "ACCEPTED" || allocation.status === "COMPLETED";
+// Thin by design: the judgement lives in agreement-core.reservationFor(),
+// and this is only the local reading of its answer.
+export function consumesCapacity(allocation: Pick<Allocation, "reserves">): boolean {
+  return allocation.reserves;
 }
 
 // How much of an intent's authorized quantity is currently spoken for.
@@ -123,6 +96,27 @@ export function remainingCapacity(
 ): number | null {
   if (intent.quantity == null) return null;
   return Math.max(0, intent.quantity - allocatedQuantity(allocations, intent.unit));
+}
+
+// How much more is agreed than the owner currently authorizes.
+//
+// Zero in every ordinary case. It goes positive when someone edits an
+// intent down below what they have already agreed away — authorized 20,
+// agreed 26, then edited to 15.
+//
+// Reported rather than resolved, and that is the whole point. FarmaTrade
+// must not quietly reduce agreements a counterparty is relying on, must not
+// invent a compensating quantity, and must not touch inventory. What it can
+// do is stop pretending the numbers add up, and say plainly that 26 tonnes
+// are agreed against 15 authorized so the owner can decide which agreement
+// to renegotiate. Deciding for them is a person's call, and the tools for
+// making it are not built yet.
+export function overcommitment(
+  intent: { quantity: number | null; unit: string | null },
+  allocations: readonly Allocation[],
+): number {
+  if (intent.quantity == null) return 0;
+  return Math.max(0, allocatedQuantity(allocations, intent.unit) - intent.quantity);
 }
 
 // Whether there is any capacity left to offer anyone.

@@ -10,6 +10,7 @@ import { CATEGORY_LABEL, COMMERCE_CATEGORIES } from "@/lib/categories";
 import { CategoryIcon } from "@/components/icons";
 import { SectionHeading, buttonClass } from "@/components/ui";
 import { formatQuantity } from "@/lib/units";
+import { loadCapacities } from "@/lib/allocation";
 import { SIDE_LABEL } from "@/lib/intent";
 import type { CommerceCategory } from "@/generated/prisma/enums";
 
@@ -105,6 +106,10 @@ export default async function PostsPage({
       },
     },
   });
+
+  // What each intent still has available, and whether more has been agreed
+  // than it now authorizes.
+  const capacities = await loadCapacities(intents.map((i) => i.id));
 
   const proposed = intents.filter((p) => p.status === "PROPOSED");
   const rest = intents.filter((p) => p.status !== "PROPOSED");
@@ -225,6 +230,34 @@ export default async function PostsPage({
                     {p.neededBy && ` · needed by ${p.neededBy.toLocaleDateString()}`}
                     {p.travelDate && ` · travelling ${p.travelDate.toLocaleDateString()}`}
                   </p>
+                  {(() => {
+                    const capacity = capacities.get(p.id);
+                    if (!capacity) return null;
+                    return (
+                      <>
+                        {capacity.remaining != null && capacity.authorized != null && (
+                          <p className="mt-1 text-sm text-muted-fg">
+                            {formatQuantity(capacity.remaining, capacity.unit)} of{" "}
+                            {formatQuantity(capacity.authorized, capacity.unit)} still available
+                          </p>
+                        )}
+                        {/* Said plainly rather than hidden behind a
+                            remaining figure of zero. More is agreed than is
+                            now offered, and the people on the other end of
+                            those agreements are counting on it. FarmaTrade
+                            will not reduce them on the farmer's behalf, and
+                            will not pretend the numbers add up. */}
+                        {capacity.overcommitted > 0 && (
+                          <p className="mt-1 text-sm text-warning-fg">
+                            You have agreed{" "}
+                            {formatQuantity(capacity.overcommitted, capacity.unit)} more than this
+                            now offers. Nothing has been changed for you — open the agreements
+                            below to settle which one moves.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                   {p.description && (
                     <p className="mt-1 text-sm text-muted-fg">{p.description}</p>
                   )}

@@ -45,7 +45,11 @@ describe("respondToMatch", () => {
     await cleanupParties(partyIds.splice(0));
   });
 
-  it("lets a party in the match accept it", async () => {
+  it("records one party's acceptance without settling the trade", async () => {
+    // This assertion used to read ACCEPTED, which was the bug: one party
+    // clicking accept moved the engagement to a state that reserved the
+    // counterparty's capacity. Now it records where the seller stands and
+    // waits for an answer.
     const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
     partyIds.push(seller.party.id, buyer.party.id);
 
@@ -53,7 +57,28 @@ describe("respondToMatch", () => {
     await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
 
     const updated = await prisma.match.findUnique({ where: { id: match.id } });
-    expect(updated!.status).toBe("ACCEPTED");
+    expect(updated!.status).toBe("NEGOTIATING");
+
+    const terms = await prisma.agreementTerms.findMany({
+      where: { matchId: match.id },
+      include: { acceptances: true },
+    });
+    expect(terms).toHaveLength(1);
+    expect(terms[0].acceptances.map((a) => a.partyId)).toEqual([seller.party.id]);
+  });
+
+  it("settles the trade when the second party agrees to the same terms", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    await loginAs(buyer.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    const updated = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(updated!.status).toBe("AGREED");
   });
 
   it("lets a party in the match decline it", async () => {

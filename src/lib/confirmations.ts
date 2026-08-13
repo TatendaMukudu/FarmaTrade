@@ -10,14 +10,19 @@ export { pendingStamps, stampBanner };
 
 // Trades this party agreed to and hasn't put on the record yet.
 //
-// Reads ACCEPTED matches rather than COMPLETED ones: a match only becomes
+// Reads AGREED matches rather than COMPLETED ones: a match only becomes
 // COMPLETED once both sides have filed, so by definition everything
-// outstanding is still sitting in ACCEPTED. That is also why the count can
+// outstanding is still sitting in AGREED. That is also why the count can
 // never be reconstructed from Match.status alone.
+//
+// Legacy ACCEPTED rows are included. Their consent was never proven, so
+// they reserve no capacity — but two parties may well have traded on one
+// before this release, and refusing to let them file a report about it
+// would lose real history.
 export async function loadPendingStamps(partyId: string, now = new Date()) {
   const accepted = await prisma.match.findMany({
     where: {
-      status: "ACCEPTED",
+      status: { in: ["AGREED", "ACCEPTED"] },
       OR: [{ intentA: { partyId } }, { intentB: { partyId } }],
     },
     include: {

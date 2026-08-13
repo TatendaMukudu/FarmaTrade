@@ -13,6 +13,15 @@ import {
 } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
+import {
+  awaitingFrom,
+  governingTerms,
+  openTerms,
+  viewFor,
+  type EngagementView,
+  type Participants,
+} from "@/lib/agreement-core";
+import { toTermsVersions } from "@/lib/agreement-view";
 import { loadCapacities } from "@/lib/allocation";
 import { pairwiseQuantity } from "@/lib/capacity";
 import { formatMoney, regionFor } from "@/lib/regions";
@@ -34,13 +43,21 @@ const BUCKET_LIMIT: Record<Bucket, number> = {
   worth_knowing: 3,
 };
 
-// Enums spelled for a human. "COMPLETED GOOD" and "MATCHED" were leaking
-// straight through to the page.
-const MATCH_STATUS_LABEL: Record<string, string> = {
-  SUGGESTED: "Suggested",
-  ACCEPTED: "Agreed",
-  DECLINED: "Declined",
-  COMPLETED: "Completed",
+// Where an engagement has got to, said as coordination between two people
+// rather than as steps in a checkout. "Waiting for them" is the sentence a
+// farmer actually wants; "ACCEPTED" was never one.
+//
+// The one that matters most is that a single party clicking accept now
+// reads as waiting, not as agreed — the page must not imply a trade is
+// settled because one side said yes.
+const ENGAGEMENT_LABEL: Record<EngagementView, string> = {
+  suggested: "Suggested",
+  waiting_for_you: "They are waiting on you",
+  waiting_for_them: "Waiting for them",
+  agreed: "Agreed",
+  renegotiating: "Agreed \u2014 new terms proposed",
+  completed: "Completed",
+  closed: "Closed",
 };
 
 // How much is actually known about this counterparty, said plainly. The
@@ -68,7 +85,7 @@ export default async function OpportunitiesPage() {
   const [active, history, relations, matchingHistory] = await Promise.all([
     prisma.match.findMany({
       where: {
-        status: { in: ["SUGGESTED", "ACCEPTED"] },
+        status: { in: ["SUGGESTED", "NEGOTIATING", "AGREED", "ACCEPTED"] },
         OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
       },
       include: {
@@ -79,6 +96,7 @@ export default async function OpportunitiesPage() {
           include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
         },
         confirmations: true,
+        terms: { include: { acceptances: { select: { partyId: true } } } },
       },
       orderBy: { score: "desc" },
     }),
@@ -219,12 +237,21 @@ export default async function OpportunitiesPage() {
                     { remaining: remainingOf(supplySide), unit: supplySide.unit },
                     { remaining: remainingOf(demandSide), unit: demandSide.unit },
                   );
+                  const versions = toTermsVersions(m.terms);
+                  const participants: Participants = [yours.partyId, theirs.partyId];
+                  const view = viewFor({ status: m.status, versions }, participants, party.id);
+                  const governing = governingTerms(versions, participants);
+                  const open = openTerms(versions, participants);
+                  // Whose move it is, from the rows rather than from the
+                  // status. One party having accepted is not agreement, and
+                  // the page must never round it up to one.
+                  const yourMove = open != null && awaitingFrom(open, participants).includes(party.id);
                   return (
                     <li id={`match-${m.id}`} className="scroll-mt-4 rounded-card border border-border bg-card p-4" key={m.id}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-subtle-fg">
-                            <span>{MATCH_STATUS_LABEL[m.status] ?? m.status}</span>
+                            <span>{ENGAGEMENT_LABEL[view]}</span>
                             {(yours.urgent || theirs.urgent) && <Badge tone="warning">Time-sensitive</Badge>}
                             {strength && strength >= 2 && (
                               <Badge tone="info">Preferred partner · {strength} completed</Badge>
@@ -276,26 +303,45 @@ export default async function OpportunitiesPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 sm:shrink-0 sm:flex-col sm:items-end">
-                          {m.status === "ACCEPTED" && m.quantity != null && (
+                          {governing?.quantity != null && (
                             <span className="text-xs whitespace-nowrap text-subtle-fg">
-                              Agreed: {formatQuantity(m.quantity, m.unit)}
+                              Agreed: {formatQuantity(governing.quantity, governing.unit)}
                             </span>
                           )}
-                          {m.status === "SUGGESTED" && (
+                          {/* Terms somebody is waiting on an answer to.
+                              Shown with the number attached, because
+                              agreeing to "it" without seeing what "it" is
+                              is not consent to anything. */}
+                          {open?.quantity != null && (
+                            <span className="text-xs whitespace-nowrap text-subtle-fg">
+                              {yourMove ? "They propose" : "You proposed"}:{" "}
+                              {formatQuantity(open.quantity, open.unit)}
+                            </span>
+                          )}
+                          {(m.status === "SUGGESTED" || yourMove) && (
                             <form action={respondToMatch} className="flex gap-2">
                               <input type="hidden" name="id" value={m.id} />
+                              {open && <input type="hidden" name="version" value={open.version} />}
                               <button type="submit" name="decision" value="ACCEPTED" className={SOLID_BUTTON}>
-                                {/* The number is on the button because
-                                    accepting is what takes it off the
-                                    market. A farmer should see how much
-                                    they are agreeing to before they agree,
-                                    not after. */}
-                                {upTo != null ? `Accept up to ${formatQuantity(upTo, yours.unit ?? theirs.unit)}` : "Accept"}
+                                {/* Says what it does. Agreeing when the
+                                    other side already has is what settles
+                                    the trade; going first only records
+                                    where you stand. */}
+                                {open
+                                  ? `Agree to ${open.quantity != null ? formatQuantity(open.quantity, open.unit) : "these terms"}`
+                                  : upTo != null
+                                    ? `Offer ${formatQuantity(upTo, yours.unit ?? theirs.unit)}`
+                                    : "I am interested"}
                               </button>
                               <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>
                                 Decline
                               </button>
                             </form>
+                          )}
+                          {open != null && !yourMove && (
+                            <span className="text-xs whitespace-nowrap text-subtle-fg">
+                              Waiting for {theirs.party.name}
+                            </span>
                           )}
                           <div className="flex gap-2">
                             <Link href={`/dashboard/conversations/${m.id}`} className={OUTLINE_BUTTON}>
@@ -307,7 +353,7 @@ export default async function OpportunitiesPage() {
                           </div>
                         </div>
                       </div>
-                      {m.status === "ACCEPTED" && (
+                      {(view === "agreed" || view === "renegotiating") && (
                         <div className="mt-4 border-t border-border pt-4">
                           {myConfirmation ? (
                             <p className="text-sm text-muted-fg">

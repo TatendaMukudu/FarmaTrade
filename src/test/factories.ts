@@ -103,6 +103,16 @@ export async function cleanupParties(partyIds: string[]) {
   const matchIds = matches.map((m) => m.id);
 
   if (matchIds.length) {
+    const terms = await prisma.agreementTerms.findMany({
+      where: { matchId: { in: matchIds } },
+      select: { id: true },
+    });
+    if (terms.length) {
+      await prisma.termsAcceptance.deleteMany({
+        where: { termsId: { in: terms.map((t) => t.id) } },
+      });
+      await prisma.agreementTerms.deleteMany({ where: { id: { in: terms.map((t) => t.id) } } });
+    }
     await prisma.conversation.deleteMany({ where: { matchId: { in: matchIds } } });
     await prisma.rating.deleteMany({ where: { matchId: { in: matchIds } } });
     await prisma.transactionConfirmation.deleteMany({ where: { matchId: { in: matchIds } } });

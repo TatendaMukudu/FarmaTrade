@@ -6,7 +6,8 @@ import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
 import { recomputeRelation } from "@/lib/relations";
-import { allocateForMatch, releaseAllocation, syncEngagementForMatch } from "@/lib/allocation";
+import { loadCapacities } from "@/lib/allocation";
+import { acceptTerms, closeEngagement, proposeTerms, suggestedTerms, syncEngagementForMatch } from "@/lib/agreement";
 import { logger } from "@/lib/logger";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
@@ -22,7 +23,10 @@ export async function respondToMatch(formData: FormData) {
 
   const match = await prisma.match.findUnique({
     where: { id },
-    select: { intentA: { select: { partyId: true } }, intentB: { select: { partyId: true } } },
+    select: {
+      intentA: { select: { id: true, partyId: true, side: true, unit: true, askingPrice: true } },
+      intentB: { select: { id: true, partyId: true, side: true, unit: true, askingPrice: true } },
+    },
   });
   if (!match) return;
 
@@ -30,24 +34,76 @@ export async function respondToMatch(formData: FormData) {
     match.intentA.partyId === party.id || match.intentB.partyId === party.id;
   if (!ownsMatch) return;
 
-  // Accepting is what takes capacity off the market, so it goes through the
-  // allocation path rather than writing the status here. A quantity typed
-  // into the form is what the parties agreed; without one, the engagement
-  // takes as much as both sides can still do.
+  if (decision === "DECLINED") {
+    await closeEngagement(id, party.id);
+    revalidatePath("/dashboard/opportunities");
+    revalidatePath("/dashboard/intent");
+    return;
+  }
+
+  // "Accept" no longer reserves anything by itself, and that is the whole
+  // correction. One party saying yes is one party saying yes: it records
+  // their consent to specific terms and waits for the other side. Capacity
+  // moves when the second acceptance lands, inside the transaction that
+  // checks it still fits.
   //
-  // The status write lives inside that transaction on purpose. Setting it
-  // here and allocating afterwards would leave a window where a match reads
-  // as agreed while the capacity it speaks for is still on offer to
-  // somebody else.
-  if (decision === "ACCEPTED") {
-    const raw = formData.get("quantity");
-    const requested = raw ? Number(raw) : null;
-    await allocateForMatch(id, Number.isFinite(requested) ? requested : null);
+  // With terms already on the table, this agrees to the version the party
+  // was shown. With none, it puts the obvious ones there — as much as both
+  // sides can still do, at whatever asking price was named — as an opening
+  // position the counterparty must still answer.
+  const version = formData.get("version");
+  const existing = await prisma.agreementTerms.count({ where: { matchId: id } });
+
+  if (existing > 0) {
+    await acceptTerms(id, party.id, version ? Number(version) : undefined);
   } else {
-    await releaseAllocation(id);
+    const sides = await loadCapacities([match.intentA.id, match.intentB.id]);
+    const supply = match.intentA.side === "SUPPLY" ? match.intentA : match.intentB;
+    const demand = match.intentA.side === "SUPPLY" ? match.intentB : match.intentA;
+    await proposeTerms(
+      id,
+      party.id,
+      suggestedTerms(
+        {
+          remaining: sides.get(supply.id)?.remaining ?? null,
+          unit: supply.unit,
+          askingPrice: supply.askingPrice == null ? null : Number(supply.askingPrice),
+        },
+        {
+          remaining: sides.get(demand.id)?.remaining ?? null,
+          unit: demand.unit,
+          askingPrice: demand.askingPrice == null ? null : Number(demand.askingPrice),
+        },
+      ),
+    );
   }
 
   revalidatePath("/dashboard/opportunities");
+  revalidatePath("/dashboard/intent");
+}
+
+// Put different terms on the table — the renegotiation path.
+//
+// Creates a new version rather than editing the current one, so consent to
+// the old terms cannot silently carry forward onto the new ones. Any
+// agreement already in force keeps governing until this version is agreed
+// by both sides too.
+export async function proposeMatchTerms(formData: FormData) {
+  const party = await getCurrentParty();
+  if (!party) return;
+
+  const id = String(formData.get("matchId"));
+  const quantity = Number(formData.get("quantity"));
+  const price = Number(formData.get("price"));
+
+  await proposeTerms(id, party.id, {
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+    unit: (formData.get("unit") as string) || null,
+    price: Number.isFinite(price) && price > 0 ? price : null,
+  });
+
+  revalidatePath("/dashboard/opportunities");
+  revalidatePath(`/dashboard/conversations/${id}`);
   revalidatePath("/dashboard/intent");
 }
 
@@ -77,7 +133,10 @@ export async function confirmMatch(
       intentB: { select: { partyId: true } },
     },
   });
-  if (!match || match.status !== "ACCEPTED") {
+  // AGREED is the state a trade can be reported on. Legacy ACCEPTED rows
+  // are allowed too: they reserve nothing, but two parties may genuinely
+  // have traded on one before agreement became bilateral.
+  if (!match || (match.status !== "AGREED" && match.status !== "ACCEPTED")) {
     return { error: "This match isn't in a confirmable state" };
   }
 
