@@ -66,12 +66,12 @@ export async function respondToMatch(formData: FormData) {
       suggestedTerms(
         {
           remaining: sides.get(supply.id)?.remaining ?? null,
-          unit: supply.unit,
+          basis: sides.get(supply.id)?.basis ?? null,
           askingPrice: supply.askingPrice == null ? null : Number(supply.askingPrice),
         },
         {
           remaining: sides.get(demand.id)?.remaining ?? null,
-          unit: demand.unit,
+          basis: sides.get(demand.id)?.basis ?? null,
           askingPrice: demand.askingPrice == null ? null : Number(demand.askingPrice),
         },
       ),

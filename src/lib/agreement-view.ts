@@ -12,6 +12,7 @@ type StoredTerms = {
   version: number;
   quantity: number | null;
   unit: string | null;
+  unitCode: string | null;
   price: unknown;
   handoverOn: Date | null;
   proposedById: string;
@@ -24,6 +25,7 @@ export function toTermsVersions(rows: readonly StoredTerms[]): TermsVersion[] {
     version: t.version,
     quantity: t.quantity,
     unit: t.unit,
+    unitCode: t.unitCode,
     price: t.price == null ? null : Number(t.price),
     handoverOn: t.handoverOn,
     proposedById: t.proposedById,

@@ -1,12 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import {
-  overcommitment,
-  remainingCapacity,
-  unquantifiedAllocations,
-  type Allocation,
-} from "@/lib/capacity";
+import { readCapacity, unmeasuredCount, type Allocation, type Unmeasured } from "@/lib/capacity";
 import { reservationsByIntent } from "@/lib/agreement";
+import { unitByCode, type CanonicalUnit } from "@/lib/measurement";
 
 // Reading commercial capacity.
 //
@@ -21,36 +17,54 @@ import { reservationsByIntent } from "@/lib/agreement";
 
 export type Capacity = {
   intentId: string;
-  // What the owner authorized. Null where they never said.
+  // All canonical, all in `basis`. What the owner authorized, what
+  // bilateral agreements hold, and what is left.
   authorized: number | null;
-  unit: string | null;
-  // Derived, never stored. Null means unbounded.
-  remaining: number | null;
   reserved: number;
-  // Live agreements whose amount could not be counted — no quantity agreed,
-  // or units that cannot be compared.
-  unquantified: number;
-  // How much more is agreed than is currently authorized. Positive only
-  // when an owner edits an intent below what they already agreed away; see
-  // capacity.ts for why this is reported rather than resolved.
+  remaining: number | null;
   overcommitted: number;
+  // The canonical unit the four figures above are in. Null where the intent
+  // named no unit or one FarmaTrade cannot resolve, in which case they are
+  // bare numbers and only same-basis agreements were counted.
+  basis: CanonicalUnit | null;
+  // The unit the owner originally typed, and its canonical identity — for
+  // rendering the figures back in their own words.
+  displayUnit: string | null;
+  unitCode: string | null;
+  // Live agreements that could not be counted, broken down by why. The UI
+  // must never have to guess whether a number is missing because nobody
+  // stated one, because the unit is unrecognised, or because bags do not
+  // convert to tonnes.
+  unmeasured: Unmeasured;
+  unquantified: number;
 };
 
 function capacityFrom(
-  intent: { id: string; quantity: number | null; unit: string | null },
+  intent: { id: string; quantity: number | null; unit: string | null; unitCode: string | null },
   reservations: Allocation[],
 ): Capacity {
-  const remaining = remainingCapacity(intent, reservations);
+  const reading = readCapacity(intent, reservations);
   return {
     intentId: intent.id,
-    authorized: intent.quantity,
-    unit: intent.unit,
-    remaining,
-    reserved: intent.quantity == null ? 0 : intent.quantity - (remaining ?? 0),
-    unquantified: unquantifiedAllocations(reservations, intent.unit),
-    overcommitted: overcommitment(intent, reservations),
+    authorized: reading.authorized,
+    reserved: reading.reserved,
+    remaining: reading.remaining,
+    overcommitted: reading.overcommitted,
+    basis: reading.basis,
+    displayUnit: intent.unit,
+    unitCode: intent.unitCode,
+    unmeasured: reading.unmeasured,
+    unquantified: unmeasuredCount(reading.unmeasured),
   };
 }
+
+// The canonical unit an intent's own figures are expressed in, for callers
+// that need to pair two intents up (see capacity.pairwiseQuantity).
+export function basisOf(capacity: Capacity | undefined): CanonicalUnit | null {
+  return capacity?.basis ?? null;
+}
+
+export { unitByCode };
 
 // What each of these intents still has available.
 //
@@ -63,7 +77,7 @@ export async function loadCapacities(intentIds: string[]): Promise<Map<string, C
 
   const intents = await prisma.intent.findMany({
     where: { id: { in: intentIds } },
-    select: { id: true, quantity: true, unit: true },
+    select: { id: true, quantity: true, unit: true, unitCode: true },
   });
   const reservations = await reservationsByIntent(prisma, intentIds);
 

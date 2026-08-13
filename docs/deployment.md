@@ -82,3 +82,42 @@ The policy, chosen because the alternatives all involve inventing facts:
 Operationally this means live pilot engagements sitting in `ACCEPTED` will
 show as needing agreement after deploy. Tell those users before shipping;
 the alternative is honouring reservations nobody agreed to.
+
+## `20260813180000_canonical_units` is rolling-deploy safe
+
+It adds two nullable columns and backfills them from an exact CASE over the
+alias table in `src/lib/measurement.ts`. Old code ignores the columns; new
+code reads a NULL `unitCode` as "this quantity cannot be compared with
+anything", which is the correct reading of a unit nobody can resolve.
+
+### Migration resolution report
+
+Against the development database at time of writing:
+
+| Outcome | Rows | Detail |
+|---|---|---|
+| Deterministic | 9 | `"TONNE"` → `METRIC_TONNE` |
+| Contextual (identity recorded, no conversion) | 1 | `"BAG"` → `BAG` |
+| Unresolved | 0 | — |
+| Ambiguous | 0 | — |
+| No unit stated | 15 | transport/equipment intents; left NULL, unchanged in behaviour |
+
+Every unit-bearing row resolved. **That number is not a target.** Where a
+term is not an exact alias the column is left NULL on purpose: an intent
+measured in "punnets" is a perfectly good intent whose quantity FarmaTrade
+cannot compare with anything, and writing a guessed code onto it would put
+an invented tonnage into the capacity arithmetic.
+
+`ProduceStock` is not migrated. Its `ProduceUnit` enum maps into the
+canonical set through `PRODUCE_UNIT_CANONICAL`, a function the Record type
+makes total — a new enum value cannot be added without a canonical meaning,
+and a test asserts every value maps and agrees with what the alias table
+resolves the same label to. There is no second vocabulary to migrate, and no
+inventory row is read or written.
+
+### Behaviour change on deploy
+
+Capacity figures are now reported in canonical units — kilograms for mass.
+An intent authorized as "2 tonnes" reports `authorized: 2000`. Anything
+consuming `Capacity` numerically must render through `basis` rather than
+assuming the owner's original unit.

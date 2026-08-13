@@ -10,7 +10,20 @@ import { CATEGORY_LABEL, COMMERCE_CATEGORIES } from "@/lib/categories";
 import { CategoryIcon } from "@/components/icons";
 import { SectionHeading, buttonClass } from "@/components/ui";
 import { formatQuantity } from "@/lib/units";
-import { loadCapacities } from "@/lib/allocation";
+import { loadCapacities, type Capacity } from "@/lib/allocation";
+import { formatCanonical } from "@/lib/measurement";
+
+// A canonical figure written the way a person writes it.
+//
+// Rendering only, and it happens after every subtraction rather than
+// during: mixing the two is how a display choice turns into a commercial
+// one. An intent with no resolvable unit falls back to whatever the owner
+// typed, which is still the most honest thing available.
+function showQuantity(value: number, capacity: Capacity): string {
+  return capacity.basis
+    ? formatCanonical(value, capacity.basis)
+    : formatQuantity(value, capacity.displayUnit);
+}
 import { SIDE_LABEL } from "@/lib/intent";
 import type { CommerceCategory } from "@/generated/prisma/enums";
 
@@ -237,8 +250,36 @@ export default async function PostsPage({
                       <>
                         {capacity.remaining != null && capacity.authorized != null && (
                           <p className="mt-1 text-sm text-muted-fg">
-                            {formatQuantity(capacity.remaining, capacity.unit)} of{" "}
-                            {formatQuantity(capacity.authorized, capacity.unit)} still available
+                            {/* Canonical figures rendered in the canonical
+                                unit's own word. The arithmetic happened in
+                                kilograms; this is only how it is written
+                                down, and the two are deliberately separate
+                                steps. */}
+                            {showQuantity(capacity.remaining, capacity)} of{" "}
+                            {showQuantity(capacity.authorized, capacity)} still available
+                          </p>
+                        )}
+                        {/* Why some of the engagements on this intent could
+                            not be counted, said specifically. "Bags cannot
+                            be weighed" is actionable; "some engagements are
+                            unquantified" is not. */}
+                        {capacity.unmeasured.context_required > 0 && (
+                          <p className="mt-1 text-sm text-muted-fg">
+                            {capacity.unmeasured.context_required} agreed in packaging units.
+                            FarmaTrade cannot tell how much a bag or crate weighs, so those are
+                            not counted above.
+                          </p>
+                        )}
+                        {capacity.unmeasured.unknown_unit > 0 && (
+                          <p className="mt-1 text-sm text-muted-fg">
+                            {capacity.unmeasured.unknown_unit} agreed in a unit FarmaTrade does not
+                            recognise, so those are not counted above.
+                          </p>
+                        )}
+                        {capacity.unmeasured.incompatible_dimension > 0 && (
+                          <p className="mt-1 text-sm text-muted-fg">
+                            {capacity.unmeasured.incompatible_dimension} agreed in a unit that
+                            measures something else entirely, so those are not counted above.
                           </p>
                         )}
                         {/* Said plainly rather than hidden behind a
@@ -250,7 +291,7 @@ export default async function PostsPage({
                         {capacity.overcommitted > 0 && (
                           <p className="mt-1 text-sm text-warning-fg">
                             You have agreed{" "}
-                            {formatQuantity(capacity.overcommitted, capacity.unit)} more than this
+                            {showQuantity(capacity.overcommitted, capacity)} more than this
                             now offers. Nothing has been changed for you — open the agreements
                             below to settle which one moves.
                           </p>

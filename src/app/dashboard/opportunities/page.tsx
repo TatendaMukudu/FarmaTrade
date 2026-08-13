@@ -22,10 +22,11 @@ import {
   type Participants,
 } from "@/lib/agreement-core";
 import { toTermsVersions } from "@/lib/agreement-view";
-import { loadCapacities } from "@/lib/allocation";
+import { basisOf, loadCapacities } from "@/lib/allocation";
 import { pairwiseQuantity } from "@/lib/capacity";
 import { formatMoney, regionFor } from "@/lib/regions";
 import { formatQuantity, pluralizeUnit } from "@/lib/units";
+import { formatCanonical } from "@/lib/measurement";
 import { Badge } from "@/components/badge";
 import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
@@ -233,9 +234,14 @@ export default async function OpportunitiesPage() {
                   // FarmaTrade has no honest one to record.
                   const supplySide = yours.side === "SUPPLY" ? yours : theirs;
                   const demandSide = yours.side === "SUPPLY" ? theirs : yours;
+                  // Across units now: a supplier with 2 tonnes and a buyer
+                  // needing 500 kg meet at 500 kg. Null where the two sides
+                  // cannot be brought together at all — bags against
+                  // tonnes — in which case the button says nothing about
+                  // amounts rather than inventing one.
                   const upTo = pairwiseQuantity(
-                    { remaining: remainingOf(supplySide), unit: supplySide.unit },
-                    { remaining: remainingOf(demandSide), unit: demandSide.unit },
+                    { remaining: remainingOf(supplySide), basis: basisOf(capacities.get(supplySide.id)) },
+                    { remaining: remainingOf(demandSide), basis: basisOf(capacities.get(demandSide.id)) },
                   );
                   const versions = toTermsVersions(m.terms);
                   const participants: Participants = [yours.partyId, theirs.partyId];
@@ -266,8 +272,14 @@ export default async function OpportunitiesPage() {
                               a quantity — there is no ceiling to report. */}
                           {yoursRemaining != null && yours.quantity != null && (
                             <p className="text-xs text-subtle-fg">
-                              {formatQuantity(yoursRemaining, yours.unit)} of{" "}
-                              {formatQuantity(yours.quantity, yours.unit)} still available
+                              {(() => {
+                                const basis = basisOf(capacities.get(yours.id));
+                                const authorized = capacities.get(yours.id)?.authorized ?? yours.quantity;
+                                return basis
+                                  ? `${formatCanonical(yoursRemaining, basis)} of ${formatCanonical(authorized, basis)}`
+                                  : `${formatQuantity(yoursRemaining, yours.unit)} of ${formatQuantity(yours.quantity, yours.unit)}`;
+                              })()}{" "}
+                              still available
                             </p>
                           )}
                           <MatchCounterpart
@@ -330,7 +342,7 @@ export default async function OpportunitiesPage() {
                                 {open
                                   ? `Agree to ${open.quantity != null ? formatQuantity(open.quantity, open.unit) : "these terms"}`
                                   : upTo != null
-                                    ? `Offer ${formatQuantity(upTo, yours.unit ?? theirs.unit)}`
+                                    ? `Offer ${upTo.unit ? formatCanonical(upTo.value, upTo.unit) : formatQuantity(upTo.value, yours.unit ?? theirs.unit)}`
                                     : "I am interested"}
                               </button>
                               <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>

@@ -11,8 +11,8 @@ import {
   type Participants,
   type TermsVersion,
 } from "@/lib/agreement-core";
-import { pairwiseQuantity, pairwiseUnit, remainingCapacity, type Allocation } from "@/lib/capacity";
-import { unitsComparable } from "@/lib/units";
+import { fitsWithin, pairwiseQuantity, readCapacity, type Allocation } from "@/lib/capacity";
+import { resolveUnit, type CanonicalUnit } from "@/lib/measurement";
 import { isAuthorizedToMatch } from "@/lib/intent";
 
 // The authoritative write path for commercial agreement.
@@ -55,8 +55,18 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
       status: true,
       quantity: true,
       unit: true,
-      intentA: { select: { id: true, partyId: true, side: true, status: true, quantity: true, unit: true } },
-      intentB: { select: { id: true, partyId: true, side: true, status: true, quantity: true, unit: true } },
+      intentA: {
+        select: {
+          id: true, partyId: true, side: true, status: true,
+          quantity: true, unit: true, unitCode: true,
+        },
+      },
+      intentB: {
+        select: {
+          id: true, partyId: true, side: true, status: true,
+          quantity: true, unit: true, unitCode: true,
+        },
+      },
       confirmations: { select: { outcome: true } },
       terms: {
         select: {
@@ -64,6 +74,7 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
           version: true,
           quantity: true,
           unit: true,
+          unitCode: true,
           price: true,
           handoverOn: true,
           proposedById: true,
@@ -79,6 +90,7 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
     version: t.version,
     quantity: t.quantity,
     unit: t.unit,
+    unitCode: t.unitCode,
     price: t.price == null ? null : Number(t.price),
     handoverOn: t.handoverOn,
     proposedById: t.proposedById,
@@ -87,6 +99,17 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
 
   const participants: Participants = [match.intentA.partyId, match.intentB.partyId];
   return { match, versions, participants };
+}
+
+// A canonical unit code for a free-text unit, or null.
+//
+// Used only for legacy Match rows, which predate the canonical column.
+// Deterministic where the term is a known alias and null otherwise —
+// exactly the answer the backfill migration reached, so a legacy row means
+// the same thing whether it is read here or was rewritten there.
+function legacyCode(unit: string | null): string | null {
+  const resolved = resolveUnit(unit);
+  return resolved.ok ? resolved.unit.code : null;
 }
 
 // Same primitive as P0.3, and deliberately the only one. A second
@@ -127,6 +150,7 @@ async function reservationsByIntent(
           version: true,
           quantity: true,
           unit: true,
+          unitCode: true,
           price: true,
           handoverOn: true,
           proposedById: true,
@@ -145,6 +169,7 @@ async function reservationsByIntent(
       version: t.version,
       quantity: t.quantity,
       unit: t.unit,
+      unitCode: t.unitCode,
       price: t.price == null ? null : Number(t.price),
       handoverOn: t.handoverOn,
       proposedById: t.proposedById,
@@ -158,6 +183,9 @@ async function reservationsByIntent(
       governing: governingTerms(versions, participants),
       legacyQuantity: m.quantity,
       legacyUnit: m.unit,
+      // Legacy Match rows never had a canonical column. Resolved from the
+      // stored text at read time, deterministically or not at all.
+      legacyUnitCode: legacyCode(m.unit),
     });
 
     for (const id of [m.intentAId, m.intentBId]) {
@@ -204,9 +232,14 @@ export async function proposeTerms(
     // Proposing the deal that is already in force is not a renegotiation,
     // and should not blank the counterparty's consent to it.
     const governing = governingTerms(versions, participants);
+    // Canonical identity is fixed here, at proposal time, and stored beside
+    // the words. What the parties agree to is a physical quantity, not a
+    // string that a later alias change could re-point.
+    const resolved = resolveUnit(input.unit);
     const terms = {
       quantity: input.quantity ?? null,
       unit: input.unit ?? null,
+      unitCode: resolved.ok ? resolved.unit.code : null,
       price: input.price ?? null,
       handoverOn: input.handoverOn ?? null,
     };
@@ -221,6 +254,7 @@ export async function proposeTerms(
         version,
         quantity: terms.quantity,
         unit: terms.unit,
+        unitCode: terms.unitCode,
         price: terms.price,
         handoverOn: terms.handoverOn,
         proposedById: partyId,
@@ -236,7 +270,10 @@ export async function proposeTerms(
       data: {
         status: statusFor(
           match.status,
-          [...versions, { ...created, price: terms.price, acceptedBy: [partyId] } as TermsVersion],
+          [
+            ...versions,
+            { ...created, price: terms.price, acceptedBy: [partyId] } as TermsVersion,
+          ],
           participants,
         ),
       },
@@ -305,17 +342,21 @@ export async function acceptTerms(
     if (wouldBeAgreed && target.quantity != null) {
       const intentIds = [match.intentA.id, match.intentB.id];
       const others = await reservationsByIntent(tx, intentIds, matchId);
-      const fits = intents.every((intent) => {
-        // Only meaningful where the agreed unit and the intent's unit can
-        // be compared. An agreement in bags against an intent authorized in
-        // tonnes reserves nothing measurable, so there is nothing to check
-        // — and checking anyway would be comparing 30 bags to 20 tonnes as
-        // though the numbers meant the same thing, which is the exact
-        // arithmetic this codebase refuses to do.
-        if (!unitsComparable(target.unit, intent.unit)) return true;
-        const remaining = remainingCapacity(intent, others.get(intent.id) ?? []);
-        return remaining === null || remaining >= target.quantity!;
-      });
+      // Checked in canonical units, so agreeing 8000 kg against an intent
+      // authorized in tonnes is weighed correctly rather than compared as
+      // two bare numbers. Where the agreement cannot be measured against
+      // the intent at all — bags against tonnes — fitsWithin reports that
+      // it fits, because it reserves nothing measurable and there is no
+      // quantity question to answer. It shows up in the diagnostics
+      // instead of being silently converted.
+      const fits = intents.every(
+        (intent) =>
+          fitsWithin(
+            readCapacity(intent, others.get(intent.id) ?? []),
+            target.quantity,
+            target.unitCode,
+          ).fits,
+      );
       if (!fits) return { ok: false, reason: "insufficient_capacity" };
     }
 
@@ -353,12 +394,19 @@ export async function acceptTerms(
 // behalf — it is still proposed by a party and still needs the other to
 // agree.
 export function suggestedTerms(
-  supply: { remaining: number | null; unit: string | null; askingPrice: number | null },
-  demand: { remaining: number | null; unit: string | null; askingPrice: number | null },
+  supply: { remaining: number | null; basis: CanonicalUnit | null; askingPrice: number | null },
+  demand: { remaining: number | null; basis: CanonicalUnit | null; askingPrice: number | null },
 ): TermsInput {
+  const pairwise = pairwiseQuantity(supply, demand);
   return {
-    quantity: pairwiseQuantity(supply, demand),
-    unit: pairwiseUnit(supply.unit, demand.unit),
+    quantity: pairwise?.value ?? null,
+    // The canonical unit's own word, so what gets proposed says "500 kg"
+    // rather than echoing a string neither side typed.
+    unit: pairwise?.unit?.one ?? null,
+    // Price is passed through untouched and is NOT rescaled by any
+    // conversion. Its per-unit-or-total meaning is ambiguous in the current
+    // data model (see docs/measurement.md), and rescaling an ambiguous
+    // number is how $500/tonne quietly becomes $500/kg.
     price: supply.askingPrice ?? demand.askingPrice ?? null,
     handoverOn: null,
   };

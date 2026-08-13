@@ -8,6 +8,7 @@ import { intentSchemaFor } from "@/lib/validation";
 import { regionFor } from "@/lib/regions";
 import { normalizeProductTerm, subjectFromTitle } from "@/lib/products";
 import { generateMatchesForIntent } from "@/lib/matching";
+import { resolveUnit } from "@/lib/measurement";
 import { uploadPhoto } from "@/lib/storage";
 import type { IntentSide, CommerceCategory } from "@/generated/prisma/client";
 
@@ -79,6 +80,16 @@ async function resolveInventoryRef(
     select: { id: true },
   });
   return row ? { equipmentId: row.id } : {};
+}
+
+// A canonical unit code for what the farmer typed, or null.
+//
+// Exact alias lookup, never fuzzy. "tone" does not become TONNE; it stays
+// unresolved and visible, because silently correcting it would be guessing
+// at the size of somebody's trade.
+function canonicalUnitCode(unit: string | null | undefined): string | null {
+  const resolved = resolveUnit(unit);
+  return resolved.ok ? resolved.unit.code : null;
 }
 
 export type PostActionState = { error?: string };
@@ -162,6 +173,11 @@ export async function createPost(
       description: data.description,
       quantity: data.quantity,
       unit: data.unit,
+      // Canonical identity resolved once, at write time. The free text
+      // stays as the farmer's own words; this is what capacity reasons
+      // about. Null where the term is not one FarmaTrade knows, which
+      // leaves the quantity uncountable rather than guessed.
+      unitCode: canonicalUnitCode(data.unit),
       province: data.province,
       district: data.district,
       askingPrice: data.askingPrice,

@@ -6,6 +6,12 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import type { PartyRole } from "@/generated/prisma/client";
+import { resolveUnit } from "@/lib/measurement";
+
+function canonicalUnitCode(unit: string | null): string | null {
+  const resolved = resolveUnit(unit);
+  return resolved.ok ? resolved.unit.code : null;
+}
 
 let counter = 0;
 function unique(prefix: string) {
@@ -59,6 +65,7 @@ export async function createTestIntent(
     status: "ACTIVE" | "PROPOSED" | "ENGAGED" | "WITHDRAWN";
     quantity: number | null;
     unit: string | null;
+    unitCode: string | null;
   }> = {},
 ) {
   return prisma.intent.create({
@@ -75,6 +82,12 @@ export async function createTestIntent(
       status: overrides.status ?? "ACTIVE",
       quantity: overrides.quantity ?? null,
       unit: overrides.unit ?? null,
+      // Resolved the same way the real write path does, so fixtures carry
+      // the canonical identity a genuine intent would.
+      unitCode:
+        overrides.unitCode !== undefined
+          ? overrides.unitCode
+          : canonicalUnitCode(overrides.unit ?? null),
     },
   });
 }

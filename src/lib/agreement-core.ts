@@ -27,7 +27,13 @@ export type TermsVersion = {
   id: string;
   version: number;
   quantity: number | null;
+  // What was typed, for showing the parties their own words back.
   unit: string | null;
+  // Canonical unit identity, fixed when the version was proposed. What the
+  // parties agreed cannot change because an alias table changed later — see
+  // measurement.ts. Null where the term could not be resolved, which makes
+  // the agreement real but its quantity uncountable.
+  unitCode: string | null;
   price: number | null;
   handoverOn: Date | null;
   proposedById: string;
@@ -87,11 +93,16 @@ export function nextVersion(versions: readonly TermsVersion[]): number {
 // the silent carrying-forward of consent this module exists to prevent. If
 // a term is not worth re-confirming, it does not belong in the terms.
 export function materiallyDiffers(
-  a: Pick<TermsVersion, "quantity" | "unit" | "price" | "handoverOn">,
-  b: Pick<TermsVersion, "quantity" | "unit" | "price" | "handoverOn">,
+  a: Pick<TermsVersion, "quantity" | "unit" | "unitCode" | "price" | "handoverOn">,
+  b: Pick<TermsVersion, "quantity" | "unit" | "unitCode" | "price" | "handoverOn">,
 ): boolean {
   return (
     a.quantity !== b.quantity ||
+    // Both the canonical identity and the typed words. The identity is what
+    // the deal means; the words are what the parties read, and re-proposing
+    // "10 t" over "10 tonnes" is not worth blanking consent over — but a
+    // change from tonnes to bags plainly is, and that shows up in both.
+    (a.unitCode ?? null) !== (b.unitCode ?? null) ||
     (a.unit ?? null) !== (b.unit ?? null) ||
     a.price !== b.price ||
     (a.handoverOn?.getTime() ?? null) !== (b.handoverOn?.getTime() ?? null)
@@ -108,6 +119,9 @@ export type Reservation = {
   reserves: boolean;
   quantity: number | null;
   unit: string | null;
+  // Canonical identity of `quantity`. Capacity converts through this and
+  // never through the display string.
+  unitCode: string | null;
   // Why, in a word — for tests and for explaining a capacity figure to
   // somebody who does not believe it.
   basis: "mutual_agreement" | "legacy_completed" | "none";
@@ -122,8 +136,15 @@ export function reservationFor(engagement: {
   // Match.quantity/unit, read for exactly one case. See below.
   legacyQuantity?: number | null;
   legacyUnit?: string | null;
+  legacyUnitCode?: string | null;
 }): Reservation {
-  const none: Reservation = { reserves: false, quantity: null, unit: null, basis: "none" };
+  const none: Reservation = {
+    reserves: false,
+    quantity: null,
+    unit: null,
+    unitCode: null,
+    basis: "none",
+  };
 
   // A trade that fell through consumed nothing, whatever anybody agreed
   // beforehand. Leaving it holding capacity would strand a farmer's supply
@@ -142,6 +163,7 @@ export function reservationFor(engagement: {
         reserves: true,
         quantity: engagement.governing.quantity,
         unit: engagement.governing.unit,
+        unitCode: engagement.governing.unitCode,
         basis: "mutual_agreement",
       };
     }
@@ -155,6 +177,12 @@ export function reservationFor(engagement: {
         reserves: true,
         quantity: engagement.legacyQuantity ?? null,
         unit: engagement.legacyUnit ?? null,
+        // Legacy rows predate canonical identity, so the code is resolved
+        // from the stored text at read time. Deterministic where the term
+        // is a known alias and null otherwise, which is the same answer the
+        // backfill reached — nothing is invented for a row that never had a
+        // canonical unit.
+        unitCode: engagement.legacyUnitCode ?? null,
         basis: "legacy_completed",
       };
     }

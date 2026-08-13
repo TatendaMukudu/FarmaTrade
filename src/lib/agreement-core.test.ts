@@ -23,6 +23,7 @@ function terms(overrides: Partial<TermsVersion> = {}): TermsVersion {
     version: 1,
     quantity: 10,
     unit: "tonne",
+    unitCode: "METRIC_TONNE",
     price: 290,
     handoverOn: null,
     proposedById: FARMER,
@@ -108,19 +109,31 @@ describe("nextVersion", () => {
 });
 
 describe("materiallyDiffers", () => {
-  const base = { quantity: 10, unit: "tonne", price: 290, handoverOn: null };
+  const base = {
+    quantity: 10,
+    unit: "tonne",
+    unitCode: "METRIC_TONNE" as string | null,
+    price: 290,
+    handoverOn: null as Date | null,
+  };
 
   it("treats every term as material", () => {
     // There is no cosmetic change to a price or a handover date. A term not
     // worth re-confirming does not belong in the terms at all.
     expect(materiallyDiffers(base, { ...base, quantity: 12 })).toBe(true);
-    expect(materiallyDiffers(base, { ...base, unit: "bag" })).toBe(true);
+    expect(materiallyDiffers(base, { ...base, unit: "bag", unitCode: "BAG" })).toBe(true);
     expect(materiallyDiffers(base, { ...base, price: 300 })).toBe(true);
     expect(materiallyDiffers(base, { ...base, handoverOn: new Date("2026-09-01") })).toBe(true);
   });
 
   it("recognises the identical deal, so re-proposing it is not a renegotiation", () => {
     expect(materiallyDiffers(base, { ...base })).toBe(false);
+  });
+
+  it("treats a change of canonical unit as material even at the same number", () => {
+    // 10 tonnes and 10 bags are not the same deal, and the canonical
+    // identity is what says so rather than the spelling.
+    expect(materiallyDiffers(base, { ...base, unit: "bags", unitCode: "BAG" })).toBe(true);
   });
 
   it("compares dates by their instant, not their identity", () => {
@@ -148,6 +161,7 @@ describe("reservationFor", () => {
       reserves: true,
       quantity: 10,
       unit: "tonne",
+      unitCode: "METRIC_TONNE",
       basis: "mutual_agreement",
     });
   });
@@ -190,12 +204,19 @@ describe("reservationFor", () => {
         governing: null,
         legacyQuantity: 10,
         legacyUnit: "tonne",
+        legacyUnitCode: "METRIC_TONNE",
       }),
-    ).toEqual({ reserves: true, quantity: 10, unit: "tonne", basis: "legacy_completed" });
+    ).toEqual({
+      reserves: true,
+      quantity: 10,
+      unit: "tonne",
+      unitCode: "METRIC_TONNE",
+      basis: "legacy_completed",
+    });
   });
 
   it("reserves an agreement that named no quantity, but measures nothing", () => {
-    const unquantified = terms({ quantity: null, unit: null, acceptedBy: [FARMER, BUYER] });
+    const unquantified = terms({ quantity: null, unit: null, unitCode: null, acceptedBy: [FARMER, BUYER] });
     expect(reservationFor({ status: "AGREED", governing: unquantified })).toMatchObject({
       reserves: true,
       quantity: null,

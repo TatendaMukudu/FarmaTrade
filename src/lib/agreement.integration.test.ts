@@ -53,6 +53,13 @@ describe("bilateral agreement", () => {
   }
 
   const remainingOf = async (intentId: string) => (await loadCapacity(intentId))?.remaining;
+
+  // Capacity reports canonical quantities, and the canonical basis for mass
+  // is the kilogram. Every fixture in this file is denominated in tonnes, so
+  // expectations are written in tonnes and converted here rather than as
+  // bare thousands — the point being tested is the agreement rules, and a
+  // wall of 12000s would obscure that the number is twelve tonnes.
+  const kg = (tonnes: number) => tonnes * 1000;
   const stockOf = async (id: string) =>
     (await prisma.produceStock.findUnique({ where: { id } }))!.quantity;
   const statusOf = async (matchId: string) =>
@@ -72,7 +79,7 @@ describe("bilateral agreement", () => {
     const result = await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "tonne" });
 
     expect(result).toMatchObject({ ok: true, status: "proposed", version: 1 });
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
     expect(await statusOf(match.id)).toBe("NEGOTIATING");
     expect(await stockOf(produce.id)).toBe(26);
   });
@@ -84,7 +91,7 @@ describe("bilateral agreement", () => {
 
     await proposeTerms(match.id, seller.id, { quantity: 10, unit: "tonne" });
 
-    expect(await remainingOf(demand.id)).toBe(10);
+    expect(await remainingOf(demand.id)).toBe(kg(10));
   });
 
   // ------------------------------------------------------------------
@@ -96,13 +103,13 @@ describe("bilateral agreement", () => {
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
     await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "tonne" });
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
 
     const result = await acceptTerms(match.id, seller.id);
 
     expect(result).toMatchObject({ ok: true, status: "agreed" });
-    expect(await remainingOf(supply.id)).toBe(16);
-    expect(await remainingOf(demand.id)).toBe(0);
+    expect(await remainingOf(supply.id)).toBe(kg(16));
+    expect(await remainingOf(demand.id)).toBe(kg(0));
     expect(await statusOf(match.id)).toBe("AGREED");
     // K. Nothing physical moved.
     expect(await stockOf(produce.id)).toBe(26);
@@ -114,11 +121,11 @@ describe("bilateral agreement", () => {
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
     await proposeTerms(match.id, seller.id, { quantity: 10, unit: "tonne" });
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
 
     await acceptTerms(match.id, buyer.id);
 
-    expect(await remainingOf(supply.id)).toBe(16);
+    expect(await remainingOf(supply.id)).toBe(kg(16));
   });
 
   // ------------------------------------------------------------------
@@ -136,12 +143,12 @@ describe("bilateral agreement", () => {
     // Two versions, one acceptance each. Nothing is agreed and nothing is
     // reserved, however many times somebody clicked.
     expect(await statusOf(match.id)).toBe("NEGOTIATING");
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
 
     // Only when the farmer answers the 12 does it become an agreement.
     await acceptTerms(match.id, seller.id);
     expect(await statusOf(match.id)).toBe("AGREED");
-    expect(await remainingOf(supply.id)).toBe(14);
+    expect(await remainingOf(supply.id)).toBe(kg(14));
   });
 
   it("will not let a changed quantity inherit the old consent", async () => {
@@ -151,7 +158,7 @@ describe("bilateral agreement", () => {
 
     await proposeTerms(match.id, seller.id, { quantity: 10, unit: "tonne" });
     await acceptTerms(match.id, buyer.id);
-    expect(await remainingOf(supply.id)).toBe(16);
+    expect(await remainingOf(supply.id)).toBe(kg(16));
 
     // The buyer now wants 15. Their own consent moves to the new version;
     // the farmer's does not follow it.
@@ -167,7 +174,7 @@ describe("bilateral agreement", () => {
 
     // And the 10-tonne deal is still the one in force — not 15, and not
     // nothing.
-    expect(await remainingOf(supply.id)).toBe(16);
+    expect(await remainingOf(supply.id)).toBe(kg(16));
     expect(await statusOf(match.id)).toBe("AGREED");
   });
 
@@ -191,7 +198,7 @@ describe("bilateral agreement", () => {
     const agreed = results.filter((r) => r.ok && r.status === "agreed");
     expect(agreed).toHaveLength(1);
     expect(results.filter((r) => !r.ok)).toMatchObject([{ reason: "insufficient_capacity" }]);
-    expect(await remainingOf(supply.id)).toBe(2);
+    expect(await remainingOf(supply.id)).toBe(kg(2));
   });
 
   // ------------------------------------------------------------------
@@ -206,13 +213,13 @@ describe("bilateral agreement", () => {
 
     await proposeTerms(match.id, seller.id, { quantity: 6, unit: "tonne" });
     await acceptTerms(match.id, buyer.id);
-    expect(await remainingOf(supply.id)).toBe(4);
+    expect(await remainingOf(supply.id)).toBe(kg(4));
 
     await proposeTerms(match.id, buyer.id, { quantity: 8, unit: "tonne" });
     const result = await acceptTerms(match.id, seller.id);
 
     expect(result).toMatchObject({ ok: true, status: "agreed", version: 2 });
-    expect(await remainingOf(supply.id)).toBe(2);
+    expect(await remainingOf(supply.id)).toBe(kg(2));
   });
 
   it("keeps the old agreement when a renegotiation does not fit", async () => {
@@ -228,7 +235,7 @@ describe("bilateral agreement", () => {
     const otherMatch = await createTestMatch(supply.id, second.demand.id, "SUGGESTED");
     await proposeTerms(otherMatch.id, second.buyer.id, { quantity: 4, unit: "tonne" });
     await acceptTerms(otherMatch.id, seller.id);
-    expect(await remainingOf(supply.id)).toBe(0);
+    expect(await remainingOf(supply.id)).toBe(kg(0));
 
     // Now try to grow the first deal from 6 to 9. It cannot fit: 9 + 4 > 10.
     await proposeTerms(match.id, buyer.id, { quantity: 9, unit: "tonne" });
@@ -238,7 +245,7 @@ describe("bilateral agreement", () => {
     // The 6-tonne deal survives untouched. A failed replacement must never
     // destroy the thing it failed to replace.
     expect(await statusOf(match.id)).toBe("AGREED");
-    expect(await remainingOf(supply.id)).toBe(0);
+    expect(await remainingOf(supply.id)).toBe(kg(0));
     const terms = await prisma.agreementTerms.findMany({
       where: { matchId: match.id },
       include: { acceptances: true },
@@ -258,11 +265,11 @@ describe("bilateral agreement", () => {
 
     await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "tonne" });
     await acceptTerms(match.id, seller.id);
-    expect(await remainingOf(supply.id)).toBe(16);
+    expect(await remainingOf(supply.id)).toBe(kg(16));
 
     await closeEngagement(match.id, seller.id);
 
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
     expect((await prisma.intent.findUnique({ where: { id: supply.id } }))!.status).toBe("ACTIVE");
     expect(await stockOf(produce.id)).toBe(26);
     // The record of what was agreed survives the cancellation.
@@ -284,7 +291,7 @@ describe("bilateral agreement", () => {
       ],
     });
 
-    expect(await remainingOf(supply.id)).toBe(26);
+    expect(await remainingOf(supply.id)).toBe(kg(26));
   });
 
   // ------------------------------------------------------------------
@@ -366,7 +373,7 @@ describe("bilateral agreement", () => {
       expect(result).toMatchObject({ ok: true, status: "agreed" });
     }
 
-    expect(await remainingOf(demand.id)).toBe(30);
+    expect(await remainingOf(demand.id)).toBe(kg(30));
   });
 
   // ------------------------------------------------------------------
@@ -399,7 +406,7 @@ describe("bilateral agreement", () => {
     await proposeTerms(match.id, buyer.id, { quantity: 30, unit: "bag" });
     await acceptTerms(match.id, seller.id);
 
-    expect(await remainingOf(supply.id)).toBe(20);
+    expect(await remainingOf(supply.id)).toBe(kg(20));
     const capacity = await loadCapacity(supply.id);
     // Reported, not silently dropped.
     expect(capacity!.unquantified).toBe(1);
@@ -419,12 +426,12 @@ describe("bilateral agreement", () => {
     await prisma.intent.update({ where: { id: supply.id }, data: { quantity: 15 } });
 
     const capacity = await loadCapacity(supply.id);
-    expect(capacity!.authorized).toBe(15);
+    expect(capacity!.authorized).toBe(kg(15));
     expect(capacity!.remaining).toBe(0);
     // Three tonnes are promised to somebody who is counting on them, and
     // saying so is the whole point — remaining alone would report nothing
     // available and hide the conflict.
-    expect(capacity!.overcommitted).toBe(3);
+    expect(capacity!.overcommitted).toBe(kg(3));
 
     // The agreement is not rewritten, and no stock moves.
     const terms = await prisma.agreementTerms.findFirst({ where: { matchId: match.id } });
@@ -445,7 +452,7 @@ describe("bilateral agreement", () => {
       data: { status: "ACCEPTED", quantity: 8, unit: "tonne" },
     });
 
-    expect(await remainingOf(supply.id)).toBe(20);
+    expect(await remainingOf(supply.id)).toBe(kg(20));
   });
 
   it("grandfathers a legacy completed trade, where both parties demonstrably acted", async () => {
@@ -463,7 +470,7 @@ describe("bilateral agreement", () => {
       ],
     });
 
-    expect(await remainingOf(supply.id)).toBe(12);
+    expect(await remainingOf(supply.id)).toBe(kg(12));
   });
 
   // ------------------------------------------------------------------
@@ -498,7 +505,7 @@ describe("bilateral agreement", () => {
 
     expect(again).toMatchObject({ ok: true, status: "already_agreed", version: 1 });
     expect(await prisma.agreementTerms.count({ where: { matchId: match.id } })).toBe(1);
-    expect(await remainingOf(supply.id)).toBe(12);
+    expect(await remainingOf(supply.id)).toBe(kg(12));
   });
 
   it("does not double-count when a party agrees to the same terms twice", async () => {
@@ -511,6 +518,6 @@ describe("bilateral agreement", () => {
     const again = await acceptTerms(match.id, seller.id);
 
     expect(again).toMatchObject({ ok: true, status: "already_agreed" });
-    expect(await remainingOf(supply.id)).toBe(12);
+    expect(await remainingOf(supply.id)).toBe(kg(12));
   });
 });

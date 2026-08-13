@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatQuantity } from "@/lib/units";
+import { PRODUCE_UNIT_CANONICAL } from "@/lib/measurement";
 import {
   HARVEST_WINDOW_DAYS,
   decide,
@@ -19,6 +20,12 @@ import {
 // It also never touches inventory. A proposal is a reading of state, not a
 // claim on it: proposing 26 tonnes leaves 26 tonnes recorded, and only
 // fulfilment ever moves that number.
+
+// A ProduceUnit value's canonical identity. Total over the enum by
+// construction — see PRODUCE_UNIT_CANONICAL — so this never guesses.
+function canonicalFor(unit: string): string | null {
+  return PRODUCE_UNIT_CANONICAL[unit as keyof typeof PRODUCE_UNIT_CANONICAL] ?? null;
+}
 
 // Everything already derived from a farm's produce, grouped by source row.
 async function existingBySource(partyId: string): Promise<Map<string, ExistingDerived[]>> {
@@ -115,6 +122,10 @@ export async function ensureDerivedIntent(
           title: `${formatQuantity(proposal.quantity, proposal.unit)} of ${proposal.label}`,
           quantity: proposal.quantity,
           unit: proposal.unit,
+          // Inventory's enum maps into canonical identity through a proven
+          // total function, so a derived proposal arrives with its unit
+          // already machine-readable rather than as a string to re-parse.
+          unitCode: canonicalFor(proposal.unit),
           productId: proposal.productId,
           countryCode: party.countryCode,
           province: party.province,
@@ -139,6 +150,10 @@ export async function ensureDerivedIntent(
           title: `${formatQuantity(proposal.quantity, proposal.unit)} of ${proposal.label}`,
           quantity: proposal.quantity,
           unit: proposal.unit,
+          // Inventory's enum maps into canonical identity through a proven
+          // total function, so a derived proposal arrives with its unit
+          // already machine-readable rather than as a string to re-parse.
+          unitCode: canonicalFor(proposal.unit),
           productId: proposal.productId,
           derivationKey: proposal.derivationKey,
           urgent: proposal.urgent,
