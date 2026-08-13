@@ -56,7 +56,9 @@ export async function createTestIntent(
     province: string;
     district: string;
     openToCrossBorder: boolean;
-    status: "ACTIVE" | "PROPOSED" | "WITHDRAWN";
+    status: "ACTIVE" | "PROPOSED" | "ENGAGED" | "WITHDRAWN";
+    quantity: number | null;
+    unit: string | null;
   }> = {},
 ) {
   return prisma.intent.create({
@@ -71,6 +73,8 @@ export async function createTestIntent(
       district: overrides.district ?? "Harare",
       openToCrossBorder: overrides.openToCrossBorder ?? false,
       status: overrides.status ?? "ACTIVE",
+      quantity: overrides.quantity ?? null,
+      unit: overrides.unit ?? null,
     },
   });
 }

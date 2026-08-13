@@ -2,22 +2,33 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "@/lib/matching-core";
 import { isMatchable, oppositeSide } from "@/lib/intent";
+import { loadCapacities, loadCapacity } from "@/lib/allocation";
 
 export { scoreMatch };
 
-// Called right after an intent becomes active. Finds active intents facing
-// the opposite way, for a compatible product in a reachable place, and
-// records a Match for each.
+// Called right after an intent becomes active. Finds intents facing the
+// opposite way, for a compatible product in a reachable place, with capacity
+// still available on both sides, and records a Match for each.
 //
 // intentA is always the pre-existing intent and intentB the one just
 // activated, so re-running this never produces a duplicate pair.
 //
-// Only ACTIVE intents take part. A PROPOSED one was derived by FarmaTrade
-// and its owner has not agreed to it, so matching on one would be putting
+// Eligibility is a question about remaining capacity, not about status
+// alone. An intent already in discussion still has whatever it has not
+// agreed away, and it stays in the candidate pool for as long as that is
+// more than nothing — a farmer who agreed 8 of 20 tonnes should keep
+// hearing about buyers for the other 12. What removes an intent is being
+// fully spoken for, or never having been authorized in the first place.
+//
+// A PROPOSED intent is excluded however much it offers: FarmaTrade derived
+// it and its owner has not agreed to it, so matching on one would be putting
 // words in their mouth.
 export async function generateMatchesForIntent(intentId: string) {
   const intent = await prisma.intent.findUnique({ where: { id: intentId } });
-  if (!intent || !isMatchable(intent)) return;
+  if (!intent) return;
+
+  const capacity = await loadCapacity(intentId);
+  if (!isMatchable({ status: intent.status, remaining: capacity?.remaining ?? null })) return;
 
   // Every other category is local-first: a match is only ever suggested
   // within the same province. TRANSPORT is the one exception — a
@@ -67,16 +78,45 @@ export async function generateMatchesForIntent(intentId: string) {
   // `productFilter` can carry their own `OR`, and spreading them would let
   // the second silently overwrite the first — dropping a filter without any
   // error, which is the worst way for a matching constraint to fail.
-  const candidates = await prisma.intent.findMany({
+  const authorized = await prisma.intent.findMany({
     where: {
       side: oppositeSide(intent.side),
       category: intent.category,
-      status: "ACTIVE",
+      // Both states the owner consented to. Which of the two an intent is
+      // in says whether anyone is talking to them, not whether they have
+      // anything left; the capacity filter below decides that.
+      status: { in: ["ACTIVE", "ENGAGED"] },
       partyId: { not: intent.partyId },
       AND: [productFilter, reach],
     },
     include: { party: { include: { reputation: true } } },
   });
+
+  if (authorized.length === 0) return;
+
+  // Remaining capacity is a sum over engagements rather than a column, so it
+  // is filtered here rather than in the query above. One extra round trip
+  // for every candidate at once — cheap at this scale, and the alternative
+  // is a stored counter that can disagree with the engagements justifying
+  // it. If this ever becomes the bottleneck, the fix is a materialized view
+  // or a cached column with the sum as its source of truth, not a second
+  // number people are trusted to keep up to date.
+  //
+  // Quantity compatibility deliberately stops here. Two sides are eligible
+  // when both have something left, not when their amounts are similar: a
+  // supplier with 12 tonnes and a buyer needing 100 is a real trade for 12,
+  // and partial fulfilment is how a 100-tonne order gets filled at all.
+  // Nothing requires the numbers to be equal, or even close, and differing
+  // units are not a disqualification either — those parties can still
+  // trade; FarmaTrade simply will not claim to know how much until there is
+  // a conversion layer that makes such a claim true.
+  const capacities = await loadCapacities(authorized.map((c) => c.id));
+  const candidates = authorized.filter((candidate) =>
+    isMatchable({
+      status: candidate.status,
+      remaining: capacities.get(candidate.id)?.remaining ?? null,
+    }),
+  );
 
   if (candidates.length === 0) return;
 

@@ -29,6 +29,19 @@ migration is the reason a rename must first be done expand/contract: add the
 new name, write to both, migrate readers, then drop the old one. Nothing in
 the current history follows that pattern, because nothing needed to.
 
+## `20260813090000_match_quantity` is rolling-deploy safe
+
+It adds two nullable columns to `Match` and backfills nothing, so old code
+ignores them and new code reads null as "no amount was ever agreed" — which
+is the truth about every match that predates the column. Both builds can
+serve at once.
+
+Deliberately no backfill: guessing what historical engagements were for
+would put invented numbers into the record that remaining-capacity
+arithmetic then treats as fact. An engagement with no quantity consumes no
+capacity, which is the honest reading of an agreement whose size nobody
+recorded.
+
 ## Product catalogue seeding
 
 `npm start` also runs `prisma/seed-products.ts`. Every write is an idempotent

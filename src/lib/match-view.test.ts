@@ -47,14 +47,33 @@ describe("groupMatchesByOwnIntent", () => {
 });
 
 describe("combinedOfferedQuantity", () => {
-  it("sums the counterparty's quantity across matches, treating null as zero", () => {
-    const mine = { id: "need-1", partyId: "me", quantity: 100 };
-    const matches = [
-      match("m1", mine, { id: "have-1", partyId: "a", quantity: 30 }),
-      match("m2", { id: "have-2", partyId: "b", quantity: null }, mine),
-      match("m3", mine, { id: "have-3", partyId: "c", quantity: 20 }),
-    ];
-    expect(combinedOfferedQuantity(matches, "me")).toBe(50);
+  const mine = { id: "need-1", partyId: "me", quantity: 100 };
+  const matches = [
+    match("m1", mine, { id: "have-1", partyId: "a", quantity: 30 }),
+    match("m2", { id: "have-2", partyId: "b", quantity: null }, mine),
+    match("m3", mine, { id: "have-3", partyId: "c", quantity: 20 }),
+  ];
+
+  it("sums what each counterparty still has, not what they first offered", () => {
+    // have-1 offered 30 but has already agreed 25 of them elsewhere, so it
+    // contributes 5. Counting the 30 would tell this buyer their order was
+    // covered when most of it is spoken for.
+    const remaining = new Map<string, number | null>([
+      ["have-1", 5],
+      ["have-2", null],
+      ["have-3", 20],
+    ]);
+    expect(combinedOfferedQuantity(matches, "me", (i) => remaining.get(i.id) ?? null)).toEqual({
+      total: 25,
+      unbounded: 1,
+    });
+  });
+
+  it("counts counterparties who named no ceiling rather than reading them as zero", () => {
+    expect(combinedOfferedQuantity(matches, "me", () => null)).toEqual({
+      total: 0,
+      unbounded: 3,
+    });
   });
 });
 

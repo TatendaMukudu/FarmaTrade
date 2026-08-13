@@ -21,6 +21,7 @@
 // Pure and DB-free.
 
 import type { Intent as IntentRow, IntentOrigin, IntentSide, IntentStatus } from "@/generated/prisma/client";
+import { hasRemainingCapacity } from "@/lib/capacity";
 
 export type { IntentOrigin, IntentSide, IntentStatus };
 
@@ -51,20 +52,44 @@ export const ORIGIN_LABEL: Record<IntentOrigin, string> = {
   DECLARED: "You added this",
 };
 
-// Whether an intent is currently open to being matched.
+// Whether an intent is authorized to take part in the market at all.
 //
 // PROPOSED is excluded because FarmaTrade derived it and its owner has not
 // agreed to it — matching on one would be putting words in their mouth.
+// WITHDRAWN is excluded because the owner said no. Both are questions about
+// permission, and no amount of remaining quantity answers them.
+export function isAuthorizedToMatch(intent: { status: IntentStatus }): boolean {
+  return intent.status === "ACTIVE" || intent.status === "ENGAGED";
+}
+
+// Whether an intent is currently open to being matched.
 //
-// ENGAGED is excluded *for now* and only because that is exactly what the
-// old MATCHED status did; this is a rename, not a behaviour change. It is
-// not because engagement is terminal. An intent under discussion may still
-// be partly available, may carry several matches, and returns to ACTIVE when
-// a negotiation falls through. When quantity semantics land, this predicate
-// becomes a question about remaining availability rather than about status,
-// and ENGAGED will stop being a blanket exclusion.
-export function isMatchable(intent: { status: IntentStatus }): boolean {
-  return intent.status === "ACTIVE";
+// Two questions, and keeping them separate is the point: is this party
+// authorized to trade at all, and is there anything left to trade. ENGAGED
+// used to fail the first question, which was the old MATCHED behaviour
+// carried forward under a new name — it treated "in discussion" as
+// "finished". A farmer offering 20 tonnes who agreed 8 with one buyer still
+// has 12 tonnes for sale, and taking the whole intent off the market was
+// costing them the other 12.
+//
+// So ENGAGED is now authorized, and exhaustion is what removes an intent
+// instead. Remaining is derived from live engagements rather than stored;
+// see lib/capacity.ts.
+//
+//   ACTIVE,  remaining > 0    matchable
+//   ACTIVE,  remaining = 0    not matchable — fully spoken for
+//   ENGAGED, remaining > 0    matchable — partly available
+//   ENGAGED, remaining = 0    not matchable
+//   PROPOSED / WITHDRAWN      never matchable, whatever the quantity
+//
+// `remaining` of null means unbounded, not empty: an intent whose owner
+// never stated a quantity has declared no ceiling to reach.
+export function isMatchable(intent: {
+  status: IntentStatus;
+  remaining: number | null;
+}): boolean {
+  if (!isAuthorizedToMatch(intent)) return false;
+  return hasRemainingCapacity(intent.remaining);
 }
 
 // The shape the domain passes around: a projection of the stored row, named

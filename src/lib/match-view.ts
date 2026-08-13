@@ -39,16 +39,36 @@ export function groupMatchesByOwnIntent<P extends { id: string; partyId: string 
   return order.map((id) => groups.get(id)!);
 }
 
-// Sum of what the other side of each match is offering — only meaningful
-// once matches are grouped by your own NEED post (see above).
+// Sum of what the other side of each match still has available — only
+// meaningful once matches are grouped by your own DEMAND intent (see above).
+//
+// Takes REMAINING capacity per counterparty rather than their headline
+// quantity, which is the difference between a useful number and a
+// misleading one: a supplier offering 40 tonnes who has already agreed 35 of
+// them contributes 5 to a buyer's coverage. Adding the 40 would tell the
+// buyer their order was covered when most of it is spoken for elsewhere.
+//
+// `remainingFor` returns null where a counterparty declared no ceiling.
+// Those are counted separately rather than as zero — "three suppliers, two
+// of whom did not say how much" is honest; silently treating them as nothing
+// is not.
 export function combinedOfferedQuantity<
   P extends { id: string; partyId: string; quantity: number | null },
   M extends { intentA: P; intentB: P },
->(matches: M[], partyId: string): number {
-  return matches.reduce((sum, m) => {
+>(
+  matches: M[],
+  partyId: string,
+  remainingFor: (intent: P) => number | null,
+): { total: number; unbounded: number } {
+  let total = 0;
+  let unbounded = 0;
+  for (const m of matches) {
     const { theirs } = resolveMatchSides<P>(m, partyId);
-    return sum + (theirs.quantity ?? 0);
-  }, 0);
+    const remaining = remainingFor(theirs);
+    if (remaining === null) unbounded++;
+    else total += remaining;
+  }
+  return { total, unbounded };
 }
 
 export function isPartyInMatch(

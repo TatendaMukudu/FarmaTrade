@@ -13,8 +13,10 @@ import {
 } from "@/lib/match-view";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { planMatches, type Bucket } from "@/lib/match-rank";
+import { loadCapacities } from "@/lib/allocation";
+import { pairwiseQuantity } from "@/lib/capacity";
 import { formatMoney, regionFor } from "@/lib/regions";
-import { pluralizeUnit } from "@/lib/units";
+import { formatQuantity, pluralizeUnit } from "@/lib/units";
 import { Badge } from "@/components/badge";
 import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
@@ -98,6 +100,15 @@ export default async function OpportunitiesPage() {
     loadMatchingHistory(),
   ]);
 
+  // What every intent on this page still has available. Loaded once for
+  // both sides of every match, because "how much is left" is the question
+  // this page is really answering and asking it per card would be a query
+  // per row.
+  const capacities = await loadCapacities([
+    ...new Set(active.flatMap((m) => [m.intentAId, m.intentBId])),
+  ]);
+  const remainingOf = (intent: { id: string }) => capacities.get(intent.id)?.remaining ?? null;
+
   const strengthByCounterparty = new Map<string, number>();
   for (const r of relations) {
     const counterpartyId = r.partyAId === party.id ? r.partyBId : r.partyAId;
@@ -123,9 +134,14 @@ export default async function OpportunitiesPage() {
     .map((g) => ({
       yours: g.yours,
       count: g.matches.length,
+      // What is still outstanding on this order, not what was originally
+      // asked for — a buyer who has already agreed 70 of 100 tonnes wants to
+      // see the 30.
+      outstanding: capacities.get(g.yours.id)?.remaining ?? g.yours.quantity ?? 0,
       combined: combinedOfferedQuantity<CounterpartPost, (typeof active)[number]>(
         g.matches,
         party.id,
+        remainingOf,
       ),
     }));
 
@@ -149,23 +165,29 @@ export default async function OpportunitiesPage() {
 
       {coverage.length > 0 && (
         <div className="flex flex-col gap-3">
-          {coverage.map(({ yours, count, combined }) => {
-            const needed = yours.quantity ?? 0;
-            return (
-              <div key={yours.id} className="rounded-card border border-border bg-new-bg p-3">
-                <p className="text-sm font-medium text-new-fg">
-                  Combined available for &ldquo;{yours.title}&rdquo;: {combined.toLocaleString()} /{" "}
-                  {needed.toLocaleString()} {yours.unit ? pluralizeUnit(yours.unit, needed) : ""} across {count} matches
+          {coverage.map(({ yours, count, outstanding, combined }) => (
+            <div key={yours.id} className="rounded-card border border-border bg-new-bg p-3">
+              <p className="text-sm font-medium text-new-fg">
+                Still available for &ldquo;{yours.title}&rdquo;:{" "}
+                {combined.total.toLocaleString()} / {outstanding.toLocaleString()}{" "}
+                {yours.unit ? pluralizeUnit(yours.unit, outstanding) : ""} across {count} matches
+              </p>
+              {combined.unbounded > 0 && (
+                <p className="mt-1 text-xs text-subtle-fg">
+                  {combined.unbounded} of them did not say how much, so this total is the
+                  part FarmaTrade can count.
                 </p>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-pill bg-border">
-                  <div
-                    className="h-full bg-accent"
-                    style={{ width: `${Math.min(100, (combined / needed) * 100)}%` }}
-                  />
-                </div>
+              )}
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-pill bg-border">
+                <div
+                  className="h-full bg-accent"
+                  style={{
+                    width: `${outstanding > 0 ? Math.min(100, (combined.total / outstanding) * 100) : 100}%`,
+                  }}
+                />
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -184,6 +206,19 @@ export default async function OpportunitiesPage() {
                   const { yours, theirs } = resolveMatchSides<CounterpartPost>(m, party.id);
                   const myConfirmation = m.confirmations.find((c) => c.partyId === party.id);
                   const strength = strengthByCounterparty.get(theirs.party.id);
+                  const yoursRemaining = remainingOf(yours);
+                  // The most this engagement could be for, shown before the
+                  // farmer agrees to it rather than discovered afterwards.
+                  // Null where the two sides' units cannot be compared or
+                  // neither named a quantity — in which case accepting
+                  // records the engagement without a number, because
+                  // FarmaTrade has no honest one to record.
+                  const supplySide = yours.side === "SUPPLY" ? yours : theirs;
+                  const demandSide = yours.side === "SUPPLY" ? theirs : yours;
+                  const upTo = pairwiseQuantity(
+                    { remaining: remainingOf(supplySide), unit: supplySide.unit },
+                    { remaining: remainingOf(demandSide), unit: demandSide.unit },
+                  );
                   return (
                     <li id={`match-${m.id}`} className="scroll-mt-4 rounded-card border border-border bg-card p-4" key={m.id}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -197,6 +232,17 @@ export default async function OpportunitiesPage() {
                             <span>{CONFIDENCE_LABEL[ranked.confidence]}</span>
                           </div>
                           <p className="mt-1 font-medium">Yours: {yours.title}</p>
+                          {/* What is actually left to trade under this
+                              intent, which is not the same as what it
+                              originally offered once part of it is agreed
+                              elsewhere. Absent where the owner never stated
+                              a quantity — there is no ceiling to report. */}
+                          {yoursRemaining != null && yours.quantity != null && (
+                            <p className="text-xs text-subtle-fg">
+                              {formatQuantity(yoursRemaining, yours.unit)} of{" "}
+                              {formatQuantity(yours.quantity, yours.unit)} still available
+                            </p>
+                          )}
                           <MatchCounterpart
                             post={theirs}
                             myDistrict={party.district}
@@ -230,11 +276,21 @@ export default async function OpportunitiesPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 sm:shrink-0 sm:flex-col sm:items-end">
+                          {m.status === "ACCEPTED" && m.quantity != null && (
+                            <span className="text-xs whitespace-nowrap text-subtle-fg">
+                              Agreed: {formatQuantity(m.quantity, m.unit)}
+                            </span>
+                          )}
                           {m.status === "SUGGESTED" && (
                             <form action={respondToMatch} className="flex gap-2">
                               <input type="hidden" name="id" value={m.id} />
                               <button type="submit" name="decision" value="ACCEPTED" className={SOLID_BUTTON}>
-                                Accept
+                                {/* The number is on the button because
+                                    accepting is what takes it off the
+                                    market. A farmer should see how much
+                                    they are agreeing to before they agree,
+                                    not after. */}
+                                {upTo != null ? `Accept up to ${formatQuantity(upTo, yours.unit ?? theirs.unit)}` : "Accept"}
                               </button>
                               <button type="submit" name="decision" value="DECLINED" className={OUTLINE_BUTTON}>
                                 Decline

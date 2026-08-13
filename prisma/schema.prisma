@@ -504,6 +504,27 @@ model Match {
   // evidence instead of inventing a justification.
   reasons   String[]
   status    MatchStatus @default(SUGGESTED)
+  // How much of each side's authorized capacity this engagement speaks for.
+  //
+  // This is the ONLY place an allocated commercial quantity is written, and
+  // that is deliberate: remaining capacity is derived by summing these
+  // rather than kept as a counter on Intent, so the two can never drift.
+  //
+  // Allocation and commitment are the same number on the same row at
+  // different statuses — ACCEPTED means allocated, COMPLETED means
+  // committed. A quantity therefore moves through stages instead of being
+  // copied into a second record, which is what makes double-deduction
+  // structurally impossible rather than merely avoided.
+  //
+  // Null means an engagement whose amount was never agreed — every match
+  // that predates this column, and any pair whose units cannot be compared.
+  // Null consumes no capacity, because inventing a number FarmaTrade was
+  // never told would be worse than admitting it does not know.
+  quantity  Float?
+  // The unit `quantity` is denominated in, snapshot at allocation time so a
+  // later edit to either intent cannot retroactively reinterpret what was
+  // already agreed.
+  unit      String?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 

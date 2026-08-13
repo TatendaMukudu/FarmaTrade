@@ -70,19 +70,49 @@ describe("status", () => {
 });
 
 describe("isMatchable", () => {
+  // H. Permission first, quantity second.
   it("will not match an intent FarmaTrade proposed and nobody confirmed", () => {
     // Matching on a PROPOSED intent would be putting words in a farmer's
-    // mouth — they have not agreed to offer anything yet.
-    expect(isMatchable({ status: "PROPOSED" })).toBe(false);
+    // mouth — they have not agreed to offer anything yet. No amount of
+    // remaining capacity changes that; it is not a question about quantity.
+    expect(isMatchable({ status: "PROPOSED", remaining: 20 })).toBe(false);
+    expect(isMatchable({ status: "PROPOSED", remaining: null })).toBe(false);
   });
 
-  it("matches an active one, and nothing else — for now", () => {
-    expect(isMatchable({ status: "ACTIVE" })).toBe(true);
-    expect(isMatchable({ status: "WITHDRAWN" })).toBe(false);
-    // ENGAGED is excluded because that is exactly what MATCHED did, not
-    // because engagement is terminal. When quantity semantics land this
-    // becomes a question about remaining availability instead.
-    expect(isMatchable({ status: "ENGAGED" })).toBe(false);
+  // I.
+  it("will not match one the owner closed, however much it offered", () => {
+    expect(isMatchable({ status: "WITHDRAWN", remaining: 20 })).toBe(false);
+    expect(isMatchable({ status: "WITHDRAWN", remaining: null })).toBe(false);
+  });
+
+  it("matches an active intent that has capacity left", () => {
+    expect(isMatchable({ status: "ACTIVE", remaining: 12 })).toBe(true);
+  });
+
+  // E.
+  it("stops matching an active intent once it is fully spoken for", () => {
+    expect(isMatchable({ status: "ACTIVE", remaining: 0 })).toBe(false);
+  });
+
+  // F. The correction this whole change exists for.
+  it("keeps matching an engaged intent that still has capacity", () => {
+    // A farmer offering 20 tonnes who agreed 8 with one buyer has 12 tonnes
+    // for sale. Treating "in discussion" as "finished" was costing them the
+    // other 12.
+    expect(isMatchable({ status: "ENGAGED", remaining: 12 })).toBe(true);
+  });
+
+  // G.
+  it("stops matching an engaged intent with nothing left", () => {
+    expect(isMatchable({ status: "ENGAGED", remaining: 0 })).toBe(false);
+  });
+
+  it("treats an unstated quantity as no ceiling rather than as empty", () => {
+    // Most transport and equipment intents carry no quantity at all. Reading
+    // null as zero would have taken every one of them off the market the
+    // moment capacity semantics shipped.
+    expect(isMatchable({ status: "ACTIVE", remaining: null })).toBe(true);
+    expect(isMatchable({ status: "ENGAGED", remaining: null })).toBe(true);
   });
 });
 
