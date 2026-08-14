@@ -91,8 +91,8 @@ reasoning.** Do not work around it silently.
 
 ## 3. How to work here
 
-FarmaTrade is built in **numbered phases**. Each is one coherent correction
-to the domain, and each follows the same shape:
+FarmaTrade is built in **numbered phases**, each one coherent correction to
+the domain:
 
 | Phase | | |
 |---|---|---|
@@ -112,6 +112,7 @@ Allocation takes that slot and the packaging question with it. Pricing had
 already taken P0.7 by then — hence the out-of-order row above rather than a
 renumber that would break every commit message referring to them.
 
+Every phase follows the same shape:
 
 1. **Audit first.** Map what the repo actually does before changing it. The
    two worst defects found so far — capacity reserved by one party alone,
