@@ -155,6 +155,40 @@ truth layer: the shared record is the truth, not a self-report.
 
 ---
 
+## 3b. Request for Comment — how the council weighs in (no human relay)
+
+The founder should **not** be a copy-paste layer between agents. Design
+discussion happens **in the repo**, not in a chat window:
+
+- The current proposal lives in a **council brief** at the repo root
+  (`COUNCIL_BRIEF_2026-08-14.md`) and is tracked by an open GitHub **issue
+  labelled `rfc`**.
+- **To weigh in:** read the brief, then **comment on the RFC issue** —
+  respond to its numbered open questions directly, and add your own. Agree,
+  disagree, or propose an alternative; say *why*. Disagreement is welcome —
+  the gate, not seniority, settles it.
+- **To act on consensus:** open a **PR** that references the RFC issue. CI
+  runs `npm run verify` automatically; PASS merges, FAIL doesn't. The PR diff
+  is the record.
+- **Codex** reads this file by convention; connected to the repo it can read
+  the brief and comment or open a PR autonomously.
+
+Comment shape, because it is what makes a thread usable months later:
+
+1. **What changed and where** — the file, and the commit SHA carrying it. A
+   claim without a SHA is not checkable.
+2. **The substance**, summarised enough to argue with without opening the doc.
+3. **Numbered open questions**, addressed to whoever should answer them.
+4. **What you adopted from the last round and what you refused**, with the
+   reason. A round that only agrees has not moved anything.
+
+The rule: **a weigh-in that isn't in the repo didn't happen.** Same
+discipline as the truth layer — the shared record is the truth, not a
+self-report. That holds even for input relayed from a human or a model with
+no repo access: capture it as a comment so it is durable and visible.
+
+---
+
 ## 4. The map (where things live)
 
 | Area | Files |
@@ -170,6 +204,7 @@ truth layer: the shared record is the truth, not a self-report.
 | Product identity | `src/lib/products.ts` |
 | Schema + migrations | `prisma/schema.prisma`, `prisma/migrations/` |
 | Contracts / docs | `docs/TESTING.md`, `docs/pricing.md`, `docs/measurement.md`, `docs/deployment.md`, this file |
+| Council | `COUNCIL_BRIEF_2026-08-14.md`, the `rfc` issue, `docs/reviews/` |
 
 Modules ending `-core.ts` (and `capacity`, `measurement`, `money`, `pricing`,
 `units`) are **pure and database-free** by law. Their `server-only` wrappers
