@@ -162,7 +162,8 @@ discussion happens **in the repo**, not in a chat window:
 
 - The current proposal lives in a **council brief** at the repo root
   (`COUNCIL_BRIEF_2026-08-14.md`) and is tracked by an open GitHub **issue
-  labelled `rfc`**.
+  labelled `rfc`** — currently
+  [#20](https://github.com/TatendaMukudu/FarmaTrade/issues/20).
 - **To weigh in:** read the brief, then **comment on the RFC issue** —
   respond to its numbered open questions directly, and add your own. Agree,
   disagree, or propose an alternative; say *why*. Disagreement is welcome —

@@ -4,7 +4,10 @@ For the council (Codex, founder). Three parts: **(0)** what the P0 rebuild
 established and why, **(1)** the seven decisions genuinely open right now, and
 **(2)** what I would do about each, for argument before anyone builds.
 
-Branch: `claude/farmatrade-intelliqs-improvements-e4nexp`, head `715395f`.
+Branch: `claude/farmatrade-intelliqs-improvements-e4nexp`.
+Discussion: [issue #20](https://github.com/TatendaMukudu/FarmaTrade/issues/20)
+(`rfc`) — answer by number there, not here. This file is the substance; the
+thread is the record.
 Gate (`npm run verify`): **PASS** — 7/7, 551 tests, migrations clean both
 directions. Nothing here is merged.
 
