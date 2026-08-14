@@ -3,6 +3,9 @@
 // page that renders a match (Opportunities, Overview, a Conversation) was
 // re-deriving "which side is mine" and "how far away is this" by hand.
 
+import { valuationFor, type Valuation } from "@/lib/pricing";
+import { currencyByCode } from "@/lib/money";
+
 // A Match's intentA/intentB are the Match table's own column names and stay
 // that way until the physical rename; the domain word for what they point
 // at is Intent (see lib/intent.ts). They are interchangeable — "mine"
@@ -92,13 +95,34 @@ export function distanceLabel(
   return theirProvince;
 }
 
-// Decimal (Prisma) askingPrice × quantity when both are present, else just
-// the price, else nothing worth showing.
-export function estimatedIntentValue(post: {
+// What an intent is worth, when its price says enough to know.
+//
+// This used to be `price × quantity`, which treated the stored number as a
+// rate per unit. loadPriceSignals divided by quantity instead, treating the
+// same column as a total. Both could not be right, and the one that was
+// wrong overstated a ten-tonne offer by a factor of ten.
+//
+// Neither reading is preserved. The valuation goes through the one
+// authoritative primitive, which returns a number only when the price
+// records what it means — and returns a reason rather than a figure when it
+// does not. A legacy price with no recorded basis produces nothing at all,
+// because producing either answer would be wrong about half the rows.
+export function estimatedIntentValue(intent: {
   askingPrice: unknown;
+  priceCurrency?: string | null;
+  priceBasis?: string | null;
+  priceUnitCode?: string | null;
   quantity: number | null;
-}): number | null {
-  if (post.askingPrice == null) return null;
-  const price = Number(post.askingPrice);
-  return post.quantity != null ? price * post.quantity : price;
+  unitCode?: string | null;
+}): Valuation {
+  return valuationFor(
+    {
+      amount: intent.askingPrice == null ? null : Number(intent.askingPrice),
+      currencyCode: intent.priceCurrency ?? null,
+      basis: intent.priceBasis ?? null,
+      perUnitCode: intent.priceUnitCode ?? null,
+    },
+    { value: intent.quantity, unitCode: intent.unitCode ?? null },
+    currencyByCode,
+  );
 }

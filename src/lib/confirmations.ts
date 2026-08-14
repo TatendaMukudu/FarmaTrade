@@ -4,7 +4,9 @@ import { pendingStamps, stampBanner, type StampableMatch } from "@/lib/confirmat
 import { summarizePrices, type PricedListing, type PriceSignal } from "@/lib/price-signals";
 import { PRICE_WINDOW_DAYS } from "@/lib/price-signals";
 import { resolveMatchSides } from "@/lib/match-view";
-import { regionFor } from "@/lib/regions";
+import { resolvePrice, type ResolvedPrice } from "@/lib/pricing";
+import { currencyByCode, multiplyMoney, type Money } from "@/lib/money";
+import { unitByCode, type CanonicalUnit } from "@/lib/measurement";
 
 export { pendingStamps, stampBanner };
 
@@ -50,8 +52,18 @@ export async function loadPendingStamps(partyId: string, now = new Date()) {
   return pendingStamps(stampable, now);
 }
 
-// Asking prices near this party, from intents that carry both a price and a
-// quantity to divide it by.
+// Asking RATES near this party.
+//
+// It used to divide askingPrice by quantity, which assumed the stored number
+// was a total for the lot. estimatedIntentValue multiplied by quantity,
+// assuming the opposite. Only one of those could be right and nothing in the
+// data settled which, so neither reading survives: a listing now contributes
+// a rate only when its price records what it means, and is excluded
+// entirely when it does not.
+//
+// That makes the signal smaller and true rather than larger and unreliable.
+// A range built from numbers that might be totals and might be rates is
+// worse than no range, because a farmer will price their harvest against it.
 //
 // Scoped to the party's own province rather than the whole network: a price
 // four provinces away is not a price this farmer can get, and blending it in
@@ -68,14 +80,21 @@ export async function loadPriceSignals(
       countryCode: party.countryCode,
       province: party.province,
       askingPrice: { not: null },
-      quantity: { gt: 0 },
+      // Only rows whose price says what it means. Legacy ambiguous prices
+      // are excluded here rather than filtered later, so they never reach
+      // the arithmetic at all.
+      priceBasis: { not: null },
       createdAt: { gte: since },
       status: { in: ["ACTIVE", "ENGAGED", "WITHDRAWN"] },
     },
     select: {
       askingPrice: true,
+      priceCurrency: true,
+      priceBasis: true,
+      priceUnitCode: true,
       quantity: true,
       unit: true,
+      unitCode: true,
       category: true,
       district: true,
       createdAt: true,
@@ -85,22 +104,55 @@ export async function loadPriceSignals(
   });
 
   const listings: PricedListing[] = intents.flatMap((p) => {
-    const quantity = p.quantity ?? 0;
-    if (quantity <= 0 || p.askingPrice == null) return [];
-    const unit = p.unit?.trim();
-    if (!unit) return [];
+    const stored = {
+      amount: p.askingPrice == null ? null : Number(p.askingPrice),
+      currencyCode: p.priceCurrency,
+      basis: p.priceBasis,
+      perUnitCode: p.priceUnitCode,
+    };
+    const resolved = resolvePrice(stored, currencyByCode);
+    if (!resolved.ok) return [];
+
+    const rate = asRate(resolved.price, { value: p.quantity, unitCode: p.unitCode });
+    if (!rate) return [];
+
     return [
       {
         subject: p.produce?.cropType?.trim() || categoryLabel(p.category),
         district: p.district,
-        unit,
-        unitPrice: Number(p.askingPrice) / quantity,
+        unit: rate.unit.one,
+        currencyCode: rate.money.currency.code,
+        unitPrice: rate.money.minor,
         postedAt: p.createdAt,
       },
     ];
   });
 
-  return summarizePrices(listings, now, regionFor(party.countryCode).currencySymbol);
+  return summarizePrices(listings, now);
+}
+
+// A listing's asking rate, per one canonical unit.
+//
+// A PER_UNIT price already is one — no division, and that is the whole
+// point. A TOTAL price becomes one only when there is a measurable quantity
+// to divide by, which is where the old unconditional division was wrong: it
+// divided every price by every quantity regardless of what either meant.
+//
+// Anything else contributes nothing. A total for ten bags of unknown mass is
+// a real price and not a rate, and inventing a per-kilogram figure for it
+// would be exactly the fabrication this phase exists to stop.
+function asRate(
+  price: ResolvedPrice,
+  quantity: { value: number | null; unitCode: string | null },
+): { money: Money; unit: CanonicalUnit } | null {
+  if (price.basis === "PER_UNIT" && price.perUnit) {
+    return { money: price.money, unit: price.perUnit };
+  }
+
+  const unit = unitByCode(quantity.unitCode);
+  if (!unit || quantity.value == null || quantity.value <= 0) return null;
+  const { value } = multiplyMoney(price.money, 1 / quantity.value);
+  return { money: value, unit };
 }
 
 function categoryLabel(category: string): string {

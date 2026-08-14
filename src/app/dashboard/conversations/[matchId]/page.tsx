@@ -16,6 +16,11 @@ import {
   type Participants,
 } from "@/lib/agreement-core";
 import { toTermsVersions } from "@/lib/agreement-view";
+import type { TermsVersion } from "@/lib/agreement-core";
+import { valuationFor } from "@/lib/pricing";
+import { CURRENCIES, currencyByCode, formatMoneyAmount } from "@/lib/money";
+import { unitByCode } from "@/lib/measurement";
+import { regionFor } from "@/lib/regions";
 import { formatQuantity } from "@/lib/units";
 import { buttonClass } from "@/components/ui";
 
@@ -30,6 +35,30 @@ const STATE_LINE: Record<string, string> = {
   completed: "Completed",
   closed: "Closed",
 };
+
+// "500 USD per tonne" or "500 USD for the whole lot" — never a bare number
+// that each reader interprets for themselves.
+function describePrice(terms: TermsVersion): string {
+  if (terms.price == null) return "";
+  const currency = terms.priceCurrency ?? "";
+  const amount = `${terms.price}${currency ? ` ${currency}` : ""}`;
+  if (terms.priceBasis === "TOTAL") return `${amount} for the whole lot`;
+  const per = unitByCode(terms.priceUnitCode);
+  return per ? `${amount} per ${per.one}` : amount;
+}
+
+function valuationOfTerms(terms: TermsVersion) {
+  return valuationFor(
+    {
+      amount: terms.price,
+      currencyCode: terms.priceCurrency,
+      basis: terms.priceBasis,
+      perUnitCode: terms.priceUnitCode,
+    },
+    { value: terms.quantity, unitCode: terms.unitCode },
+    currencyByCode,
+  );
+}
 
 export default async function ConversationPage({
   params,
@@ -68,6 +97,7 @@ export default async function ConversationPage({
   const open = openTerms(versions, participants);
   const yourMove = open != null && awaitingFrom(open, participants).includes(party.id);
   const settled = view === "agreed" || view === "renegotiating";
+  const region = regionFor(party.countryCode);
 
   // A PRODUCE/LIVESTOCK/EQUIPMENT/INPUTS match and a TRANSPORT match are
   // two separate graphs — once a trade like this is accepted, the two
@@ -126,7 +156,11 @@ export default async function ConversationPage({
               {governing.quantity != null
                 ? formatQuantity(governing.quantity, governing.unit)
                 : "an amount you have not put a number to"}
-              {governing.price != null && ` at ${governing.price}`}
+              {governing.price != null && ` at ${describePrice(governing)}`}
+              {(() => {
+                const value = valuationOfTerms(governing);
+                return value.ok ? ` — ${formatMoneyAmount(value.total)} in total` : "";
+              })()}
             </p>
           )}
           {open && (
@@ -137,7 +171,11 @@ export default async function ConversationPage({
               {open.quantity != null
                 ? formatQuantity(open.quantity, open.unit)
                 : "no particular amount"}
-              {open.price != null && ` at ${open.price}`}
+              {open.price != null && ` at ${describePrice(open)}`}
+              {(() => {
+                const value = valuationOfTerms(open);
+                return value.ok ? ` — ${formatMoneyAmount(value.total)} in total` : "";
+              })()}
               {governing && " — replacing the terms above, once you both agree"}
             </p>
           )}
@@ -198,6 +236,52 @@ export default async function ConversationPage({
                 min="0"
                 defaultValue={open?.price ?? governing?.price ?? undefined}
                 className="w-28 rounded-control border border-border bg-background px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-fg">
+              Currency
+              <select
+                name="priceCurrency"
+                defaultValue={
+                  open?.priceCurrency ?? governing?.priceCurrency ?? region.currencyCode
+                }
+                className="rounded-control border border-border bg-background px-2 py-1 text-sm"
+              >
+                {Object.keys(CURRENCIES).map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {/* Agreeing to "450" is not agreeing to anything. Both parties
+                see which of the two it is before either says yes. */}
+            <label className="flex flex-col gap-1 text-xs text-muted-fg">
+              That price is
+              <select
+                name="priceBasis"
+                defaultValue={open?.priceBasis ?? governing?.priceBasis ?? "PER_UNIT"}
+                className="rounded-control border border-border bg-background px-2 py-1 text-sm"
+              >
+                <option value="PER_UNIT">per unit</option>
+                <option value="TOTAL">for the whole lot</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-fg">
+              Per
+              <input
+                type="text"
+                name="priceUnit"
+                defaultValue={
+                  open?.priceUnitCode ??
+                  governing?.priceUnitCode ??
+                  open?.unit ??
+                  governing?.unit ??
+                  yours.unit ??
+                  ""
+                }
+                placeholder="tonne"
+                className="w-24 rounded-control border border-border bg-background px-2 py-1 text-sm"
               />
             </label>
             <button type="submit" className={buttonClass("secondary", "sm")}>

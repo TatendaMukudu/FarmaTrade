@@ -24,7 +24,7 @@ import {
 import { toTermsVersions } from "@/lib/agreement-view";
 import { basisOf, loadCapacities } from "@/lib/allocation";
 import { pairwiseQuantity } from "@/lib/capacity";
-import { formatMoney, regionFor } from "@/lib/regions";
+import { formatMoneyAmount } from "@/lib/money";
 import { formatQuantity, pluralizeUnit } from "@/lib/units";
 import { formatCanonical } from "@/lib/measurement";
 import { Badge } from "@/components/badge";
@@ -286,7 +286,6 @@ export default async function OpportunitiesPage() {
                             post={theirs}
                             myDistrict={party.district}
                             myProvince={party.province}
-                            countryCode={party.countryCode}
                           />
                           {m.reasons.length > 0 && (
                             <p className="mt-2 text-sm font-medium text-foreground">
@@ -420,14 +419,15 @@ function MatchCounterpart({
   post,
   myDistrict,
   myProvince,
-  countryCode,
 }: {
   post: CounterpartPost;
   myDistrict: string;
   myProvince: string;
-  countryCode: string;
 }) {
   const reputation = summarizeReputation(post.party.reputation);
+  // A value only where the price says enough to have one. A legacy price
+  // with no recorded basis shows nothing rather than a number that is wrong
+  // half the time.
   const estimatedValue = estimatedIntentValue(post);
 
   return (
@@ -444,8 +444,7 @@ function MatchCounterpart({
         {reputation.headline}
         {reputation.hasHistory && ` · ${reputation.completedLine}`} ·{" "}
         {distanceLabel(post.district, post.province, myDistrict, myProvince)}
-        {estimatedValue != null &&
-          ` · Est. value ${formatMoney(estimatedValue, regionFor(countryCode))}`}
+        {estimatedValue.ok && ` · Est. value ${formatMoneyAmount(estimatedValue.total)}`}
         {post.destinationDistrict &&
           post.destinationProvince &&
           ` · Route: ${post.district} → ${post.destinationDistrict}`}

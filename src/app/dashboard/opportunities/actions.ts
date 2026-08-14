@@ -24,8 +24,18 @@ export async function respondToMatch(formData: FormData) {
   const match = await prisma.match.findUnique({
     where: { id },
     select: {
-      intentA: { select: { id: true, partyId: true, side: true, unit: true, askingPrice: true } },
-      intentB: { select: { id: true, partyId: true, side: true, unit: true, askingPrice: true } },
+      intentA: {
+        select: {
+          id: true, partyId: true, side: true, unit: true,
+          askingPrice: true, priceCurrency: true, priceBasis: true, priceUnitCode: true,
+        },
+      },
+      intentB: {
+        select: {
+          id: true, partyId: true, side: true, unit: true,
+          askingPrice: true, priceCurrency: true, priceBasis: true, priceUnitCode: true,
+        },
+      },
     },
   });
   if (!match) return;
@@ -68,11 +78,17 @@ export async function respondToMatch(formData: FormData) {
           remaining: sides.get(supply.id)?.remaining ?? null,
           basis: sides.get(supply.id)?.basis ?? null,
           askingPrice: supply.askingPrice == null ? null : Number(supply.askingPrice),
+          priceCurrency: supply.priceCurrency,
+          priceBasis: supply.priceBasis,
+          priceUnitCode: supply.priceUnitCode,
         },
         {
           remaining: sides.get(demand.id)?.remaining ?? null,
           basis: sides.get(demand.id)?.basis ?? null,
           askingPrice: demand.askingPrice == null ? null : Number(demand.askingPrice),
+          priceCurrency: demand.priceCurrency,
+          priceBasis: demand.priceBasis,
+          priceUnitCode: demand.priceUnitCode,
         },
       ),
     );
@@ -96,10 +112,17 @@ export async function proposeMatchTerms(formData: FormData) {
   const quantity = Number(formData.get("quantity"));
   const price = Number(formData.get("price"));
 
+  const priceBasis = String(formData.get("priceBasis") || "");
+
   await proposeTerms(id, party.id, {
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
     unit: (formData.get("unit") as string) || null,
     price: Number.isFinite(price) && price > 0 ? price : null,
+    // A price without these is a number nobody can total, so the form
+    // always sends them and the domain records exactly what arrived.
+    priceCurrency: (formData.get("priceCurrency") as string) || null,
+    priceBasis: priceBasis === "TOTAL" || priceBasis === "PER_UNIT" ? priceBasis : null,
+    priceUnit: (formData.get("priceUnit") as string) || null,
   });
 
   revalidatePath("/dashboard/opportunities");

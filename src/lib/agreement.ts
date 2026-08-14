@@ -13,6 +13,7 @@ import {
 } from "@/lib/agreement-core";
 import { fitsWithin, pairwiseQuantity, readCapacity, type Allocation } from "@/lib/capacity";
 import { resolveUnit, type CanonicalUnit } from "@/lib/measurement";
+import type { PriceBasis } from "@/generated/prisma/client";
 import { isAuthorizedToMatch } from "@/lib/intent";
 
 // The authoritative write path for commercial agreement.
@@ -31,6 +32,12 @@ export type TermsInput = {
   quantity?: number | null;
   unit?: string | null;
   price?: number | null;
+  // What the price means. A caller that supplies an amount without these is
+  // proposing a number nobody can total, and the stored row says so rather
+  // than pretending otherwise.
+  priceCurrency?: string | null;
+  priceBasis?: PriceBasis | null;
+  priceUnit?: string | null;
   handoverOn?: Date | null;
 };
 
@@ -76,6 +83,9 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
           unit: true,
           unitCode: true,
           price: true,
+          priceCurrency: true,
+          priceBasis: true,
+          priceUnitCode: true,
           handoverOn: true,
           proposedById: true,
           acceptances: { select: { partyId: true } },
@@ -92,6 +102,9 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
     unit: t.unit,
     unitCode: t.unitCode,
     price: t.price == null ? null : Number(t.price),
+    priceCurrency: t.priceCurrency,
+    priceBasis: t.priceBasis,
+    priceUnitCode: t.priceUnitCode,
     handoverOn: t.handoverOn,
     proposedById: t.proposedById,
     acceptedBy: t.acceptances.map((a) => a.partyId),
@@ -152,6 +165,9 @@ async function reservationsByIntent(
           unit: true,
           unitCode: true,
           price: true,
+          priceCurrency: true,
+          priceBasis: true,
+          priceUnitCode: true,
           handoverOn: true,
           proposedById: true,
           acceptances: { select: { partyId: true } },
@@ -171,6 +187,9 @@ async function reservationsByIntent(
       unit: t.unit,
       unitCode: t.unitCode,
       price: t.price == null ? null : Number(t.price),
+      priceCurrency: t.priceCurrency,
+      priceBasis: t.priceBasis,
+      priceUnitCode: t.priceUnitCode,
       handoverOn: t.handoverOn,
       proposedById: t.proposedById,
       acceptedBy: t.acceptances.map((a) => a.partyId),
@@ -236,11 +255,19 @@ export async function proposeTerms(
     // the words. What the parties agree to is a physical quantity, not a
     // string that a later alias change could re-point.
     const resolved = resolveUnit(input.unit);
+    // The unit a rate is quoted per, resolved through the same canonical
+    // table as the quantity. A rate per a unit FarmaTrade cannot resolve is
+    // stored with a null code, which makes it unvaluable rather than
+    // silently wrong.
+    const priceUnit = resolveUnit(input.priceUnit);
     const terms = {
       quantity: input.quantity ?? null,
       unit: input.unit ?? null,
       unitCode: resolved.ok ? resolved.unit.code : null,
       price: input.price ?? null,
+      priceCurrency: input.priceCurrency ?? null,
+      priceBasis: input.priceBasis ?? null,
+      priceUnitCode: priceUnit.ok ? priceUnit.unit.code : null,
       handoverOn: input.handoverOn ?? null,
     };
     if (governing && !materiallyDiffers(governing, terms)) {
@@ -256,6 +283,9 @@ export async function proposeTerms(
         unit: terms.unit,
         unitCode: terms.unitCode,
         price: terms.price,
+        priceCurrency: terms.priceCurrency,
+        priceBasis: terms.priceBasis,
+        priceUnitCode: terms.priceUnitCode,
         handoverOn: terms.handoverOn,
         proposedById: partyId,
       },
@@ -393,21 +423,39 @@ export async function acceptTerms(
 // A starting point for a conversation, not a decision made on anyone's
 // behalf — it is still proposed by a party and still needs the other to
 // agree.
-export function suggestedTerms(
-  supply: { remaining: number | null; basis: CanonicalUnit | null; askingPrice: number | null },
-  demand: { remaining: number | null; basis: CanonicalUnit | null; askingPrice: number | null },
-): TermsInput {
+// A side's asking price, as far as it is known to mean anything.
+export type PricedSide = {
+  remaining: number | null;
+  basis: CanonicalUnit | null;
+  askingPrice: number | null;
+  priceCurrency: string | null;
+  priceBasis: PriceBasis | null;
+  priceUnitCode: string | null;
+};
+
+export function suggestedTerms(supply: PricedSide, demand: PricedSide): TermsInput {
   const pairwise = pairwiseQuantity(supply, demand);
+
+  // Whichever side actually quoted a price whose meaning is recorded. A
+  // legacy amount with no basis is not carried forward: putting it on a new
+  // terms version would launder an ambiguous number into one two parties
+  // are about to agree on, which is precisely how the ambiguity spread in
+  // the first place.
+  const priced = [supply, demand].find((s) => s.askingPrice != null && s.priceBasis != null);
+
   return {
     quantity: pairwise?.value ?? null,
     // The canonical unit's own word, so what gets proposed says "500 kg"
     // rather than echoing a string neither side typed.
     unit: pairwise?.unit?.one ?? null,
-    // Price is passed through untouched and is NOT rescaled by any
-    // conversion. Its per-unit-or-total meaning is ambiguous in the current
-    // data model (see docs/measurement.md), and rescaling an ambiguous
-    // number is how $500/tonne quietly becomes $500/kg.
-    price: supply.askingPrice ?? demand.askingPrice ?? null,
+    // Carried across with its meaning intact and its number untouched. A
+    // rate is never rescaled to match the proposed quantity's unit — the
+    // parties quoted per tonne, and the valuation converts at read time
+    // rather than rewriting what was quoted.
+    price: priced?.askingPrice ?? null,
+    priceCurrency: priced?.priceCurrency ?? null,
+    priceBasis: priced?.priceBasis ?? null,
+    priceUnit: priced?.priceUnitCode ?? null,
     handoverOn: null,
   };
 }

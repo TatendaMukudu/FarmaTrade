@@ -35,6 +35,13 @@ export type TermsVersion = {
   // the agreement real but its quantity uncountable.
   unitCode: string | null;
   price: number | null;
+  // What that amount means, fixed with it. An agreement is only a
+  // commercial fact if both parties knew what they were agreeing to pay,
+  // and a bare "450" is not that. Null where the version predates explicit
+  // pricing — never backfilled into an invented meaning.
+  priceCurrency: string | null;
+  priceBasis: string | null;
+  priceUnitCode: string | null;
   handoverOn: Date | null;
   proposedById: string;
   // Party ids that have accepted THIS version. Never inherited from an
@@ -92,10 +99,12 @@ export function nextVersion(versions: readonly TermsVersion[]): number {
 // price or a handover date, and treating one as cosmetic would be exactly
 // the silent carrying-forward of consent this module exists to prevent. If
 // a term is not worth re-confirming, it does not belong in the terms.
-export function materiallyDiffers(
-  a: Pick<TermsVersion, "quantity" | "unit" | "unitCode" | "price" | "handoverOn">,
-  b: Pick<TermsVersion, "quantity" | "unit" | "unitCode" | "price" | "handoverOn">,
-): boolean {
+type MaterialTerms = Pick<
+  TermsVersion,
+  "quantity" | "unit" | "unitCode" | "price" | "priceCurrency" | "priceBasis" | "priceUnitCode" | "handoverOn"
+>;
+
+export function materiallyDiffers(a: MaterialTerms, b: MaterialTerms): boolean {
   return (
     a.quantity !== b.quantity ||
     // Both the canonical identity and the typed words. The identity is what
@@ -105,6 +114,12 @@ export function materiallyDiffers(
     (a.unitCode ?? null) !== (b.unitCode ?? null) ||
     (a.unit ?? null) !== (b.unit ?? null) ||
     a.price !== b.price ||
+    // The price's meaning is as material as its amount. "500 total" and
+    // "500 per tonne" are the same number and wildly different deals, and
+    // consent to one is not consent to the other.
+    (a.priceCurrency ?? null) !== (b.priceCurrency ?? null) ||
+    (a.priceBasis ?? null) !== (b.priceBasis ?? null) ||
+    (a.priceUnitCode ?? null) !== (b.priceUnitCode ?? null) ||
     (a.handoverOn?.getTime() ?? null) !== (b.handoverOn?.getTime() ?? null)
   );
 }

@@ -9,6 +9,7 @@ import { regionFor } from "@/lib/regions";
 import { normalizeProductTerm, subjectFromTitle } from "@/lib/products";
 import { generateMatchesForIntent } from "@/lib/matching";
 import { resolveUnit } from "@/lib/measurement";
+import { currencyByCode } from "@/lib/money";
 import { uploadPhoto } from "@/lib/storage";
 import type { IntentSide, CommerceCategory } from "@/generated/prisma/client";
 
@@ -92,6 +93,28 @@ function canonicalUnitCode(unit: string | null | undefined): string | null {
   return resolved.ok ? resolved.unit.code : null;
 }
 
+// The three fields that make a price mean something, or nothing at all.
+//
+// A price with no basis is not stored with a guessed one. If a farmer
+// somehow submits an amount without saying what it is per, the row is
+// honestly ambiguous rather than dishonestly precise.
+function priceSemantics(data: {
+  askingPrice?: number;
+  priceBasis?: "TOTAL" | "PER_UNIT";
+  priceCurrency?: string;
+  priceUnit?: string;
+}) {
+  if (data.askingPrice == null || !data.priceBasis) return {};
+  const perUnit = resolveUnit(data.priceUnit);
+  return {
+    priceBasis: data.priceBasis,
+    priceCurrency: currencyByCode(data.priceCurrency)?.code ?? null,
+    // Only meaningful for a rate. A total is a total whatever the goods are
+    // measured in.
+    priceUnitCode: data.priceBasis === "PER_UNIT" && perUnit.ok ? perUnit.unit.code : null,
+  };
+}
+
 export type PostActionState = { error?: string };
 
 const MAX_PHOTOS = 4;
@@ -132,6 +155,9 @@ export async function createPost(
     province: formData.get("province"),
     district: formData.get("district"),
     askingPrice: formData.get("askingPrice") || undefined,
+    priceBasis: formData.get("priceBasis") || undefined,
+    priceCurrency: formData.get("priceCurrency") || undefined,
+    priceUnit: formData.get("priceUnit") || undefined,
     urgent: formData.get("urgent") === "on",
     neededBy: formData.get("neededBy") || undefined,
     recurring: formData.get("recurring") === "on",
@@ -181,6 +207,10 @@ export async function createPost(
       province: data.province,
       district: data.district,
       askingPrice: data.askingPrice,
+      // Stored only where the farmer actually said what the number means.
+      // A price with no basis would be another ambiguous row, and ending
+      // those is the whole point of this phase.
+      ...priceSemantics(data),
       urgent: data.urgent ?? false,
       neededBy: data.neededBy,
       recurring: data.recurring ?? false,

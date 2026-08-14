@@ -424,7 +424,25 @@ model Intent {
   // international candidates; it never removes local ones, and a match only
   // ever crosses a border when BOTH sides asked for it.
   openToCrossBorder Boolean @default(false)
+  // LEGACY WHERE priceBasis IS NULL.
+  //
+  // This number was written before anything recorded what it meant, and two
+  // modules read it in opposite ways — one as a total, one as a rate per
+  // unit. The form said only "Price (optional)". Rows with a null
+  // priceBasis are therefore of unknown meaning and are never valued; see
+  // docs/pricing.md for why guessing was rejected.
+  //
+  // New writes always set priceBasis, priceCurrency and (for PER_UNIT)
+  // priceUnitCode alongside it, at which point this is simply the amount.
   askingPrice Decimal?     @db.Decimal(12, 2)
+  // ISO 4217. Currency used to be inferred at display time from the party's
+  // country, which breaks the moment a ZW seller and a ZA buyer trade —
+  // something FarmaTrade has supported since cross-border opt-in existed.
+  priceCurrency String?
+  priceBasis    PriceBasis?
+  // Canonical unit the rate is per, when priceBasis is PER_UNIT. Uses the
+  // same identities as Intent.unitCode (see lib/measurement.ts).
+  priceUnitCode String?
   status      IntentStatus @default(ACTIVE)
   // Urgency drives display/ordering today; it's the seam for the delivery
   // layer's pacing rules later — perishables and deadlines shouldn't wait
@@ -503,6 +521,19 @@ model Photo {
 // both parties agreeing. Only the second reserves anybody's capacity, and
 // the enum says which is which rather than leaving it to a convention some
 // call site can forget.
+// What a price is a price OF.
+//
+// Two values, because these are the only two shapes a farmer quotes. "Per
+// bag" is not a third — it is PER_UNIT whose basis unit happens to be a
+// package, which is why package pricing needs no special case anywhere.
+//
+// Null on a row means the price predates explicit semantics and its meaning
+// is genuinely unknown. See docs/pricing.md.
+enum PriceBasis {
+  TOTAL
+  PER_UNIT
+}
+
 enum MatchStatus {
   // FarmaTrade found a possible pairing. Nobody has answered.
   SUGGESTED
@@ -612,6 +643,13 @@ model AgreementTerms {
   // Snapshot, not a live read of Intent.askingPrice. A seller raising their
   // asking price must not retroactively change what a buyer agreed to pay.
   price      Decimal?  @db.Decimal(12, 2)
+  // What that amount means, snapshot with it. An agreement is only a
+  // commercial fact if both parties knew what they were agreeing to pay,
+  // and "450" is not that. Null on rows proposed before explicit pricing
+  // existed — never backfilled into an invented meaning.
+  priceCurrency String?
+  priceBasis    PriceBasis?
+  priceUnitCode String?
   handoverOn DateTime?
   // Who put these terms on the table. Proposing is itself an acceptance —
   // see the TermsAcceptance written alongside.

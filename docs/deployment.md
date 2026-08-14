@@ -121,3 +121,28 @@ Capacity figures are now reported in canonical units — kilograms for mass.
 An intent authorized as "2 tonnes" reports `authorized: 2000`. Anything
 consuming `Capacity` numerically must render through `basis` rather than
 assuming the owner's original unit.
+
+## `20260813210000_price_semantics` is rolling-deploy safe
+
+Adds one enum and three nullable columns to each of `Intent` and
+`AgreementTerms`, and rewrites nothing. Old code ignores them; new code
+reads a NULL `priceBasis` as "this number's meaning was never recorded".
+
+### No backfill, deliberately
+
+Existing `askingPrice` values are bare numbers of genuinely unknown meaning
+— `estimatedIntentValue` multiplied them by quantity while
+`loadPriceSignals` divided by it, and the form said only "Price (optional)".
+See `docs/pricing.md` for the evidence search and why the value ranges were
+not treated as proof.
+
+### Behaviour change on deploy
+
+- Opportunity cards **stop showing "Est. value"** for pre-existing priced
+  intents. That line was computed by the multiplying reader and was wrong
+  wherever the number was a total.
+- Price signals **stop including** pre-existing priced intents, so ranges
+  will be sparser until farmers re-enter prices with an explicit basis. Any
+  range shown is now built only from prices that state what they mean.
+- New intents and terms require a basis and currency through the UI; both
+  forms now ask.

@@ -5,6 +5,9 @@ import { createPost, type PostActionState } from "./actions";
 import { regionFor } from "@/lib/regions";
 import { formatQuantity } from "@/lib/units";
 import { CATEGORY_LABEL } from "@/lib/categories";
+import { CURRENCIES } from "@/lib/money";
+
+const CURRENCY_CODES = Object.keys(CURRENCIES);
 import type { CommerceCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
@@ -37,6 +40,10 @@ export function PostForm({
   onDone?: () => void;
 }) {
   const region = regionFor(countryCode);
+  // Mirrored into the price row, so "per tonne" fills itself in for a
+  // listing already measured in tonnes.
+  const [unit, setUnit] = useState("");
+  const [priceBasis, setPriceBasis] = useState<"PER_UNIT" | "TOTAL">("PER_UNIT");
   const formRef = useRef<HTMLFormElement>(null);
   const [category, setCategory] = useState<Category>(defaultCategory);
   const forThisCategory = inventory.filter((i) => i.category === category);
@@ -99,12 +106,11 @@ export function PostForm({
               if (!form || !picked) return;
               const title = form.elements.namedItem("title") as HTMLInputElement | null;
               const quantity = form.elements.namedItem("quantity") as HTMLInputElement | null;
-              const unit = form.elements.namedItem("unit") as HTMLInputElement | null;
               if (title && !title.value) title.value = picked.label;
               if (quantity && !quantity.value && picked.quantity != null) {
                 quantity.value = String(picked.quantity);
               }
-              if (unit && !unit.value && picked.unit) unit.value = picked.unit;
+              if (picked.unit) setUnit((current) => current || picked.unit!);
             }}
             className="w-full rounded-card border border-border px-2 py-1 text-sm"
           >
@@ -148,8 +154,21 @@ export function PostForm({
           />
         </Field>
         <Field label="Unit (optional)">
-          <input name="unit" className="w-24 rounded-card border border-border px-2 py-1 text-sm" />
+          <input
+            name="unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="w-24 rounded-card border border-border px-2 py-1 text-sm"
+          />
         </Field>
+      </div>
+
+      {/* Price used to be one unlabelled box, and nothing recorded whether
+          the number was for the whole lot or for each tonne. Two parts of
+          the app then read it in opposite ways. Saying it out loud costs a
+          dropdown and ends the ambiguity — and it is what a farmer says
+          anyway: "three hundred a tonne", not "three hundred". */}
+      <div className="flex flex-wrap items-end gap-3">
         <Field label="Price (optional)">
           <input
             name="askingPrice"
@@ -158,6 +177,45 @@ export function PostForm({
             className="w-32 rounded-card border border-border px-2 py-1 text-sm"
           />
         </Field>
+        <Field label="Currency">
+          <select
+            name="priceCurrency"
+            defaultValue={region.currencyCode}
+            className="rounded-card border border-border px-2 py-1 text-sm"
+          >
+            {CURRENCY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="That price is">
+          <select
+            name="priceBasis"
+            value={priceBasis}
+            onChange={(e) => setPriceBasis(e.target.value as "PER_UNIT" | "TOTAL")}
+            className="rounded-card border border-border px-2 py-1 text-sm"
+          >
+            <option value="PER_UNIT">per unit</option>
+            <option value="TOTAL">for the whole lot</option>
+          </select>
+        </Field>
+        {priceBasis === "PER_UNIT" && (
+          <Field label="Per">
+            {/* Defaults to whatever they are measuring in, because "$300 a
+                tonne" for a listing of tonnes is the overwhelmingly common
+                case. Editable, because a farmer selling tonnes may quote
+                per bag. */}
+            <input
+              name="priceUnit"
+              defaultValue={unit}
+              key={unit}
+              placeholder="tonne"
+              className="w-24 rounded-card border border-border px-2 py-1 text-sm"
+            />
+          </Field>
+        )}
       </div>
 
       {category === "TRANSPORT" && (

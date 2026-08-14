@@ -126,6 +126,12 @@ export const intentSchemaFor = (labels: RegionLabels = PILOT_LABELS) =>
   unit: z.string().trim().optional(),
   ...locationShape(labels),
   askingPrice: z.coerce.number().positive().optional(),
+  // What the price means. Optional because price itself is optional, but a
+  // price that arrives without a basis is stored as legacy-ambiguous rather
+  // than being guessed at — see lib/pricing.ts.
+  priceBasis: z.enum(["TOTAL", "PER_UNIT"]).optional(),
+  priceCurrency: z.string().trim().toUpperCase().optional(),
+  priceUnit: z.string().trim().optional(),
   urgent: z.coerce.boolean().optional(),
   neededBy: z.coerce.date().optional(),
   recurring: z.coerce.boolean().optional(),

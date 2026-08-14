@@ -25,6 +25,9 @@ function terms(overrides: Partial<TermsVersion> = {}): TermsVersion {
     unit: "tonne",
     unitCode: "METRIC_TONNE",
     price: 290,
+    priceCurrency: "USD",
+    priceBasis: "PER_UNIT",
+    priceUnitCode: "METRIC_TONNE",
     handoverOn: null,
     proposedById: FARMER,
     acceptedBy: [FARMER],
@@ -114,6 +117,9 @@ describe("materiallyDiffers", () => {
     unit: "tonne",
     unitCode: "METRIC_TONNE" as string | null,
     price: 290,
+    priceCurrency: "USD" as string | null,
+    priceBasis: "PER_UNIT" as string | null,
+    priceUnitCode: "METRIC_TONNE" as string | null,
     handoverOn: null as Date | null,
   };
 
@@ -124,6 +130,14 @@ describe("materiallyDiffers", () => {
     expect(materiallyDiffers(base, { ...base, unit: "bag", unitCode: "BAG" })).toBe(true);
     expect(materiallyDiffers(base, { ...base, price: 300 })).toBe(true);
     expect(materiallyDiffers(base, { ...base, handoverOn: new Date("2026-09-01") })).toBe(true);
+  });
+
+  it("treats the price's meaning as material, not just its amount", () => {
+    // "290 per tonne" and "290 for the lot" are the same number and a
+    // completely different deal. Consent to one is not consent to the other.
+    expect(materiallyDiffers(base, { ...base, priceBasis: "TOTAL", priceUnitCode: null })).toBe(true);
+    expect(materiallyDiffers(base, { ...base, priceCurrency: "ZAR" })).toBe(true);
+    expect(materiallyDiffers(base, { ...base, priceUnitCode: "KILOGRAM" })).toBe(true);
   });
 
   it("recognises the identical deal, so re-proposing it is not a renegotiation", () => {

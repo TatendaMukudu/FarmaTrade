@@ -14,6 +14,9 @@ type StoredTerms = {
   unit: string | null;
   unitCode: string | null;
   price: unknown;
+  priceCurrency: string | null;
+  priceBasis: string | null;
+  priceUnitCode: string | null;
   handoverOn: Date | null;
   proposedById: string;
   acceptances: { partyId: string }[];
@@ -27,6 +30,9 @@ export function toTermsVersions(rows: readonly StoredTerms[]): TermsVersion[] {
     unit: t.unit,
     unitCode: t.unitCode,
     price: t.price == null ? null : Number(t.price),
+    priceCurrency: t.priceCurrency,
+    priceBasis: t.priceBasis,
+    priceUnitCode: t.priceUnitCode,
     handoverOn: t.handoverOn,
     proposedById: t.proposedById,
     acceptedBy: t.acceptances.map((a) => a.partyId),
