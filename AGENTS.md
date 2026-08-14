@@ -91,8 +91,27 @@ reasoning.** Do not work around it silently.
 
 ## 3. How to work here
 
-FarmaTrade is built in **numbered phases** (P0.1, P0.2, …). Each is one
-coherent correction to the domain, and each follows the same shape:
+FarmaTrade is built in **numbered phases**. Each is one coherent correction
+to the domain, and each follows the same shape:
+
+| Phase | | |
+|---|---|---|
+| P0.1 | canonical product identity | shipped |
+| P0.2 | intent lifecycle + derived proposals | shipped |
+| P0.3 | quantity-aware capacity | shipped |
+| P0.4 | bilateral agreement | shipped |
+| P0.5 | canonical measurement | shipped |
+| P0.7 | commercial price semantics | shipped |
+| **P0.6** | **commitment & allocation** (absorbs packaging) | **in the loop** |
+| P0.8 | transaction lifecycle: pickup → delivery → dispute | next |
+| P0.9 | matching quality | after |
+| P0.10 | proactive coordination | after |
+
+P0.6 stayed free when packaging was deferred out of P0.5, so Commitment &
+Allocation takes that slot and the packaging question with it. Pricing had
+already taken P0.7 by then — hence the out-of-order row above rather than a
+renumber that would break every commit message referring to them.
+
 
 1. **Audit first.** Map what the repo actually does before changing it. The
    two worst defects found so far — capacity reserved by one party alone,
@@ -161,9 +180,10 @@ The founder should **not** be a copy-paste layer between agents. Design
 discussion happens **in the repo**, not in a chat window:
 
 - The current proposal lives in a **council brief** at the repo root
-  (`COUNCIL_BRIEF_2026-08-14.md`) and is tracked by an open GitHub **issue
-  labelled `rfc`** — currently
-  [#20](https://github.com/TatendaMukudu/FarmaTrade/issues/20).
+  and is tracked by an open GitHub **issue labelled `rfc`**. Current briefs:
+  `COUNCIL_BRIEF_2026-08-14.md`
+  ([#20](https://github.com/TatendaMukudu/FarmaTrade/issues/20)) and
+  `COUNCIL_BRIEF_P0.6.md` (Commitment & Allocation).
 - **To weigh in:** read the brief, then **comment on the RFC issue** —
   respond to its numbered open questions directly, and add your own. Agree,
   disagree, or propose an alternative; say *why*. Disagreement is welcome —
@@ -205,7 +225,7 @@ no repo access: capture it as a comment so it is durable and visible.
 | Product identity | `src/lib/products.ts` |
 | Schema + migrations | `prisma/schema.prisma`, `prisma/migrations/` |
 | Contracts / docs | `docs/TESTING.md`, `docs/pricing.md`, `docs/measurement.md`, `docs/deployment.md`, this file |
-| Council | `COUNCIL_BRIEF_2026-08-14.md`, the `rfc` issue, `docs/reviews/` |
+| Council | `COUNCIL_BRIEF_*.md`, the `rfc` issues, `docs/reviews/` |
 
 Modules ending `-core.ts` (and `capacity`, `measurement`, `money`, `pricing`,
 `units`) are **pure and database-free** by law. Their `server-only` wrappers
