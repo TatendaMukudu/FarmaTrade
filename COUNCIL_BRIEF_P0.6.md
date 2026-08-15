@@ -131,3 +131,143 @@ livestock and equipment — which have the same exposure and no probe yet.
   have not tested them. So does a DEMAND intent shared across two buyers'
   orders, if that is even reachable.
 - Try to break law 1 or law 8 while you are in there.
+
+---
+
+## Appendix — the probes
+
+Deliberately **not** in the suite: they assert current *broken* behaviour, so
+committing them would mean the suite goes red the day P0.6 fixes it. They
+live here so the second seat can reproduce them, and they become real tests
+inverted once the invariant holds.
+
+Drop into `src/lib/zz-probe.test.ts`, run
+`DATABASE_URL=... SESSION_SECRET=x npx vitest run src/lib/zz-probe.test.ts`,
+then delete it.
+
+```ts
+// Scratch probe for the P0.6 audit. NOT part of the suite.
+//
+// Governing invariant under test: FarmaTrade must never promise the same
+// physical supply twice.
+import { describe, expect, it, afterEach } from "vitest";
+import { prisma } from "@/lib/prisma";
+import { acceptTerms, proposeTerms } from "@/lib/agreement";
+import { loadCapacity } from "@/lib/allocation";
+import { ensureDerivedIntent } from "@/lib/derived-intent";
+import { createTestParty, createTestIntent, createTestMatch, cleanupParties } from "@/test/factories";
+
+describe("P0.6 probe", () => {
+  const partyIds: string[] = [];
+  afterEach(async () => cleanupParties(partyIds.splice(0)));
+
+  async function party() {
+    const { party } = await createTestParty({ roles: ["FARM"] });
+    partyIds.push(party.id);
+    return party;
+  }
+
+  it("PROBE A: two intents on the SAME produce row", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "F" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 26, unit: "TONNE" },
+    });
+
+    // Two commercial intents, both about the same 26 tonnes.
+    const a = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 20, unit: "tonnes" });
+    const b = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 20, unit: "tonnes" });
+    await prisma.intent.updateMany({
+      where: { id: { in: [a.id, b.id] } },
+      data: { produceId: produce.id },
+    });
+
+    // 8t agreed against intent A.
+    const buyer = await party();
+    const demand = await createTestIntent(buyer.id, { side: "DEMAND", quantity: 8, unit: "tonnes" });
+    const match = await createTestMatch(a.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 8, unit: "tonnes" });
+    await acceptTerms(match.id, seller.id);
+
+    const capA = await loadCapacity(a.id);
+    const capB = await loadCapacity(b.id);
+    const promised = (capA!.remaining ?? 0) + (capB!.remaining ?? 0) + capA!.reserved;
+
+    console.log("\n  PROBE A ---------------------------------------");
+    console.log("  physical stock          :", produce.quantity, "tonnes (26000 kg)");
+    console.log("  intent A remaining (kg) :", capA!.remaining);
+    console.log("  intent A reserved  (kg) :", capA!.reserved);
+    console.log("  intent B remaining (kg) :", capB!.remaining);
+    console.log("  TOTAL PROMISED     (kg) :", promised, " vs 26000 kg physical");
+    console.log("  -----------------------------------------------\n");
+
+    expect(promised).toBeGreaterThan(26000);
+  });
+
+  it("PROBE B: derivation after withdrawing an intent that holds a live agreement", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "F" } });
+    const produce = await prisma.produceStock.create({
+      data: {
+        farmId: farm.id,
+        cropType: "Maize",
+        quantity: 26,
+        unit: "TONNE",
+        expectedHarvestDate: new Date(Date.now() + 3 * 86400000),
+      },
+    });
+    await ensureDerivedIntent(farm.id, seller);
+    const [derived] = await prisma.intent.findMany({
+      where: { partyId: seller.id, origin: "DERIVED" },
+    });
+    await prisma.intent.update({ where: { id: derived.id }, data: { status: "ACTIVE" } });
+
+    // Agree 8t against it.
+    const buyer = await party();
+    const demand = await createTestIntent(buyer.id, { side: "DEMAND", quantity: 8, unit: "TONNE" });
+    const match = await createTestMatch(derived.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 8, unit: "TONNE" });
+    await acceptTerms(match.id, seller.id);
+    const held = (await loadCapacity(derived.id))!.reserved;
+
+    // Farmer withdraws the intent. The agreement is untouched.
+    await prisma.intent.update({ where: { id: derived.id }, data: { status: "WITHDRAWN" } });
+    // Harvest is re-weighed materially higher.
+    await prisma.produceStock.update({ where: { id: produce.id }, data: { quantity: 40 } });
+    await ensureDerivedIntent(farm.id, seller);
+
+    const all = await prisma.intent.findMany({
+      where: { partyId: seller.id, origin: "DERIVED" },
+      orderBy: { createdAt: "asc" },
+    });
+    const stillReserved = (await loadCapacity(derived.id))!.reserved;
+
+    console.log("\n  PROBE B ---------------------------------------");
+    console.log("  agreement held (kg)      :", held);
+    console.log("  derived intents now      :", all.length, all.map((i) => `${i.status}:${i.quantity}`).join(", "));
+    console.log("  old intent still reserves:", stillReserved, "kg");
+    console.log("  new proposal aware of it :", all.length > 1 ? "NO" : "n/a");
+    console.log("  -----------------------------------------------\n");
+    expect(all.length).toBeGreaterThan(0);
+  });
+});
+```
+
+Expected output on `9302045`:
+
+```
+  PROBE A ---------------------------------------
+  physical stock          : 26 tonnes (26000 kg)
+  intent A remaining (kg) : 12000
+  intent A reserved  (kg) : 8000
+  intent B remaining (kg) : 20000
+  TOTAL PROMISED     (kg) : 40000  vs 26000 kg physical
+  -----------------------------------------------
+
+  PROBE B ---------------------------------------
+  agreement held (kg)      : 8000
+  derived intents now      : 2 WITHDRAWN:26, PROPOSED:40
+  old intent still reserves: 8000 kg
+  new proposal aware of it : NO
+  -----------------------------------------------
+```
