@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { summarizeReputation } from "@/lib/reputation";
+import { canSeeContactDetails } from "@/lib/identity-safety";
 import { Badge } from "@/components/badge";
 
 export default async function PartyProfilePage({
@@ -39,6 +40,12 @@ export default async function PartyProfilePage({
   if (!party) notFound();
 
   const reputation = summarizeReputation(party.reputation);
+
+  // PRODUCT_TRUTH.md §29 / INV-14. The rule lives in identity-safety.ts
+  // because it is product truth, not presentation — a page that decides for
+  // itself who may see a phone number is a page that can be copied without
+  // the rule.
+  const engaged = await canSeeContactDetails(currentParty?.id, partyId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,7 +105,7 @@ export default async function PartyProfilePage({
         </div>
       )}
 
-      {(party.phone || party.contactDetails) && (
+      {engaged && (party.phone || party.contactDetails) && (
         <div className="rounded-card border border-border bg-card p-4">
           <p className="text-xs text-muted-fg">Contact</p>
           {party.phone && <p className="font-medium">{party.phone}</p>}
@@ -106,6 +113,11 @@ export default async function PartyProfilePage({
             <p className="mt-1 text-sm whitespace-pre-line text-muted-fg">{party.contactDetails}</p>
           )}
         </div>
+      )}
+      {!engaged && (party.phone || party.contactDetails) && (
+        <p className="text-xs text-subtle-fg">
+          Contact details become available once you and {party.name} have agreed a trade.
+        </p>
       )}
     </div>
   );

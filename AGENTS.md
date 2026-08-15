@@ -5,6 +5,16 @@ implementers (Claude, Codex) who write and review each other's work.
 **The verification gate is the arbiter** — not seniority, not confidence, not
 who wrote it. Read this before touching anything.
 
+> **`PRODUCT_TRUTH.md` outranks this file.** That is founder product truth —
+> what FarmaTrade must preserve *even if the architecture changes
+> completely*. This file is the implementation contract: how agents work,
+> what the gate is, what the code may not do. Where they conflict, product
+> truth wins and this file is wrong.
+>
+> Live status of its twenty invariants: `docs/invariant-register.md`. Read
+> it before proposing a phase — it says which product truths the code does
+> not yet keep.
+
 ---
 
 ## 0. The rule that overrides all others
@@ -71,6 +81,10 @@ FarmaTrade is *allowed to do*:
 7. **No forecasting or causal claims** in farmer-facing reasons.
 8. **One authoritative consent predicate.** Never count acceptances at a
    call site.
+9. **Law Zero — favorability before revenue.** Ranking may not read a
+   revenue, sponsorship or paid-placement signal. `PRODUCT_TRUTH.md` §5.
+10. **Farm size is not a quality signal.** Matching may not read acreage.
+    `PRODUCT_TRUTH.md` §41.
 
 Behavioural laws the static checks cannot reach, guarded by the suite:
 
@@ -225,6 +239,8 @@ no repo access: capture it as a comment so it is durable and visible.
 | Matching | `src/lib/matching-core.ts`, `src/lib/matching.ts`, `src/lib/match-rank.ts` |
 | Product identity | `src/lib/products.ts` |
 | Schema + migrations | `prisma/schema.prisma`, `prisma/migrations/` |
+| **Product truth** | **`PRODUCT_TRUTH.md`, `docs/invariant-register.md`** |
+| Identity safety | `src/lib/identity-safety.ts` |
 | Contracts / docs | `docs/TESTING.md`, `docs/pricing.md`, `docs/measurement.md`, `docs/deployment.md`, this file |
 | Council | `COUNCIL_BRIEF_*.md`, the `rfc` issues, `docs/reviews/` |
 

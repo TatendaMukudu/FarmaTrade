@@ -1,0 +1,205 @@
+# Invariant register
+
+Live status of `PRODUCT_TRUTH.md` §52 against the code.
+
+Every row is evidence-based — either a test that runs, a static check in
+`scripts/invariants.mjs`, or a structural fact I verified in the source.
+Where a row says **VIOLATED** the code contradicts DECIDED product truth
+today, and that is a defect, not a backlog item.
+
+| Status | Meaning |
+|---|---|
+| **HELD (test)** | An executable test fails if it breaks |
+| **HELD (structural)** | The architecture makes it true; no test yet pins it |
+| **PARTIAL** | True in part; a named case is not covered |
+| **VIOLATED** | The code contradicts DECIDED product truth |
+| **NOT BUILT** | Trivially true because the feature does not exist |
+
+---
+
+## INV-01 — Favorability before revenue · **HELD (static)**
+
+No revenue concept exists, so nothing can corrupt ranking. Now pinned by
+`scripts/invariants.mjs` law 9: the ranking modules may not import or
+reference any revenue, sponsorship, fee or placement signal. It bites before
+the first paid placement is written rather than after.
+
+## INV-02 — Proposed is not agreed · **HELD (test)**
+
+P0.2 + P0.4. A `PROPOSED` intent is never matchable
+(`agreement.integration.test.ts`), and capacity moves only when the second
+`TermsAcceptance` row lands.
+
+## INV-03 — Demand initiates · **PARTIAL — see divergence D1**
+
+The literal invariant text ("available supply does not automatically create
+commitments") **holds**: nothing auto-commits. But §10's stronger prose
+("demand acts", "a farmer should not have to chase every possible buyer")
+is not implemented — `proposeTerms` is symmetric and a supplier may open
+terms on a buyer.
+
+## INV-04 — Negotiation preserves agency · **HELD (test)**
+
+P0.4 terms versions. Accept, decline and counter all covered.
+
+## INV-05 — Agreement creates history · **HELD (test)**
+
+`AgreementTerms` are immutable and append-only; cancellation sets
+`Match.status` and leaves the terms intact. Tested: "the record of what was
+agreed survives the cancellation."
+
+## INV-06 — Future supply is tradeable · **HELD (structural)**
+
+Derivation reads `expectedHarvestDate` and proposes ahead of harvest; an
+agreement may be formed against it. No test yet asserts the *future* aspect
+specifically.
+
+## INV-07 — Multi-supplier fulfillment · **HELD (test)**
+
+Tested end to end: a 100t demand satisfied by 40t + 30t leaves 30t.
+
+## INV-08 — Small does not mean inferior · **HELD (static)**
+
+`matching-core.ts` and `match-rank.ts` contain zero references to
+`sizeHectares` or any size signal. Now pinned by law 10 so it cannot be
+introduced quietly.
+
+## INV-09 — Network is not reputation · **NOT BUILT**
+
+No network concept exists (§23 is unbuilt). Trivially true; untestable until
+connections exist.
+
+## INV-10 — Role reputation remains separate · **VIOLATED**
+
+`Reputation` is a **single aggregate per party**: `completedCount`,
+`averageRating`, `ratingCount`. There is no role dimension, so poor buyer
+behaviour and strong supplier performance land in the same average. §31 is
+DECIDED and the schema cannot express it.
+
+## INV-11 — Reviews cannot rewrite facts · **HELD (structural)**
+
+`Rating` (subjective) and `TransactionConfirmation` (observed) are separate
+models and `recomputeReputation` derives `completedCount` from confirmations
+only. A rating cannot touch observed history.
+
+## INV-12 — Quiet success counts · **HELD (structural)**
+
+`completedCount = completedGoodCount + completedIssueCount`, both from
+`TransactionConfirmation`. Ratings feed only `averageRating`/`ratingCount`.
+A trade with no review still counts.
+
+## INV-13 — Cancellation persists · **PARTIAL**
+
+The agreed terms survive a cancellation. But `Match.status` is mutable with
+no history and there is no cancellation *record*, reason or timestamp — so
+"recent cancellation behaviour remains visible" (§37) is not supported.
+Same gap as P0.6 case 10.
+
+## INV-14 — Personal identity remains protected · **HELD (test)** — was VIOLATED
+
+`/dashboard/directory/[partyId]` rendered `party.phone` and
+`party.contactDetails` to **any signed-in party**, with no relationship
+gate. Directly contradicts §29 DECIDED.
+
+Fixed conservatively in `src/lib/identity-safety.ts`, pinned by seven cases
+in `identity-safety.integration.test.ts`: contact details are visible only
+where the viewer and the subject share a **mutually agreed** engagement. A
+suggested match does not qualify, and neither does one party having proposed
+terms — the same bar P0.4 set for consuming capacity. §57 item 15 ("exact
+circumstances in which personal/contact information unlocks") is **\***, so
+this is the narrowest reversible rule that satisfies the DECIDED half —
+**not** a proposed answer to the starred question.
+
+## INV-15 — Stranger messaging cannot bypass trust boundary · **PARTIAL**
+
+`assertPartyInMatch` gates every message on being a party to the match, so
+there is no open inbox. But matches are system-generated, so a stranger
+FarmaTrade suggested can message you before any agreement. Whether the
+suggested match *is* the trust boundary (§30) is a product question.
+
+## INV-16 — Payment cannot buy trust · **NOT BUILT**
+
+No payment, premium or subscription concept exists.
+
+## INV-17 — Sponsorship cannot masquerade as favorability · **HELD (static)**
+
+Same check as INV-01, law 9.
+
+## INV-18 — User remains trader · **HELD (test)**
+
+The strongest invariant in the codebase. P0.4: no capacity moves without
+both parties accepting the same terms version, proven under concurrency.
+
+## INV-19 — Commercial truth does not require a post · **HELD (structural)**
+
+There is no post concept at all. Commercial facts live in `ProduceStock`,
+`Livestock`, `Equipment` and `Intent`; derivation turns farm state into
+proposals with no listing authored by anyone.
+
+## INV-20 — Posts cannot become inventory authority · **NOT BUILT**
+
+No post concept exists to conflict with inventory. Becomes live the moment
+§9's profile/post layer is built, and is worth encoding *before* that.
+
+---
+
+## Divergences from DECIDED product truth
+
+Raised rather than silently implemented, per §54.
+
+**D1 — §10 "Demand acts" is not implemented.** `generateMatchesForIntent`
+runs on both sides and `proposeTerms` is symmetric. A supplier can open
+terms on a buyer today. INV-03 as written is satisfied; §10's prose is not.
+These are different claims and the register treats them separately.
+
+**D2 — §6 Home is not opportunity-first.** `/dashboard` opens with a
+greeting and the farmer's location, then stamping reminders, then stat
+tiles. The hero is administration, not *"4 strong opportunities found."*
+This is a direct divergence from DECIDED truth and the largest single gap
+between the product document and the running product.
+
+**D3 — §7 structure does not exist.** There is no Home/Trade/Network/fourth
+shape. Navigation is Overview, Intent, Opportunities, Farm, Directory,
+Settings. **`/dashboard/intent` leaks an implementation word into the URL**,
+which §4 explicitly names as an implementation concept, not a user one.
+
+**D4 — §23 Network does not exist.** No connections, no Request/Connect
+actions (§30), no network trust signals (§26). `Relation` exists but is
+derived from completed trades only — it cannot represent a pre-existing
+off-platform relationship (§25).
+
+**D5 — §35 review retaliation protection does not exist.** Ratings are
+visible immediately. No review window.
+
+**D6 — §31 role reputation** — see INV-10.
+
+---
+
+## Where I disagree, stated explicitly
+
+Per §54, rather than implementing my preference quietly.
+
+**§10 "Demand acts" vs §3A "What opportunities did FarmaTrade find for
+me?"** — I think these are in tension for the supply side. If a farmer opens
+FarmaTrade and sees a buyer who needs their maize, §3A has created
+anticipation and §10 tells them to wait for the buyer to act. Either
+suppliers get a first-class action on a discovered opportunity, or Home is
+mostly a demand-side experience and suppliers get a quieter product. I do
+not think this is resolved, and I would not implement either reading without
+a ruling.
+
+**§35 hidden reviews vs §36 quiet success.** If reviews are hidden until a
+window expires, and completion counts regardless, then during the window a
+counterparty sees a completion count that moved with no visible reason. That
+is probably fine, but it means the review window is visible in the data even
+while the review is not — worth knowing before it is called a privacy
+property.
+
+---
+
+## What is deliberately not here
+
+Nothing in `PRODUCT_TRUTH.md` §57 has been resolved by implementation. The
+INV-14 fix touches item 15 and deliberately does **not** answer it: it
+implements the DECIDED half (strangers cannot see contact details) with the
+narrowest reversible rule available, and leaves the unlock condition open.

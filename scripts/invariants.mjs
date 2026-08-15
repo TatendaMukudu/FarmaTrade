@@ -217,9 +217,54 @@ function law(name, detail, offenders) {
 }
 
 // ---------------------------------------------------------------------------
+// 9. Law Zero — favorability before revenue.
+// ---------------------------------------------------------------------------
+// PRODUCT_TRUTH.md §5 and INV-01/INV-17. If Farm A earns FarmaTrade more and
+// Farm B is the better opportunity, Farm B ranks higher. No revenue concept
+// exists yet, which is exactly why this check is worth writing now: it fails
+// the day somebody threads a sponsorship or fee signal into ranking, rather
+// than being written after the fact when the incentive to weaken it exists.
+//
+// Scoped to the modules that actually decide order. Revenue may one day be
+// modelled elsewhere in the app; it may not reach these.
+{
+  const ranking = ["match-rank.ts", "match-ranking.ts", "matching-core.ts", "matching.ts"];
+  const revenue = /\bsponsor|\bpromoted\b|\bpaidPlacement|\bboost(ed)?Rank|commission|\brevenue\b|\bfeeRate|premiumTier/i;
+  law(
+    "law-zero-favorability-before-revenue",
+    "Ranking may not read a revenue, sponsorship or paid-placement signal. Paid placement must never masquerade as organic favorability.",
+    ranking
+      .map((name) => join(ROOT, "src/lib", name))
+      .filter((f) => sources.includes(f) && revenue.test(read(f)))
+      .map(rel),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 10. Farm size is not a quality signal.
+// ---------------------------------------------------------------------------
+// PRODUCT_TRUTH.md §41 and INV-08. A smaller farm that can satisfy the
+// quantity and executes better may rank above a much larger one. Size is
+// recorded on the farm profile and must stay out of the ordering, or
+// FarmaTrade quietly becomes a product where scale buys opportunity — the
+// opposite of §15's reason for multi-supplier fulfilment.
+{
+  const ranking = ["match-rank.ts", "match-ranking.ts", "matching-core.ts", "matching.ts"];
+  const size = /sizeHectares|farmSize|\bhectares\b/i;
+  law(
+    "farm-size-is-not-a-quality-signal",
+    "Matching and ranking may not read farm size. Demonstrated execution scales opportunity; acreage does not.",
+    ranking
+      .map((name) => join(ROOT, "src/lib", name))
+      .filter((f) => sources.includes(f) && size.test(read(f)))
+      .map(rel),
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 if (failures.length === 0) {
-  console.log(`invariants: ${8} laws upheld`);
+  console.log(`invariants: ${10} laws upheld`);
   process.exit(0);
 }
 
