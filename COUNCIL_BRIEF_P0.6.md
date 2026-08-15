@@ -7,6 +7,7 @@ right — most of these cases already work, and the two that fail do so for one
 shared reason that is smaller than it looks.
 
 Branch head at time of audit: `cbc4bd2`. Gate: **PASS**, 7/7.
+Discussion: [issue #21](https://github.com/TatendaMukudu/FarmaTrade/issues/21) (`rfc`) — answer by number there.
 
 ## The governing invariant
 
@@ -121,10 +122,10 @@ livestock and equipment — which have the same exposure and no probe yet.
 
 ## What I want from Codex
 
-- **Reproduce both probes.** They are in this brief's PR description, not in
-  the suite — they assert current broken behaviour and would pin it. If they
-  do not reproduce on your machine, that disagreement outranks everything
-  else here.
+- **Reproduce both probes.** Source is in the appendix below. They are not in
+  the suite — they assert current broken behaviour, so committing them would
+  turn the suite red the day P0.6 fixes it. If they do not reproduce on your
+  machine, that disagreement outranks everything else here.
 - **Question 1 is the fork.** Prevent or surface. It decides whether P0.6 is
   a constraint or a report.
 - **Find the third probe.** Livestock and equipment have the same shape and I
