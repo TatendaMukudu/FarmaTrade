@@ -234,14 +234,21 @@ export async function proposeTerms(
   return prisma.$transaction(async (tx) => {
     const loaded = await loadEngagement(tx, matchId);
     if (!loaded) return { ok: false, reason: "not_found" };
-    const { match, versions, participants } = loaded;
+    const { match: initiallyLoaded, participants: initialParticipants } = loaded;
 
-    if (!participants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
+    if (!initialParticipants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
+
+    await lockIntents(tx, [initiallyLoaded.intentA.id, initiallyLoaded.intentB.id]);
+    // The initial read only identifies the rows to lock. Decisions use a
+    // fresh read after the lock, otherwise a close/withdraw/proposal that
+    // committed while this transaction waited could be silently overwritten.
+    const current = await loadEngagement(tx, matchId);
+    if (!current) return { ok: false, reason: "not_found" };
+    const { match, versions, participants } = current;
+
     if (match.status === "DECLINED" || match.status === "COMPLETED") {
       return { ok: false, reason: "closed" };
     }
-
-    await lockIntents(tx, [match.intentA.id, match.intentB.id]);
 
     const intents = [match.intentA, match.intentB];
     if (intents.some((i) => !isAuthorizedToMatch(i))) {
@@ -332,9 +339,15 @@ export async function acceptTerms(
   return prisma.$transaction(async (tx) => {
     const loaded = await loadEngagement(tx, matchId);
     if (!loaded) return { ok: false, reason: "not_found" };
-    const { match, versions, participants } = loaded;
+    const { match: initiallyLoaded, participants: initialParticipants } = loaded;
 
-    if (!participants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
+    if (!initialParticipants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
+
+    await lockIntents(tx, [initiallyLoaded.intentA.id, initiallyLoaded.intentB.id]);
+    const current = await loadEngagement(tx, matchId);
+    if (!current) return { ok: false, reason: "not_found" };
+    const { match, versions, participants } = current;
+
     if (match.status === "DECLINED" || match.status === "COMPLETED") {
       return { ok: false, reason: "closed" };
     }
@@ -348,8 +361,6 @@ export async function acceptTerms(
         ? versions.reduce((a, b) => (b.version > a.version ? b : a))
         : versions.find((t) => t.version === version);
     if (!target) return { ok: false, reason: "not_found" };
-
-    await lockIntents(tx, [match.intentA.id, match.intentB.id]);
 
     const intents = [match.intentA, match.intentB];
     if (intents.some((i) => !isAuthorizedToMatch(i))) {
@@ -515,11 +526,16 @@ export async function closeEngagement(matchId: string, partyId: string): Promise
   return prisma.$transaction(async (tx) => {
     const loaded = await loadEngagement(tx, matchId);
     if (!loaded) return { ok: false, reason: "not_found" };
-    const { match, participants } = loaded;
-    if (!participants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
+    const { match: initiallyLoaded, participants: initialParticipants } = loaded;
+    if (!initialParticipants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
 
-    const intentIds = [match.intentA.id, match.intentB.id];
+    const intentIds = [initiallyLoaded.intentA.id, initiallyLoaded.intentB.id];
     await lockIntents(tx, intentIds);
+    const current = await loadEngagement(tx, matchId);
+    if (!current) return { ok: false, reason: "not_found" };
+    if (current.match.status === "COMPLETED" || current.match.status === "DECLINED") {
+      return { ok: false, reason: "closed" };
+    }
     await tx.match.update({ where: { id: matchId }, data: { status: "DECLINED" } });
     await syncEngagement(tx, intentIds);
 

@@ -111,34 +111,54 @@ export async function ensureDerivedIntent(
     const decision = decide(source, bySource.get(row.id) ?? [], now, formatQuantity);
 
     if (decision.action === "create") {
-      const { proposal } = decision;
-      await prisma.intent.create({
-        data: {
-          partyId: party.id,
-          side: "SUPPLY",
-          category: "PRODUCE",
-          // The farmer's own word for the crop, with the quantity as a
-          // ceiling they can reduce.
-          title: `${formatQuantity(proposal.quantity, proposal.unit)} of ${proposal.label}`,
-          quantity: proposal.quantity,
-          unit: proposal.unit,
-          // Inventory's enum maps into canonical identity through a proven
-          // total function, so a derived proposal arrives with its unit
-          // already machine-readable rather than as a string to re-parse.
-          unitCode: canonicalFor(proposal.unit),
-          productId: proposal.productId,
-          countryCode: party.countryCode,
-          province: party.province,
-          district: party.district,
-          status: "PROPOSED",
-          origin: "DERIVED",
-          derivationKey: proposal.derivationKey,
-          urgent: proposal.urgent,
-          neededBy: proposal.availableFrom,
-          produceId: proposal.sourceId,
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        // The source-specific transaction lock makes the create decision
+        // atomic without storing another copy of proposal state. A second
+        // page render waits, rereads, and sees the first proposal.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${party.id}:${row.id}`}, 0))::text`;
+        const current = await tx.intent.findMany({
+          where: { partyId: party.id, origin: "DERIVED", produceId: row.id },
+          select: {
+            id: true,
+            origin: true,
+            status: true,
+            derivationKey: true,
+            quantity: true,
+            productId: true,
+          },
+        });
+        const lockedDecision = decide(source, current, now, formatQuantity);
+        if (lockedDecision.action !== "create") return false;
+        const lockedProposal = lockedDecision.proposal;
+        await tx.intent.create({
+          data: {
+            partyId: party.id,
+            side: "SUPPLY",
+            category: "PRODUCE",
+            // The farmer's own word for the crop, with the quantity as a
+            // ceiling they can reduce.
+            title: `${formatQuantity(lockedProposal.quantity, lockedProposal.unit)} of ${lockedProposal.label}`,
+            quantity: lockedProposal.quantity,
+            unit: lockedProposal.unit,
+            // Inventory's enum maps into canonical identity through a proven
+            // total function, so a derived proposal arrives with its unit
+            // already machine-readable rather than as a string to re-parse.
+            unitCode: canonicalFor(lockedProposal.unit),
+            productId: lockedProposal.productId,
+            countryCode: party.countryCode,
+            province: party.province,
+            district: party.district,
+            status: "PROPOSED",
+            origin: "DERIVED",
+            derivationKey: lockedProposal.derivationKey,
+            urgent: lockedProposal.urgent,
+            neededBy: lockedProposal.availableFrom,
+            produceId: lockedProposal.sourceId,
+          },
+        });
+        return true;
       });
-      run.created++;
+      if (created) run.created++;
     } else if (decision.action === "revise") {
       const { proposal } = decision;
       // Guarded on status: between reading and writing, the farmer may have

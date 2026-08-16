@@ -20,7 +20,13 @@
 //
 // Pure and DB-free.
 
-import type { Intent as IntentRow, IntentOrigin, IntentSide, IntentStatus } from "@/generated/prisma/client";
+import type {
+  CommerceCategory,
+  Intent as IntentRow,
+  IntentOrigin,
+  IntentSide,
+  IntentStatus,
+} from "@/generated/prisma/client";
 import { hasRemainingCapacity } from "@/lib/capacity";
 
 export type { IntentOrigin, IntentSide, IntentStatus };
@@ -51,6 +57,17 @@ export const ORIGIN_LABEL: Record<IntentOrigin, string> = {
   DERIVED: "From your farm records",
   DECLARED: "You added this",
 };
+
+// Both ACTIVE and ENGAGED remain the owner's commercial position. ENGAGED
+// means some capacity is committed, not that the owner surrendered control
+// of the uncommitted remainder.
+export function canWithdrawIntent(status: IntentStatus): boolean {
+  return status === "ACTIVE" || status === "ENGAGED";
+}
+
+export function intentHref(side: IntentSide, category: CommerceCategory): string {
+  return `/dashboard/intent?side=${side}&category=${category}`;
+}
 
 // Whether an intent is authorized to take part in the market at all.
 //

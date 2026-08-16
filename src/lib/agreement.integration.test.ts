@@ -151,6 +151,24 @@ describe("bilateral agreement", () => {
     expect(await remainingOf(supply.id)).toBe(kg(14));
   });
 
+  it("serializes simultaneous counteroffers into distinct versions", async () => {
+    const { seller, supply } = await farmerOffering(26, 26);
+    const { buyer, demand } = await buyerNeeding(20);
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+
+    const results = await Promise.all([
+      proposeTerms(match.id, seller.id, { quantity: 10, unit: "tonne" }),
+      proposeTerms(match.id, buyer.id, { quantity: 12, unit: "tonne" }),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    const terms = await prisma.agreementTerms.findMany({
+      where: { matchId: match.id },
+      orderBy: { version: "asc" },
+    });
+    expect(terms.map((term) => term.version)).toEqual([1, 2]);
+  });
+
   it("will not let a changed quantity inherit the old consent", async () => {
     const { seller, supply } = await farmerOffering(26, 26);
     const { buyer, demand } = await buyerNeeding(20);
@@ -274,6 +292,18 @@ describe("bilateral agreement", () => {
     expect(await stockOf(produce.id)).toBe(26);
     // The record of what was agreed survives the cancellation.
     expect(await prisma.agreementTerms.count({ where: { matchId: match.id } })).toBe(1);
+  });
+
+  it("never rewrites a completed engagement as declined", async () => {
+    const { seller, supply } = await farmerOffering(10, 26);
+    const { buyer, demand } = await buyerNeeding(10);
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "tonne" });
+    await acceptTerms(match.id, seller.id);
+    await prisma.match.update({ where: { id: match.id }, data: { status: "COMPLETED" } });
+
+    expect(await closeEngagement(match.id, seller.id)).toEqual({ ok: false, reason: "closed" });
+    expect(await statusOf(match.id)).toBe("COMPLETED");
   });
 
   it("returns the capacity of a trade someone reported never happened", async () => {

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { SIDE_LABEL, STATUS_LABEL, asIntent, isMatchable, oppositeSide } from "./intent";
+import {
+  SIDE_LABEL,
+  STATUS_LABEL,
+  asIntent,
+  canWithdrawIntent,
+  intentHref,
+  isMatchable,
+  oppositeSide,
+} from "./intent";
 import type { Intent } from "@/generated/prisma/client";
 
 function row(overrides: Partial<Intent> = {}): Intent {
@@ -66,6 +74,24 @@ describe("status", () => {
     // discussion may still be partly available and returns to ACTIVE when a
     // negotiation falls through.
     expect(STATUS_LABEL.ENGAGED).not.toMatch(/complete|done|finish|closed/i);
+  });
+
+  it("lets the owner withdraw both available and partly committed capacity", () => {
+    expect(canWithdrawIntent("ACTIVE")).toBe(true);
+    expect(canWithdrawIntent("ENGAGED")).toBe(true);
+    expect(canWithdrawIntent("PROPOSED")).toBe(false);
+    expect(canWithdrawIntent("WITHDRAWN")).toBe(false);
+  });
+});
+
+describe("intent links", () => {
+  it("carries the commercial side expected by the intent form", () => {
+    expect(intentHref("SUPPLY", "PRODUCE")).toBe(
+      "/dashboard/intent?side=SUPPLY&category=PRODUCE",
+    );
+    expect(intentHref("DEMAND", "TRANSPORT")).toBe(
+      "/dashboard/intent?side=DEMAND&category=TRANSPORT",
+    );
   });
 });
 

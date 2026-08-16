@@ -28,7 +28,9 @@ the first paid placement is written rather than after.
 
 P0.2 + P0.4. A `PROPOSED` intent is never matchable
 (`agreement.integration.test.ts`), and capacity moves only when the second
-`TermsAcceptance` row lands.
+`TermsAcceptance` row lands. Concurrent derivation runs are serialized per
+physical source and tested to converge on one proposal, so two page renders
+cannot duplicate proposed capacity before its owner sees it.
 
 ## INV-03 — Demand initiates · **PARTIAL — see divergence D1**
 

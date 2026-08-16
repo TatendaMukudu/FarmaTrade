@@ -61,6 +61,18 @@ describe("ensureDerivedIntent", () => {
     expect(derived.every((i) => i.status === "PROPOSED")).toBe(true);
   });
 
+  it("creates one proposal when two page renders derive the same harvest concurrently", async () => {
+    const { party, farm } = await farmWithHarvest();
+
+    const runs = await Promise.all([
+      ensureDerivedIntent(farm.id, party),
+      ensureDerivedIntent(farm.id, party),
+    ]);
+
+    expect(await derivedFor(party.id)).toHaveLength(1);
+    expect(runs.reduce((count, run) => count + run.created, 0)).toBe(1);
+  });
+
   it("does not decrement inventory just because an intent exists", async () => {
     // The farm still holds 26 tonnes. A proposal is a reading of state, not
     // a claim on it.

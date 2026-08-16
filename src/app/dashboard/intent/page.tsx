@@ -24,18 +24,8 @@ function showQuantity(value: number, capacity: Capacity): string {
     ? formatCanonical(value, capacity.basis)
     : formatQuantity(value, capacity.displayUnit);
 }
-import { SIDE_LABEL } from "@/lib/intent";
+import { SIDE_LABEL, STATUS_LABEL, canWithdrawIntent } from "@/lib/intent";
 import type { CommerceCategory } from "@/generated/prisma/enums";
-
-// Stored status spelled as what it means commercially. See
-// src/lib/intent.ts — the domain says PROPOSED/ACTIVE/ENGAGED/WITHDRAWN and
-// this is where those reach a farmer.
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Suggested by FarmaTrade",
-  OPEN: "Available",
-  MATCHED: "In discussion",
-  CLOSED: "Closed",
-};
 
 const VALID_SIDES = new Set(["SUPPLY", "DEMAND"]);
 const VALID_CATEGORIES = new Set<string>(COMMERCE_CATEGORIES);
@@ -320,7 +310,7 @@ export default async function PostsPage({
                   <span className="text-xs whitespace-nowrap text-subtle-fg">
                     {matchCount} match{matchCount === 1 ? "" : "es"}
                   </span>
-                  {p.status === "ACTIVE" && (
+                  {canWithdrawIntent(p.status) && (
                     <form action={closePost}>
                       <input type="hidden" name="id" value={p.id} />
                       <button

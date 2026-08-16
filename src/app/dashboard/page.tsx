@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureDerivedIntent } from "@/lib/derived-intent";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
+import { intentHref } from "@/lib/intent";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
 import {
@@ -287,22 +288,22 @@ export default async function DashboardPage() {
         <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
           <QuickAction
-            href="/dashboard/intent?type=HAVE&category=PRODUCE"
+            href={intentHref("SUPPLY", "PRODUCE")}
             icon={<ProduceIcon />}
             label="Sell produce"
           />
           <QuickAction
-            href="/dashboard/intent?type=NEED&category=TRANSPORT"
+            href={intentHref("DEMAND", "TRANSPORT")}
             icon={<CategoryIcon category="TRANSPORT" />}
             label="Need transport"
           />
           <QuickAction
-            href="/dashboard/intent?type=NEED&category=EQUIPMENT"
+            href={intentHref("DEMAND", "EQUIPMENT")}
             icon={<CategoryIcon category="EQUIPMENT" />}
             label="Borrow equipment"
           />
           <QuickAction
-            href="/dashboard/intent?type=NEED&category=INPUTS"
+            href={intentHref("DEMAND", "INPUTS")}
             icon={<CategoryIcon category="INPUTS" />}
             label="Need supplies"
           />
