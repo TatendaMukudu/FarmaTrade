@@ -5,6 +5,7 @@ import { ensureDerivedIntent } from "@/lib/derived-intent";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
 import { intentHref } from "@/lib/intent";
+import { opportunityHeadline } from "@/lib/home";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
 import {
@@ -22,7 +23,7 @@ import { loadPendingStamps, loadPriceSignals, stampBanner } from "@/lib/confirma
 import { promptsWorthSurfacing } from "@/lib/confirmations-core";
 import { signalForSubject } from "@/lib/price-signals";
 import { Badge } from "@/components/badge";
-import { Card, EmptyState, LinkCard, SectionHeading, StatTile, buttonClass } from "@/components/ui";
+import { Card, EmptyState, LinkCard, StatTile, buttonClass } from "@/components/ui";
 import type { Intent, Party } from "@/generated/prisma/client";
 
 // How many recent suggestions the overview ranks before taking the top few.
@@ -134,19 +135,58 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-semibold">
+      <section data-home-hero className="flex flex-col gap-3 rounded-card border border-border bg-card p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-accent">FarmaTrade found</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+              {opportunityHeadline(topMatches.length)}
+            </h1>
+          </div>
+          <Link href="/dashboard/opportunities" className={buttonClass("secondary", "sm")}>
+            See all
+          </Link>
+        </div>
+        {topMatches.length === 0 ? (
+          <EmptyState
+            icon={<SproutIcon />}
+            title="No opportunities yet"
+            hint="Record what you have available and what you are looking for, and FarmaTrade matches it against the network."
+            action={{ href: "/dashboard/intent", label: "Add supply or a need" }}
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {topMatches.map(({ match }) => {
+              const m = match.source;
+              const { theirs } = resolveMatchSides(m, party.id);
+              const isNew = since ? m.createdAt > since : true;
+              return (
+                <li key={m.id}>
+                  <LinkCard href={`/dashboard/conversations/${m.id}`}>
+                    <span className="text-sm">
+                      <OpportunityLine post={theirs} isNew={isNew} />
+                    </span>
+                  </LinkCard>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <div data-home-administration>
+        <h2 className="text-xl font-semibold">
           {greeting(region.timeZone)}, {party.name.split(" ")[0]}
-        </h1>
+        </h2>
         <p className="text-sm text-muted-fg">
           {party.farm ? party.farm.farmName : `${party.district}, ${party.province}`}
         </p>
       </div>
 
-      {/* Stamping leads the page when something is owed. Every learning
+      {/* Stamping follows the opportunity hero when something is owed. Every learning
           signal FarmaTrade has runs through these confirmations, and a
-          farmer's own track record is empty until they file them — so this
-          sits above matches rather than below. */}
+          farmer's own track record is empty until they file them, so it stays
+          prominent without displacing Home's product-defining purpose. */}
       {banner && (
         <div
           className={`rounded-card border border-border p-4 ${
@@ -251,39 +291,6 @@ export default async function DashboardPage() {
           </p>
         </Card>
       )}
-
-      <div className="flex flex-col gap-3">
-        <SectionHeading
-          title="Today's opportunities"
-          action={{ href: "/dashboard/opportunities", label: "See all" }}
-        />
-        {topMatches.length === 0 ? (
-          <EmptyState
-            icon={<SproutIcon />}
-            title="No opportunities yet"
-            hint="Record what you have available and what you are looking for, and FarmaTrade matches it against the network."
-            action={{ href: "/dashboard/intent", label: "Add supply or a need" }}
-          />
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {topMatches.map(({ match }) => {
-              const m = match.source;
-              const { theirs } = resolveMatchSides(m, party.id);
-              const isNew = since ? m.createdAt > since : true;
-              return (
-                <li key={m.id}>
-                  <LinkCard href={`/dashboard/conversations/${m.id}`}>
-                    <span className="text-sm">
-                      <OpportunityLine post={theirs} isNew={isNew} />
-                    </span>
-                  </LinkCard>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
       <div>
         <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
         <div className="flex flex-wrap gap-3">

@@ -154,11 +154,13 @@ runs on both sides and `proposeTerms` is symmetric. A supplier can open
 terms on a buyer today. INV-03 as written is satisfied; §10's prose is not.
 These are different claims and the register treats them separately.
 
-**D2 — §6 Home is not opportunity-first.** `/dashboard` opens with a
-greeting and the farmer's location, then stamping reminders, then stat
-tiles. The hero is administration, not *"4 strong opportunities found."*
-This is a direct divergence from DECIDED truth and the largest single gap
-between the product document and the running product.
+**D2 — §6 Home is opportunity-first — corrected.** `/dashboard` now opens
+with a selective opportunity count and its top ranked opportunities before
+the greeting, urgent confirmations and administrative statistics. A static
+ordering test pins the hero ahead of administration. It deliberately says
+*"4 opportunities found"*, not *"4 strong opportunities found"*: the
+threshold for "strong" belongs to the unresolved exact ranking policy, and
+Home must not turn that unknown into a claim.
 
 **D3 — §7 structure does not exist.** There is no Home/Trade/Network/fourth
 shape. Navigation is Overview, Intent, Opportunities, Farm, Directory,
