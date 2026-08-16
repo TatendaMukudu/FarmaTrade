@@ -140,7 +140,7 @@ export default async function DashboardPage() {
           <div>
             <p className="text-sm font-medium text-accent">FarmaTrade found</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              {opportunityHeadline(topMatches.length)}
+              {opportunityHeadline(opportunityCount)}
             </h1>
           </div>
           <Link href="/dashboard/opportunities" className={buttonClass("secondary", "sm")}>

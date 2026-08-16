@@ -19,4 +19,10 @@ describe("opportunity-first Home", () => {
     expect(administration).toBeGreaterThan(-1);
     expect(hero).toBeLessThan(administration);
   });
+
+  it("reports every open opportunity rather than the capped preview length", () => {
+    const page = readFileSync("src/app/dashboard/page.tsx", "utf8");
+    expect(page).toContain("opportunityHeadline(opportunityCount)");
+    expect(page).not.toContain("opportunityHeadline(topMatches.length)");
+  });
 });
