@@ -7,7 +7,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { ensureDerivedIntent } from "@/lib/derived-intent";
-import { createTestParty, cleanupParties } from "@/test/factories";
+import { acceptTerms, proposeTerms } from "@/lib/agreement";
+import {
+  createTestIntent,
+  createTestMatch,
+  createTestParty,
+  cleanupParties,
+} from "@/test/factories";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -50,6 +56,33 @@ describe("ensureDerivedIntent", () => {
       expect(intent.origin).toBe("DERIVED");
       expect(intent.derivationKey).toBeTruthy();
     })();
+  });
+
+  it("lets the owner agree a trade before the expected harvest exists", async () => {
+    const { party: seller, farm, produce } = await farmWithHarvest({ daysAway: 3 });
+    await ensureDerivedIntent(farm.id, seller);
+    const [futureSupply] = await derivedFor(seller.id);
+    expect(produce.expectedHarvestDate!.getTime()).toBeGreaterThan(Date.now());
+
+    // FarmaTrade proposes; the farmer remains the trader and authorizes it.
+    await prisma.intent.update({ where: { id: futureSupply.id }, data: { status: "ACTIVE" } });
+
+    const { party: buyer } = await createTestParty();
+    partyIds.push(buyer.id);
+    const demand = await createTestIntent(buyer.id, {
+      side: "DEMAND",
+      quantity: 8,
+      unit: "tonne",
+    });
+    const match = await createTestMatch(futureSupply.id, demand.id, "SUGGESTED");
+
+    await proposeTerms(match.id, buyer.id, { quantity: 8, unit: "tonne" });
+    const result = await acceptTerms(match.id, seller.id);
+
+    expect(result).toMatchObject({ ok: true, status: "agreed" });
+    expect((await prisma.match.findUnique({ where: { id: match.id } }))!.status).toBe("AGREED");
+    // Agreement records future commerce; it does not rewrite farm state.
+    expect((await prisma.produceStock.findUnique({ where: { id: produce.id } }))!.quantity).toBe(26);
   });
 
   it("never activates anything by itself, however many times it runs", async () => {
