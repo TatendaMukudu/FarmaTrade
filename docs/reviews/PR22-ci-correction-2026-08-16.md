@@ -15,3 +15,9 @@ the clean-database failure.
 The corrected checkpoint is not passing until both a fresh local gate and the
 GitHub Actions run agree. Local success alone must not be reported as CI
 success.
+
+The first correction run proved a second clean-environment defect: the fresh
+migration check passed Prisma's `schema=public` URL option directly to `psql`,
+which rejects that option. The gate now removes only that Prisma-specific
+parameter for its `psql` administration calls while leaving the datasource URL
+unchanged for Prisma.

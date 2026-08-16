@@ -128,8 +128,13 @@ const checks = [
     run: () => {
       const scratch = `${DATABASE_URL.replace(/\/[^/?]+(\?|$)/, "/ft_verify$1")}`;
       const admin = { ...env, DATABASE_URL };
+      // `schema=public` is a Prisma connection-string option, not a libpq
+      // option. Passing the CI URL through to psql verbatim makes the fresh
+      // drift check fail before it executes any SQL.
+      const psqlUrl = new URL(DATABASE_URL);
+      psqlUrl.searchParams.delete("schema");
       const psql = (sql) =>
-        run("psql", [DATABASE_URL, "-v", "ON_ERROR_STOP=1", "-c", sql], { env: admin });
+        run("psql", [psqlUrl.toString(), "-v", "ON_ERROR_STOP=1", "-c", sql], { env: admin });
 
       psql("DROP DATABASE IF EXISTS ft_verify");
       const created = psql("CREATE DATABASE ft_verify");
