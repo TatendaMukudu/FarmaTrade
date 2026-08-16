@@ -68,7 +68,14 @@ const checks = [
   {
     name: "typecheck",
     needsDb: false,
-    run: () => run("npx", ["tsc", "--noEmit"]),
+    // PageProps/LayoutProps are generated globals in Next 16. A clean clone
+    // has no .next directory, so tsc alone reports valid route components as
+    // undefined. Generate only the route types (no database-backed build)
+    // before asking TypeScript to check them.
+    run: () => {
+      const generated = run("npx", ["next", "typegen"]);
+      return generated.code === 0 ? run("npx", ["tsc", "--noEmit"]) : generated;
+    },
   },
   {
     name: "lint",
