@@ -13,6 +13,11 @@ one is actually protecting.
 | `migration-drift-upgraded` | **yes** | Schema matches a DB upgraded through every migration. |
 | `migration-drift-fresh` | **yes** | Schema matches a DB built from nothing but the migrations. |
 
+`npm test` and the gate's `tests` check seed the idempotent product catalogue
+before running the suite. Product rows are deployment reference data rather
+than migration data; establishing them inside both commands keeps a fresh CI
+database and an already-seeded development database equivalent.
+
 ## Why the drift check runs twice
 
 A schema can match a database that was upgraded migration-by-migration and

@@ -87,9 +87,13 @@ const checks = [
   {
     name: "tests",
     needsDb: true,
-    // vitest directly rather than `npm test`, which would re-run the
-    // invariants check reported above.
-    run: () => run("npx", ["vitest", "run"]),
+    // Product identity is reference data installed by the production start
+    // command, not a migration. The gate must establish that prerequisite
+    // itself or a workstation seeded earlier can pass while clean CI fails.
+    run: () => {
+      const seeded = run("npx", ["tsx", "prisma/seed-products.ts"]);
+      return seeded.code === 0 ? run("npx", ["vitest", "run"]) : seeded;
+    },
     // The pass/skip counts, so a report cannot claim a number nobody ran.
     summarize: (out) => {
       const line = out.match(/Tests\s+(.+)/);
