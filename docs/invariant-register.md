@@ -78,17 +78,21 @@ connections exist.
 behaviour and strong supplier performance land in the same average. §31 is
 DECIDED and the schema cannot express it.
 
-## INV-11 — Reviews cannot rewrite facts · **HELD (structural)**
+## INV-11 — Reviews cannot rewrite facts · **HELD (test)**
 
 `Rating` (subjective) and `TransactionConfirmation` (observed) are separate
 models and `recomputeReputation` derives `completedCount` from confirmations
-only. A rating cannot touch observed history.
+only. An integration test pins a one-star review beside an observed good
+completion and proves the review changes rating fields without changing the
+observed completion fields.
 
-## INV-12 — Quiet success counts · **HELD (structural)**
+## INV-12 — Quiet success counts · **HELD (test)**
 
 `completedCount = completedGoodCount + completedIssueCount`, both from
 `TransactionConfirmation`. Ratings feed only `averageRating`/`ratingCount`.
-A trade with no review still counts.
+An integration test proves a completed trade with no review still increments
+the completion record while rating count remains zero and average stays
+unknown.
 
 ## INV-13 — Cancellation persists · **PARTIAL**
 
