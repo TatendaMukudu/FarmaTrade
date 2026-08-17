@@ -87,10 +87,10 @@ describe("status", () => {
 describe("intent links", () => {
   it("carries the commercial side expected by the intent form", () => {
     expect(intentHref("SUPPLY", "PRODUCE")).toBe(
-      "/dashboard/intent?side=SUPPLY&category=PRODUCE",
+      "/dashboard/trade?side=SUPPLY&category=PRODUCE",
     );
     expect(intentHref("DEMAND", "TRANSPORT")).toBe(
-      "/dashboard/intent?side=DEMAND&category=TRANSPORT",
+      "/dashboard/trade?side=DEMAND&category=TRANSPORT",
     );
   });
 });

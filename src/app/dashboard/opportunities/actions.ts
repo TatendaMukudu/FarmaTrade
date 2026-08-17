@@ -47,7 +47,7 @@ export async function respondToMatch(formData: FormData) {
   if (decision === "DECLINED") {
     await closeEngagement(id, party.id);
     revalidatePath("/dashboard/opportunities");
-    revalidatePath("/dashboard/intent");
+    revalidatePath("/dashboard/trade");
     return;
   }
 
@@ -95,7 +95,7 @@ export async function respondToMatch(formData: FormData) {
   }
 
   revalidatePath("/dashboard/opportunities");
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
 }
 
 // Put different terms on the table — the renegotiation path.
@@ -127,7 +127,7 @@ export async function proposeMatchTerms(formData: FormData) {
 
   revalidatePath("/dashboard/opportunities");
   revalidatePath(`/dashboard/conversations/${id}`);
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
 }
 
 export async function confirmMatch(

@@ -66,7 +66,7 @@ export function canWithdrawIntent(status: IntentStatus): boolean {
 }
 
 export function intentHref(side: IntentSide, category: CommerceCategory): string {
-  return `/dashboard/intent?side=${side}&category=${category}`;
+  return `/dashboard/trade?side=${side}&category=${category}`;
 }
 
 // Whether an intent is authorized to take part in the market at all.
