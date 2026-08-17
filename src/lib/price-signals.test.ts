@@ -19,14 +19,18 @@ function listing(overrides: Partial<PricedListing> = {}): PricedListing {
     subject: "Maize",
     district: "Marondera",
     unit: "TONNE",
-    unitPrice: 300,
+    unitPrice: 30000,
+    currencyCode: "USD",
     postedAt: daysAgo(1),
     ...overrides,
   };
 }
 
+// Rates are integer minor units now — $300 a tonne is 30000, not 300 — so
+// that a median never lands on a fraction of a cent. Fixtures still read in
+// dollars and are converted here, because "300" is what the test is about.
 function priced(prices: number[], overrides: Partial<PricedListing> = {}): PricedListing[] {
-  return prices.map((unitPrice) => listing({ unitPrice, ...overrides }));
+  return prices.map((major) => listing({ unitPrice: Math.round(major * 100), ...overrides }));
 }
 
 describe("summarizePrices", () => {
@@ -96,9 +100,29 @@ describe("summarizePrices", () => {
     expect(crates.line).toMatch(/\d\.\d\d/);
   });
 
-  it("uses the farmer's own currency symbol", () => {
-    const [signal] = summarizePrices(priced([300, 310, 320, 330]), NOW, "KSh");
+  it("uses the listing's own currency, not the reader's", () => {
+    // The symbol used to come from whoever was looking. A Kenyan listing is
+    // priced in shillings whoever reads it, and a range that blended KES
+    // with USD would not be a range of anything — so currency is part of
+    // the grouping key, not a formatting choice.
+    const [signal] = summarizePrices(
+      priced([300, 310, 320, 330], { currencyCode: "KES" }),
+      NOW,
+    );
     expect(signal.line).toContain("KSh");
+    expect(signal.currencyCode).toBe("KES");
+  });
+
+  it("never blends two currencies into one range", () => {
+    const signals = summarizePrices(
+      [
+        ...priced([300, 310, 320, 330]),
+        ...priced([300, 310, 320, 330], { currencyCode: "ZAR" }),
+      ],
+      NOW,
+    );
+    expect(signals).toHaveLength(2);
+    expect(new Set(signals.map((s) => s.currencyCode))).toEqual(new Set(["USD", "ZAR"]));
   });
 
   it("collapses to a single figure only when the range genuinely is one", () => {

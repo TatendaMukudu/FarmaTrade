@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureHarvestDrafts } from "@/lib/harvest-drafts";
+import { ensureDerivedIntent } from "@/lib/derived-intent";
 import { summarizeReputation } from "@/lib/reputation";
 import { resolveMatchSides } from "@/lib/match-view";
+import { intentHref } from "@/lib/intent";
 import { loadMatchingHistory, toRankableMatch } from "@/lib/match-ranking";
 import { rankMatches } from "@/lib/match-rank";
 import {
@@ -22,7 +23,7 @@ import { promptsWorthSurfacing } from "@/lib/confirmations-core";
 import { signalForSubject } from "@/lib/price-signals";
 import { Badge } from "@/components/badge";
 import { Card, EmptyState, LinkCard, SectionHeading, StatTile, buttonClass } from "@/components/ui";
-import type { Post, Party } from "@/generated/prisma/client";
+import type { Intent, Party } from "@/generated/prisma/client";
 
 // How many recent suggestions the overview ranks before taking the top few.
 // Wide enough that ranking has a real choice to make, narrow enough that the
@@ -50,7 +51,7 @@ export default async function DashboardPage() {
   if (!party) return null;
 
   if (party.farm) {
-    await ensureHarvestDrafts(party.farm.id, party);
+    await ensureDerivedIntent(party.farm.id, party);
   }
 
   // Captured before we stamp "now" below, so this render still shows what's
@@ -68,22 +69,22 @@ export default async function DashboardPage() {
     pending,
     priceSignals,
   ] = await Promise.all([
-      prisma.post.count({ where: { partyId: party.id, status: "OPEN" } }),
+      prisma.intent.count({ where: { partyId: party.id, status: "ACTIVE" } }),
       prisma.match.count({
         where: {
           status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
       }),
       prisma.match.count({
         where: {
           status: "SUGGESTED",
           createdAt: since ? { gt: since } : undefined,
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
       }),
       party.farm
-        ? prisma.post.count({ where: { partyId: party.id, status: "DRAFT" } })
+        ? prisma.intent.count({ where: { partyId: party.id, status: "PROPOSED" } })
         : Promise.resolve(0),
       // Fetched unsorted-by-score and ranked in memory: `Match.score` is
       // what was true the day the match was written, so ordering on it here
@@ -92,11 +93,11 @@ export default async function DashboardPage() {
       prisma.match.findMany({
         where: {
           status: "SUGGESTED",
-          OR: [{ postA: { partyId: party.id } }, { postB: { partyId: party.id } }],
+          OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
         },
         include: {
-          postA: { include: { party: { include: { reputation: true } } } },
-          postB: { include: { party: { include: { reputation: true } } } },
+          intentA: { include: { party: { include: { reputation: true } } } },
+          intentB: { include: { party: { include: { reputation: true } } } },
         },
         orderBy: { createdAt: "desc" },
         take: TOP_MATCH_CANDIDATES,
@@ -192,11 +193,11 @@ export default async function DashboardPage() {
 
       {draftCount > 0 && (
         <Link
-          href="/dashboard/posts"
+          href="/dashboard/intent"
           className="rounded-card border border-border bg-warning-bg p-4 text-sm font-medium text-warning-fg hover:opacity-90"
         >
-          {draftCount} listing{draftCount === 1 ? "" : "s"} drafted from your upcoming
-          harvest — confirm to publish
+          {draftCount} item{draftCount === 1 ? "" : "s"} FarmaTrade drafted from your upcoming
+          harvest — confirm to make available
         </Link>
       )}
 
@@ -214,8 +215,8 @@ export default async function DashboardPage() {
         <StatTile
           icon={<ListingIcon />}
           value={String(openPostCount)}
-          label={`active listing${openPostCount === 1 ? "" : "s"}`}
-          href="/dashboard/posts"
+          label={openPostCount === 1 ? "active offer or need" : "active offers and needs"}
+          href="/dashboard/intent"
         />
         <StatTile
           icon={<StarIcon />}
@@ -260,8 +261,8 @@ export default async function DashboardPage() {
           <EmptyState
             icon={<SproutIcon />}
             title="No opportunities yet"
-            hint="Post what you have or what you need, and FarmaTrade matches it against the opposite side."
-            action={{ href: "/dashboard/posts", label: "Create a post" }}
+            hint="Record what you have available and what you are looking for, and FarmaTrade matches it against the network."
+            action={{ href: "/dashboard/intent", label: "Add supply or a need" }}
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -287,22 +288,22 @@ export default async function DashboardPage() {
         <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
           <QuickAction
-            href="/dashboard/posts?type=HAVE&category=PRODUCE"
+            href={intentHref("SUPPLY", "PRODUCE")}
             icon={<ProduceIcon />}
             label="Sell produce"
           />
           <QuickAction
-            href="/dashboard/posts?type=NEED&category=TRANSPORT"
+            href={intentHref("DEMAND", "TRANSPORT")}
             icon={<CategoryIcon category="TRANSPORT" />}
             label="Need transport"
           />
           <QuickAction
-            href="/dashboard/posts?type=NEED&category=EQUIPMENT"
+            href={intentHref("DEMAND", "EQUIPMENT")}
             icon={<CategoryIcon category="EQUIPMENT" />}
             label="Borrow equipment"
           />
           <QuickAction
-            href="/dashboard/posts?type=NEED&category=INPUTS"
+            href={intentHref("DEMAND", "INPUTS")}
             icon={<CategoryIcon category="INPUTS" />}
             label="Need supplies"
           />
@@ -312,11 +313,11 @@ export default async function DashboardPage() {
   );
 }
 
-function OpportunityLine({ post, isNew }: { post: Post & { party: Party }; isNew: boolean }) {
+function OpportunityLine({ post, isNew }: { post: Intent & { party: Party }; isNew: boolean }) {
   return (
     <span>
       <CategoryIcon category={post.category} className="inline-block align-text-bottom" />{" "}
-      {post.party.name} {post.type === "HAVE" ? "has" : "wants"}:{" "}
+      {post.party.name} {post.side === "SUPPLY" ? "is offering" : "is looking for"}:{" "}
       {post.title}
       {isNew && (
         <Badge tone="success" className="ml-2">

@@ -18,7 +18,7 @@ import {
   type TradeRecord,
 } from "@/lib/trade-outcomes";
 import type { RankableMatch } from "@/lib/match-rank";
-import type { Party, Post, Reputation, TransactionConfirmation } from "@/generated/prisma/client";
+import type { Party, Intent, Reputation, TransactionConfirmation } from "@/generated/prisma/client";
 
 // The server-side seam between the pure ranking modules and Prisma: pages
 // call these, and never have to know that ranking is assembled from four
@@ -47,12 +47,12 @@ export type MatchingHistory = {
 
 export async function loadMatchingHistory(): Promise<MatchingHistory> {
   const settled = await prisma.match.findMany({
-    where: { status: { in: ["ACCEPTED", "DECLINED", "COMPLETED"] } },
+    where: { status: { in: ["AGREED", "ACCEPTED", "DECLINED", "COMPLETED"] } },
     select: {
       reasons: true,
       status: true,
       confirmations: { select: { outcome: true } },
-      postA: {
+      intentA: {
         select: {
           category: true,
           district: true,
@@ -64,7 +64,7 @@ export async function loadMatchingHistory(): Promise<MatchingHistory> {
           },
         },
       },
-      postB: {
+      intentB: {
         select: {
           category: true,
           district: true,
@@ -95,13 +95,13 @@ export async function loadMatchingHistory(): Promise<MatchingHistory> {
   );
 
   const records: TradeRecord[] = settled.map((m) => {
-    const { lane, laneLabel } = laneKey(m.postA.category, m.postA.district, m.postB.district);
+    const { lane, laneLabel } = laneKey(m.intentA.category, m.intentA.district, m.intentB.district);
     return {
       lane,
       laneLabel,
       counterpartyClass: weakerClass(
-        counterpartyClassOf(m.postA.party.reputation, m.postA.party.verifiedBy),
-        counterpartyClassOf(m.postB.party.reputation, m.postB.party.verifiedBy),
+        counterpartyClassOf(m.intentA.party.reputation, m.intentA.party.verifiedBy),
+        counterpartyClassOf(m.intentB.party.reputation, m.intentB.party.verifiedBy),
       ),
       outcome: outcomeOf(m.status, m.confirmations),
     };
@@ -110,9 +110,9 @@ export async function loadMatchingHistory(): Promise<MatchingHistory> {
   return { reliability, lanes: laneHistory(summarizeTradeOutcomes(records)) };
 }
 
-type PostWithParty = Post & { party: Party & { reputation: Reputation | null } };
+type PostWithParty = Intent & { party: Party & { reputation: Reputation | null } };
 
-// Rebuilds a match's evidence against today's posts and today's reputation,
+// Rebuilds a match's evidence against today's intents and today's reputation,
 // rather than reading back the score frozen into the row when the match was
 // first written. This is the whole point: nothing about the stored row
 // changes, but a counterparty who completed three trades this week now
@@ -122,8 +122,8 @@ export function toRankableMatch<
     id: string;
     status: RankableMatch["status"];
     createdAt: Date;
-    postA: PostWithParty;
-    postB: PostWithParty;
+    intentA: PostWithParty;
+    intentB: PostWithParty;
     confirmations?: Pick<TransactionConfirmation, "partyId">[];
   },
 >(

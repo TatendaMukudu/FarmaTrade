@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { scoreMatch } from "./matching-core";
-import type { Post, Reputation } from "@/generated/prisma/client";
+import type { Intent, Reputation } from "@/generated/prisma/client";
 
-function post(overrides: Partial<Post> = {}): Post {
+function post(overrides: Partial<Intent> = {}): Intent {
   return {
     id: "post-1",
     partyId: "party-1",
-    type: "HAVE",
+    side: "SUPPLY",
     category: "PRODUCE",
     title: "Maize",
     description: null,
@@ -15,7 +15,7 @@ function post(overrides: Partial<Post> = {}): Post {
     province: "Mashonaland East",
     district: "Marondera",
     askingPrice: null,
-    status: "OPEN",
+    status: "ACTIVE",
     urgent: false,
     neededBy: null,
     recurring: false,
@@ -28,7 +28,7 @@ function post(overrides: Partial<Post> = {}): Post {
     createdAt: new Date(),
     expiresAt: null,
     ...overrides,
-  } as Post;
+  } as Intent;
 }
 
 function reputation(overrides: Partial<Reputation> = {}): Reputation {

@@ -179,7 +179,9 @@ export function matchVote(row: {
   fellThrough?: boolean;
 }): "useful" | "dismiss" | null {
   if (row.fellThrough) return "dismiss";
-  if (row.status === "ACCEPTED" || row.status === "COMPLETED") return "useful";
+  if (row.status === "AGREED" || row.status === "ACCEPTED" || row.status === "COMPLETED") {
+    return "useful";
+  }
   if (row.status === "DECLINED") return "dismiss";
   return null;
 }

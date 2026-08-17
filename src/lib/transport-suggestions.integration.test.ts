@@ -10,18 +10,18 @@ import { prisma } from "@/lib/prisma";
 
 async function createTransportPost(
   partyId: string,
-  overrides: { province?: string; destinationProvince?: string | null; status?: "OPEN" | "CLOSED"; type?: "HAVE" | "NEED" } = {},
+  overrides: { province?: string; destinationProvince?: string | null; status?: "ACTIVE" | "WITHDRAWN"; side?: "SUPPLY" | "DEMAND" } = {},
 ) {
-  return prisma.post.create({
+  return prisma.intent.create({
     data: {
       partyId,
-      type: overrides.type ?? "HAVE",
+      side: overrides.side ?? "SUPPLY",
       category: "TRANSPORT",
       title: "Truck available",
       province: overrides.province ?? "Harare",
       district: "Harare",
       destinationProvince: overrides.destinationProvince,
-      status: overrides.status ?? "OPEN",
+      status: overrides.status ?? "ACTIVE",
     },
   });
 }
@@ -67,7 +67,7 @@ describe("findTransportersForRoute", () => {
   it("excludes a CLOSED transport post even if the route matches", async () => {
     const transporter = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(transporter.party.id);
-    const post = await createTransportPost(transporter.party.id, { status: "CLOSED" });
+    const post = await createTransportPost(transporter.party.id, { status: "WITHDRAWN" });
 
     const results = await findTransportersForRoute(
       { province: "Harare", district: "Harare" },
@@ -80,7 +80,7 @@ describe("findTransportersForRoute", () => {
   it("excludes a TRANSPORT NEED post (only HAVE posts are capacity offers)", async () => {
     const transporter = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(transporter.party.id);
-    const post = await createTransportPost(transporter.party.id, { type: "NEED" });
+    const post = await createTransportPost(transporter.party.id, { side: "DEMAND" });
 
     const results = await findTransportersForRoute(
       { province: "Harare", district: "Harare" },
