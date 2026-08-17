@@ -618,4 +618,28 @@ describe("bilateral agreement", () => {
     expect(await acceptance).toMatchObject({ ok: true, status: "agreed" });
   });
 
+
+  it("does not treat reusable equipment as one lifetime-consumable unit", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Equipment Farm" } });
+    const equipment = await prisma.equipment.create({
+      data: { farmId: farm.id, name: "Tractor", category: "TRACTOR", available: true },
+    });
+    const first = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 1, unit: "each" });
+    const second = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 1, unit: "each" });
+    await prisma.intent.updateMany({
+      where: { id: { in: [first.id, second.id] } },
+      data: { equipmentId: equipment.id, category: "EQUIPMENT" },
+    });
+    const one = await buyerNeeding(1, "each");
+    const two = await buyerNeeding(1, "each");
+    const firstMatch = await createTestMatch(first.id, one.demand.id, "SUGGESTED");
+    const secondMatch = await createTestMatch(second.id, two.demand.id, "SUGGESTED");
+    await proposeTerms(firstMatch.id, one.buyer.id, { quantity: 1, unit: "each", handoverOn: new Date("2026-09-01") });
+    await proposeTerms(secondMatch.id, two.buyer.id, { quantity: 1, unit: "each", handoverOn: new Date("2026-10-01") });
+
+    expect(await acceptTerms(firstMatch.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+    expect(await acceptTerms(secondMatch.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+  });
+
 });

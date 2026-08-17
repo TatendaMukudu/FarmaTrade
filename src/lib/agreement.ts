@@ -143,9 +143,10 @@ async function lockSupplySource(
     await tx.$queryRaw`SELECT id FROM "ProduceStock" WHERE id = ${intent.produceId} FOR UPDATE`;
   } else if (intent.livestockId) {
     await tx.$queryRaw`SELECT id FROM "Livestock" WHERE id = ${intent.livestockId} FOR UPDATE`;
-  } else if (intent.equipmentId) {
-    await tx.$queryRaw`SELECT id FROM "Equipment" WHERE id = ${intent.equipmentId} FOR UPDATE`;
   }
+  // Equipment is reusable and its ceiling is time-dependent. Until a
+  // scheduling model exists, treating one row as one lifetime-consumable
+  // unit would turn a past rental into permanent unavailability.
 }
 
 async function fitsSupplySource(
@@ -161,9 +162,7 @@ async function fitsSupplySource(
     ? { produceId: intent.produceId }
     : intent.livestockId
       ? { livestockId: intent.livestockId }
-      : intent.equipmentId
-        ? { equipmentId: intent.equipmentId }
-        : null;
+      : null;
   if (!sourceWhere) return true;
 
   const sourceIntents = await tx.intent.findMany({
@@ -182,14 +181,9 @@ async function fitsSupplySource(
       quantity, unitCode,
     ).fits;
   }
-  if (intent.livestockId) {
-    const source = await tx.livestock.findUnique({ where: { id: intent.livestockId } });
-    if (!source) return false;
-    return fitsWithin(readCapacity({ quantity: source.quantity, unitCode: "HEAD" }, reservations), quantity, unitCode).fits;
-  }
-  const source = await tx.equipment.findUnique({ where: { id: intent.equipmentId! } });
+  const source = await tx.livestock.findUnique({ where: { id: intent.livestockId! } });
   if (!source) return false;
-  return fitsWithin(readCapacity({ quantity: source.available ? 1 : 0, unitCode: "EACH" }, reservations), quantity, unitCode).fits;
+  return fitsWithin(readCapacity({ quantity: source.quantity, unitCode: "HEAD" }, reservations), quantity, unitCode).fits;
 }
 
 // Every reservation held against these intents, resolved through the one
