@@ -93,6 +93,32 @@ therefore incapable of drifting) or materialised, and whether it belongs to
 `ProduceStock`, to a farm-level concept, or somewhere that also covers
 livestock and equipment — which have the same exposure and no probe yet.
 
+## Founder decisions — 2026-08-17
+
+The founder resolved the governing fork after this audit:
+
+1. **Opportunity is not reservation or commitment.** Competing opportunities may
+   collectively exceed physical availability so the farmer can compare price,
+   timing, transport, buyer quality and route.
+2. **Bilateral acceptance creates commitment.** Accepted commitments must not
+   silently exceed available or explicitly expected supply. The acceptance that
+   would cross that ceiling must be blocked, while preserving the other
+   opportunities. Expected supply must be explicit farm state, never a forecast.
+3. **Cancellation is durable.** Record the actor, timestamp, reason and affected
+   agreement, then release committed quantity. Cancellation is visible trade
+   history but does not automatically change a star rating.
+4. **Identity is universal and reputation contextual.** One identity may accrue
+   role-scoped facets from roles actually played in transactions; the role model
+   must remain extensible rather than being a closed actor taxonomy.
+5. **Messaging has a mutual-consent boundary before agreement.** It opens for an
+   existing Network connection or after the other party accepts trade interest
+   in an opportunity/request. A generated opportunity alone is not consent.
+
+These decisions authorize source-ceiling enforcement at the commitment boundary
+and durable cancellation history. They do not authorize fulfilment/inventory
+mutation, guessed provenance for source-less supply, legacy role inference, a
+reputation aggregation formula, or a cancellation-derived score.
+
 ## Open questions
 
 1. **Whose ceiling is it?** Should a physical source cap the sum of

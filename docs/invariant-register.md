@@ -90,7 +90,9 @@ only. A rating cannot touch observed history.
 `TransactionConfirmation`. Ratings feed only `averageRating`/`ratingCount`.
 A trade with no review still counts.
 
-## INV-13 — Cancellation persists · **PARTIAL**
+## INV-13 — Cancellation persists · **PARTIAL — FOUNDER DIRECTION RECORDED**
+
+The founder decided cancellation must durably record actor, timestamp, reason and affected agreement, release committed quantity, and remain visible without an automatic star penalty. Implementation remains outstanding.
 
 The agreed terms survive a cancellation. But `Match.status` is mutable with
 no history and there is no cancellation *record*, reason or timestamp — so
@@ -112,7 +114,9 @@ circumstances in which personal/contact information unlocks") is **\***, so
 this is the narrowest reversible rule that satisfies the DECIDED half —
 **not** a proposed answer to the starred question.
 
-## INV-15 — Stranger messaging cannot bypass trust boundary · **PARTIAL**
+## INV-15 — Stranger messaging cannot bypass trust boundary · **PARTIAL — FOUNDER DIRECTION RECORDED**
+
+The founder set two pre-agreement consent paths: an existing Network connection, or acceptance of trade interest by the recipient. A generated opportunity alone is insufficient. Implementation remains outstanding.
 
 `assertPartyInMatch` gates every message on being a party to the match, so
 there is no open inbox. But matches are system-generated, so a stranger
