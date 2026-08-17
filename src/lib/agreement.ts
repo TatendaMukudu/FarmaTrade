@@ -12,7 +12,7 @@ import {
   type TermsVersion,
 } from "@/lib/agreement-core";
 import { fitsWithin, pairwiseQuantity, readCapacity, type Allocation } from "@/lib/capacity";
-import { resolveUnit, type CanonicalUnit } from "@/lib/measurement";
+import { PRODUCE_UNIT_CANONICAL, resolveUnit, type CanonicalUnit } from "@/lib/measurement";
 import type { PriceBasis } from "@/generated/prisma/client";
 import { isAuthorizedToMatch } from "@/lib/intent";
 
@@ -66,12 +66,14 @@ async function loadEngagement(client: Prisma.TransactionClient, matchId: string)
         select: {
           id: true, partyId: true, side: true, status: true,
           quantity: true, unit: true, unitCode: true,
+          produceId: true, livestockId: true, equipmentId: true,
         },
       },
       intentB: {
         select: {
           id: true, partyId: true, side: true, status: true,
           quantity: true, unit: true, unitCode: true,
+          produceId: true, livestockId: true, equipmentId: true,
         },
       },
       confirmations: { select: { outcome: true } },
@@ -131,6 +133,63 @@ function legacyCode(unit: string | null): string | null {
 async function lockIntents(tx: Prisma.TransactionClient, intentIds: string[]): Promise<void> {
   const ordered = [...new Set(intentIds)].sort();
   await tx.$queryRaw`SELECT id FROM "Intent" WHERE id IN (${Prisma.join(ordered)}) ORDER BY id FOR UPDATE`;
+}
+
+async function lockSupplySource(
+  tx: Prisma.TransactionClient,
+  intent: { produceId: string | null; livestockId: string | null; equipmentId: string | null },
+): Promise<void> {
+  if (intent.produceId) {
+    await tx.$queryRaw`SELECT id FROM "ProduceStock" WHERE id = ${intent.produceId} FOR UPDATE`;
+  } else if (intent.livestockId) {
+    await tx.$queryRaw`SELECT id FROM "Livestock" WHERE id = ${intent.livestockId} FOR UPDATE`;
+  } else if (intent.equipmentId) {
+    await tx.$queryRaw`SELECT id FROM "Equipment" WHERE id = ${intent.equipmentId} FOR UPDATE`;
+  }
+}
+
+async function fitsSupplySource(
+  tx: Prisma.TransactionClient,
+  intent: { id: string; side: string; produceId: string | null; livestockId: string | null; equipmentId: string | null },
+  quantity: number,
+  unitCode: string | null,
+  exceptMatchId: string,
+): Promise<boolean> {
+  if (intent.side !== "SUPPLY") return true;
+
+  const sourceWhere = intent.produceId
+    ? { produceId: intent.produceId }
+    : intent.livestockId
+      ? { livestockId: intent.livestockId }
+      : intent.equipmentId
+        ? { equipmentId: intent.equipmentId }
+        : null;
+  if (!sourceWhere) return true;
+
+  const sourceIntents = await tx.intent.findMany({
+    where: { side: "SUPPLY", ...sourceWhere },
+    select: { id: true },
+  });
+  const ids = sourceIntents.map(({ id }) => id);
+  const byIntent = await reservationsByIntent(tx, ids, exceptMatchId);
+  const reservations = ids.flatMap((id) => byIntent.get(id) ?? []);
+
+  if (intent.produceId) {
+    const source = await tx.produceStock.findUnique({ where: { id: intent.produceId } });
+    if (!source) return false;
+    return fitsWithin(
+      readCapacity({ quantity: source.quantity, unitCode: PRODUCE_UNIT_CANONICAL[source.unit] }, reservations),
+      quantity, unitCode,
+    ).fits;
+  }
+  if (intent.livestockId) {
+    const source = await tx.livestock.findUnique({ where: { id: intent.livestockId } });
+    if (!source) return false;
+    return fitsWithin(readCapacity({ quantity: source.quantity, unitCode: "HEAD" }, reservations), quantity, unitCode).fits;
+  }
+  const source = await tx.equipment.findUnique({ where: { id: intent.equipmentId! } });
+  if (!source) return false;
+  return fitsWithin(readCapacity({ quantity: source.available ? 1 : 0, unitCode: "EACH" }, reservations), quantity, unitCode).fits;
 }
 
 // Every reservation held against these intents, resolved through the one
@@ -343,6 +402,8 @@ export async function acceptTerms(
 
     if (!initialParticipants.includes(partyId)) return { ok: false, reason: "not_a_participant" };
 
+    const initialSupply = [initiallyLoaded.intentA, initiallyLoaded.intentB].find((intent) => intent.side === "SUPPLY");
+    if (initialSupply) await lockSupplySource(tx, initialSupply);
     await lockIntents(tx, [initiallyLoaded.intentA.id, initiallyLoaded.intentB.id]);
     const current = await loadEngagement(tx, matchId);
     if (!current) return { ok: false, reason: "not_found" };
@@ -399,6 +460,11 @@ export async function acceptTerms(
           ).fits,
       );
       if (!fits) return { ok: false, reason: "insufficient_capacity" };
+
+      const supply = intents.find((intent) => intent.side === "SUPPLY");
+      if (supply && !(await fitsSupplySource(tx, supply, target.quantity, target.unitCode, matchId))) {
+        return { ok: false, reason: "insufficient_capacity" };
+      }
     }
 
     await tx.termsAcceptance.create({ data: { termsId: target.id, partyId } });
