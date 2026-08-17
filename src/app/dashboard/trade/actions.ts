@@ -246,7 +246,7 @@ export async function createPost(
 
   await generateMatchesForIntent(intent.id);
 
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
   revalidatePath("/dashboard/opportunities");
   return {};
 }
@@ -261,7 +261,7 @@ export async function closePost(formData: FormData) {
     data: { status: "WITHDRAWN" },
   });
 
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
   revalidatePath("/dashboard/opportunities");
 }
 
@@ -281,7 +281,7 @@ export async function confirmProposedIntent(formData: FormData) {
   await prisma.intent.update({ where: { id }, data: { status: "ACTIVE" } });
   await generateMatchesForIntent(id);
 
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
   revalidatePath("/dashboard/opportunities");
   revalidatePath("/dashboard");
 }
@@ -308,6 +308,6 @@ export async function declineProposedIntent(formData: FormData) {
     data: { status: "WITHDRAWN" },
   });
 
-  revalidatePath("/dashboard/intent");
+  revalidatePath("/dashboard/trade");
   revalidatePath("/dashboard");
 }

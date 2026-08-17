@@ -162,10 +162,11 @@ ordering test pins the hero ahead of administration. It deliberately says
 threshold for "strong" belongs to the unresolved exact ranking policy, and
 Home must not turn that unknown into a claim.
 
-**D3 — §7 structure does not exist.** There is no Home/Trade/Network/fourth
-shape. Navigation is Overview, Intent, Opportunities, Farm, Directory,
-Settings. **`/dashboard/intent` leaks an implementation word into the URL**,
-which §4 explicitly names as an implementation concept, not a user one.
+**D3 — §7 structure is PARTIAL.** Home and Trade are now named in the
+farmer-facing navigation, and `/dashboard/trade` replaces the implementation
+word in the canonical URL. `/dashboard/intent` survives only as a bookmark
+redirect. Network does not exist, and the fourth destination remains
+deliberately unresolved, so the complete four-part shape is not yet present.
 
 **D4 — §23 Network does not exist.** No connections, no Request/Connect
 actions (§30), no network trust signals (§26). `Relation` exists but is

@@ -233,7 +233,7 @@ export default async function DashboardPage() {
 
       {draftCount > 0 && (
         <Link
-          href="/dashboard/intent"
+          href="/dashboard/trade"
           className="rounded-card border border-border bg-warning-bg p-4 text-sm font-medium text-warning-fg hover:opacity-90"
         >
           {draftCount} item{draftCount === 1 ? "" : "s"} FarmaTrade drafted from your upcoming
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
           icon={<ListingIcon />}
           value={String(openPostCount)}
           label={openPostCount === 1 ? "active offer or need" : "active offers and needs"}
-          href="/dashboard/intent"
+          href="/dashboard/trade"
         />
         <StatTile
           icon={<StarIcon />}
@@ -291,6 +291,7 @@ export default async function DashboardPage() {
           </p>
         </Card>
       )}
+
       <div>
         <h2 className="mb-3 text-lg font-medium">Quick actions</h2>
         <div className="flex flex-wrap gap-3">

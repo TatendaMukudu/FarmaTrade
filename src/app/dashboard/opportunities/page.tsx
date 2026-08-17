@@ -178,7 +178,7 @@ export default async function OpportunitiesPage() {
           icon={<SproutIcon />}
           title="No opportunities yet"
           hint="Record what you have available and what you are looking for, and FarmaTrade matches it against the network."
-          action={{ href: "/dashboard/intent", label: "Add supply or a need" }}
+          action={{ href: "/dashboard/trade", label: "Add supply or a need" }}
         />
       )}
 

@@ -12,5 +12,5 @@ export default async function LegacyPostsPage({
       v == null ? [] : [[k, Array.isArray(v) ? v[0] : v] as [string, string]],
     ),
   ).toString();
-  redirect(query ? `/dashboard/intent?${query}` : "/dashboard/intent");
+  redirect(query ? `/dashboard/trade?${query}` : "/dashboard/trade");
 }
