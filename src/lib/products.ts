@@ -78,7 +78,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     kind: "CROP",
     category: "PRODUCE",
     name: "Pearl millet",
-    aliases: ["pearl millet", "bulrush millet", "millet"],
+    aliases: ["pearl millet", "bulrush millet"],
     localNames: { sn: ["mhunga"] },
   },
   {
@@ -284,8 +284,8 @@ export type AliasEntry = {
 //
 // Throws on a duplicate normalised term rather than silently letting one
 // product win. A term that genuinely belongs to two products is a modelling
-// decision someone has to make — "millet" resolving to pearl millet rather
-// than finger millet is a choice, and it should be a visible one.
+// decision someone has to make. Generic "millet" could mean pearl or finger
+// millet, so it deliberately remains unresolved until the farmer disambiguates.
 export function seedAliases(products: SeedProduct[] = SEED_PRODUCTS): AliasEntry[] {
   const entries: AliasEntry[] = [];
   const claimed = new Map<string, string>();

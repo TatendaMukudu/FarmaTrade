@@ -58,6 +58,12 @@ describe("resolveProductKey", () => {
     expect(resolveProductKey("Nyimo", index)).toBe("bambara_nut");
   });
 
+  it("leaves generic millet unresolved instead of choosing a variety", () => {
+    expect(resolveProductKey("millet", index)).toBeNull();
+    expect(resolveProductKey("pearl millet", index)).toBe("pearl_millet");
+    expect(resolveProductKey("finger millet", index)).toBe("finger_millet");
+  });
+
   it("lets a buyer's English find a farmer's Shona", () => {
     expect(resolveProductKey("chibage", index)).toBe(resolveProductKey("maize", index));
     expect(resolveProductKey("mbudzi", index)).toBe(resolveProductKey("goats", index));
