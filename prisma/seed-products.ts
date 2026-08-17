@@ -46,6 +46,17 @@ async function main() {
     (await prisma.product.findMany({ select: { id: true, key: true } })).map((p) => [p.key, p.id]),
   );
 
+  // Remove aliases this catalogue used to seed but no longer claims. This is
+  // what makes corrections (for example, generic "millet" becoming
+  // deliberately unresolved) take effect on upgraded databases as well as
+  // fresh ones. Human-curated aliases are never touched.
+  await prisma.productAlias.deleteMany({
+    where: {
+      source: "SEEDED",
+      normalized: { notIn: aliases.map((alias) => alias.normalized) },
+    },
+  });
+
   for (const alias of aliases) {
     const productId = byKey.get(alias.productKey);
     if (!productId) continue;
