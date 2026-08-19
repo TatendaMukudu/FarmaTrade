@@ -550,4 +550,96 @@ describe("bilateral agreement", () => {
     expect(again).toMatchObject({ ok: true, status: "already_agreed" });
     expect(await remainingOf(supply.id)).toBe(kg(12));
   });
+
+  it("blocks a commitment that would over-promise one physical source across intents", async () => {
+    const { seller, produce, supply: first } = await farmerOffering(20, 26);
+    const second = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 20, unit: "tonne" });
+    await prisma.intent.update({ where: { id: second.id }, data: { produceId: produce.id } });
+    const one = await buyerNeeding(20);
+    const two = await buyerNeeding(7);
+    const firstMatch = await createTestMatch(first.id, one.demand.id, "SUGGESTED");
+    const secondMatch = await createTestMatch(second.id, two.demand.id, "SUGGESTED");
+
+    await proposeTerms(firstMatch.id, one.buyer.id, { quantity: 20, unit: "tonne" });
+    await acceptTerms(firstMatch.id, seller.id);
+    await proposeTerms(secondMatch.id, two.buyer.id, { quantity: 7, unit: "tonne" });
+
+    expect(await acceptTerms(secondMatch.id, seller.id)).toEqual({ ok: false, reason: "insufficient_capacity" });
+    expect(await statusOf(secondMatch.id)).toBe("NEGOTIATING");
+    expect(await stockOf(produce.id)).toBe(26);
+  });
+
+  it("serializes concurrent commitments across intents sharing one source", async () => {
+    const { seller, produce, supply: first } = await farmerOffering(20, 26);
+    const second = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 20, unit: "tonne" });
+    await prisma.intent.update({ where: { id: second.id }, data: { produceId: produce.id } });
+    const one = await buyerNeeding(15);
+    const two = await buyerNeeding(15);
+    const firstMatch = await createTestMatch(first.id, one.demand.id, "SUGGESTED");
+    const secondMatch = await createTestMatch(second.id, two.demand.id, "SUGGESTED");
+    await proposeTerms(firstMatch.id, one.buyer.id, { quantity: 15, unit: "tonne" });
+    await proposeTerms(secondMatch.id, two.buyer.id, { quantity: 15, unit: "tonne" });
+
+    const results = await Promise.all([
+      acceptTerms(firstMatch.id, seller.id),
+      acceptTerms(secondMatch.id, seller.id),
+    ]);
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok && result.reason === "insufficient_capacity")).toHaveLength(1);
+    expect(await stockOf(produce.id)).toBe(26);
+  });
+
+
+  it("waits for the physical source lock before committing", async () => {
+    const { seller, produce, supply } = await farmerOffering(10, 10);
+    const { buyer, demand } = await buyerNeeding(10);
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "tonne" });
+
+    let release!: () => void;
+    let locked!: () => void;
+    const releaseSignal = new Promise<void>((resolve) => { release = resolve; });
+    const lockedSignal = new Promise<void>((resolve) => { locked = resolve; });
+    const blocker = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "ProduceStock" WHERE id = ${produce.id} FOR UPDATE`;
+      locked();
+      await releaseSignal;
+    });
+    await lockedSignal;
+
+    let settled = false;
+    const acceptance = acceptTerms(match.id, seller.id).then((result) => { settled = true; return result; });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(settled).toBe(false);
+
+    release();
+    await blocker;
+    expect(await acceptance).toMatchObject({ ok: true, status: "agreed" });
+  });
+
+
+  it("does not treat reusable equipment as one lifetime-consumable unit", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Equipment Farm" } });
+    const equipment = await prisma.equipment.create({
+      data: { farmId: farm.id, name: "Tractor", category: "TRACTOR", available: true },
+    });
+    const first = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 1, unit: "each" });
+    const second = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 1, unit: "each" });
+    await prisma.intent.updateMany({
+      where: { id: { in: [first.id, second.id] } },
+      data: { equipmentId: equipment.id, category: "EQUIPMENT" },
+    });
+    const one = await buyerNeeding(1, "each");
+    const two = await buyerNeeding(1, "each");
+    const firstMatch = await createTestMatch(first.id, one.demand.id, "SUGGESTED");
+    const secondMatch = await createTestMatch(second.id, two.demand.id, "SUGGESTED");
+    await proposeTerms(firstMatch.id, one.buyer.id, { quantity: 1, unit: "each", handoverOn: new Date("2026-09-01") });
+    await proposeTerms(secondMatch.id, two.buyer.id, { quantity: 1, unit: "each", handoverOn: new Date("2026-10-01") });
+
+    expect(await acceptTerms(firstMatch.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+    expect(await acceptTerms(secondMatch.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+  });
+
 });
