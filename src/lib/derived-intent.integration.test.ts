@@ -4,21 +4,34 @@
 // file exists for is the set of promises that can only be checked against
 // real rows: that a proposal never becomes active on its own, that inventory
 // is never touched, and that a decline actually survives the next run.
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { ensureDerivedIntent } from "@/lib/derived-intent";
-import { createTestParty, cleanupParties } from "@/test/factories";
+import { acceptTerms, proposeTerms } from "@/lib/agreement";
+import { createTestIntent, createTestParty, cleanupParties } from "@/test/factories";
+import { fakeCookies, resetNextRuntime } from "@/test/next-runtime-stub";
+
+vi.mock("next/headers", () => ({
+  cookies: async () => fakeCookies,
+  headers: async () => ({ get: () => null }),
+}));
+vi.mock("next/navigation", () => ({ redirect: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+
+const { confirmProposedIntent } = await import("@/app/dashboard/intent/actions");
+const { createSession } = await import("@/lib/auth");
 
 const DAY = 24 * 60 * 60 * 1000;
 
 describe("ensureDerivedIntent", () => {
   const partyIds: string[] = [];
+  beforeEach(() => resetNextRuntime());
   afterEach(async () => {
     await cleanupParties(partyIds.splice(0));
   });
 
   async function farmWithHarvest(opts: { quantity?: number; daysAway?: number } = {}) {
-    const { party } = await createTestParty({ roles: ["FARM"] });
+    const { party, user } = await createTestParty({ roles: ["FARM"] });
     partyIds.push(party.id);
     const farm = await prisma.farm.create({
       data: { partyId: party.id, farmName: "Test Farm" },
@@ -33,7 +46,7 @@ describe("ensureDerivedIntent", () => {
         perishable: false,
       },
     });
-    return { party, farm, produce };
+    return { party, user, farm, produce };
   }
 
   const derivedFor = (partyId: string) =>
@@ -50,6 +63,47 @@ describe("ensureDerivedIntent", () => {
       expect(intent.origin).toBe("DERIVED");
       expect(intent.derivationKey).toBeTruthy();
     })();
+  });
+
+  it("lets the owner agree a trade before the expected harvest exists", async () => {
+    const { party: seller, user: sellerUser, farm, produce } = await farmWithHarvest({ daysAway: 3 });
+    await ensureDerivedIntent(farm.id, seller);
+    const [futureSupply] = await derivedFor(seller.id);
+    expect(produce.expectedHarvestDate!.getTime()).toBeGreaterThan(Date.now());
+
+    const { party: buyer } = await createTestParty();
+    partyIds.push(buyer.id);
+    const demand = await createTestIntent(buyer.id, {
+      side: "DEMAND",
+      quantity: 8,
+      unit: "tonne",
+    });
+
+    // Exercise the real ownership transition. It activates the proposal and
+    // invokes discovery; inserting a Match fixture here would prove only
+    // contracting and miss the future-supply discovery promise entirely.
+    await createSession(sellerUser.id);
+    const form = new FormData();
+    form.set("id", futureSupply.id);
+    await confirmProposedIntent(form);
+
+    const match = await prisma.match.findFirst({
+      where: {
+        OR: [
+          { intentAId: futureSupply.id, intentBId: demand.id },
+          { intentAId: demand.id, intentBId: futureSupply.id },
+        ],
+      },
+    });
+    expect(match).not.toBeNull();
+
+    await proposeTerms(match!.id, buyer.id, { quantity: 8, unit: "tonne" });
+    const result = await acceptTerms(match!.id, seller.id);
+
+    expect(result).toMatchObject({ ok: true, status: "agreed" });
+    expect((await prisma.match.findUnique({ where: { id: match!.id } }))!.status).toBe("AGREED");
+    // Agreement records future commerce; it does not rewrite farm state.
+    expect((await prisma.produceStock.findUnique({ where: { id: produce.id } }))!.quantity).toBe(26);
   });
 
   it("never activates anything by itself, however many times it runs", async () => {

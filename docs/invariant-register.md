@@ -50,11 +50,12 @@ P0.4 terms versions. Accept, decline and counter all covered.
 `Match.status` and leaves the terms intact. Tested: "the record of what was
 agreed survives the cancellation."
 
-## INV-06 — Future supply is tradeable · **HELD (structural)**
+## INV-06 — Future supply is tradeable · **HELD (test)**
 
 Derivation reads `expectedHarvestDate` and proposes ahead of harvest; an
-agreement may be formed against it. No test yet asserts the *future* aspect
-specifically.
+integration test now proves the owner can authorize that future proposal and
+form a bilateral agreement while its harvest date is still ahead, without
+commerce changing the recorded farm quantity.
 
 ## INV-07 — Multi-supplier fulfillment · **HELD (test)**
 
