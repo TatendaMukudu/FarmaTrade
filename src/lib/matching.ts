@@ -57,7 +57,16 @@ export async function generateMatchesForIntent(intentId: string) {
   // sees it. Geography is deliberately not applied here — the whole point of
   // opting in is that distance has stopped being the disqualifier.
   const reach = intent.openToCrossBorder
-    ? { OR: [local, { openToCrossBorder: true, partyId: { not: intent.partyId } }] }
+    ? {
+        OR: [
+          local,
+          {
+            openToCrossBorder: true,
+            countryCode: { not: intent.countryCode },
+            partyId: { not: intent.partyId },
+          },
+        ],
+      }
     : local;
 
   // Commodity identity, where both sides have one.

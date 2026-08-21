@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { intentHref } from "./intent";
+import { normalizeLegacyTradeParams } from "./trade-route";
 
 describe("farmer-facing Trade language", () => {
   it("uses Trade for canonical intent links", () => {
@@ -20,4 +21,11 @@ describe("farmer-facing Trade language", () => {
     expect(legacy).toContain('PageProps<"/dashboard/intent">');
     expect(legacy).toContain('redirect(query ? `/dashboard/trade?${query}` : "/dashboard/trade")');
   });
+  it("translates legacy HAVE and NEED bookmarks without changing their meaning", () => {
+    expect(normalizeLegacyTradeParams({ type: "NEED", category: "TRANSPORT" }).toString()).toBe(
+      "side=DEMAND&category=TRANSPORT",
+    );
+    expect(normalizeLegacyTradeParams({ type: "HAVE" }).toString()).toBe("side=SUPPLY");
+  });
+
 });

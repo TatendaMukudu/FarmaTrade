@@ -52,6 +52,11 @@ export function PostForm({
       const result = await createPost(prev, formData);
       if (!result.error) {
         formRef.current?.reset();
+        // Native reset cannot clear controlled fields. Carrying the previous
+        // unit into a new quantity would make the next intent commercially
+        // mean something the farmer did not choose.
+        setUnit("");
+        setPriceBasis("PER_UNIT");
         setCategory(defaultCategory);
         onDone?.();
       }

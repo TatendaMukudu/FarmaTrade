@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { normalizeLegacyTradeParams } from "@/lib/trade-route";
 
 // The Posts route is gone as a product concept. Kept as a redirect rather
 // than deleted: farmers have this bookmarked, and a 404 is a worse way to
@@ -7,10 +8,6 @@ export default async function LegacyPostsPage({
   searchParams,
 }: PageProps<"/dashboard/posts">) {
   const params = await searchParams;
-  const query = new URLSearchParams(
-    Object.entries(params).flatMap(([k, v]) =>
-      v == null ? [] : [[k, Array.isArray(v) ? v[0] : v] as [string, string]],
-    ),
-  ).toString();
+  const query = normalizeLegacyTradeParams(params).toString();
   redirect(query ? `/dashboard/trade?${query}` : "/dashboard/trade");
 }

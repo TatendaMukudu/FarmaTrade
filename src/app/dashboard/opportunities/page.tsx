@@ -103,13 +103,16 @@ export default async function OpportunitiesPage() {
     }),
     prisma.match.findMany({
       where: {
-        status: "COMPLETED",
-        OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
+        AND: [
+          { OR: [{ status: "COMPLETED" }, { cancellation: { isNot: null } }] },
+          { OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }] },
+        ],
       },
       include: {
         intentA: { include: { party: true } },
         intentB: { include: { party: true } },
         confirmations: true,
+        cancellation: { include: { cancelledBy: { select: { name: true } } } },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -404,7 +407,11 @@ export default async function OpportunitiesPage() {
                   className="rounded-card border border-border bg-card px-4 py-2 text-sm text-muted-fg"
                 >
                   {yours.title} ↔ {theirs.party.name} ({theirs.title}) ·{" "}
-                  {myConfirmation ? OUTCOME_LABEL[myConfirmation.outcome] : "Not confirmed"}
+                  {m.cancellation
+                    ? `Cancelled by ${m.cancellation.cancelledBy.name} on ${m.cancellation.createdAt.toLocaleDateString("en-GB")}`
+                    : myConfirmation
+                      ? OUTCOME_LABEL[myConfirmation.outcome]
+                      : "Not confirmed"}
                 </li>
               );
             })}

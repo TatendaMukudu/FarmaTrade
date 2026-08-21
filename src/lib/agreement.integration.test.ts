@@ -290,8 +290,23 @@ describe("bilateral agreement", () => {
     expect(await remainingOf(supply.id)).toBe(kg(26));
     expect((await prisma.intent.findUnique({ where: { id: supply.id } }))!.status).toBe("ACTIVE");
     expect(await stockOf(produce.id)).toBe(26);
-    // The record of what was agreed survives the cancellation.
+    // The record of what was agreed survives the cancellation, including
+    // who cancelled and the exact immutable terms that were governing.
     expect(await prisma.agreementTerms.count({ where: { matchId: match.id } })).toBe(1);
+    const cancellation = await prisma.agreementCancellation.findUnique({ where: { matchId: match.id } });
+    const terms = await prisma.agreementTerms.findFirstOrThrow({ where: { matchId: match.id } });
+    expect(cancellation).toMatchObject({ cancelledById: seller.id, termsId: terms.id });
+    expect(cancellation!.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("records a pre-agreement decline as no cancellation", async () => {
+    const { seller, supply } = await farmerOffering(10, 26);
+    const { demand } = await buyerNeeding(10);
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+
+    await closeEngagement(match.id, seller.id);
+
+    expect(await prisma.agreementCancellation.findUnique({ where: { matchId: match.id } })).toBeNull();
   });
 
   it("never rewrites a completed engagement as declined", async () => {

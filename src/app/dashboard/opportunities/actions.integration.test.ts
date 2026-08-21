@@ -15,7 +15,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({ redirect: () => {} }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { respondToMatch, confirmMatch } = await import("./actions");
+const { respondToMatch, confirmMatch, proposeMatchTerms } = await import("./actions");
 const { createSession } = await import("@/lib/auth");
 const { prisma } = await import("@/lib/prisma");
 
@@ -81,6 +81,21 @@ describe("respondToMatch", () => {
     expect(updated!.status).toBe("AGREED");
   });
 
+  it("records who cancelled after both parties agreed", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+    await loginAs(buyer.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "DECLINED" }));
+
+    expect(await prisma.agreementCancellation.findUnique({ where: { matchId: match.id } }))
+      .toMatchObject({ cancelledById: seller.party.id });
+  });
+
   it("lets a party in the match decline it", async () => {
     const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
     partyIds.push(seller.party.id, buyer.party.id);
@@ -102,6 +117,32 @@ describe("respondToMatch", () => {
 
     const updated = await prisma.match.findUnique({ where: { id: match.id } });
     expect(updated!.status).toBe("SUGGESTED");
+  });
+});
+
+describe("proposeMatchTerms", () => {
+  const partyIds: string[] = [];
+  beforeEach(() => resetNextRuntime());
+  afterEach(async () => cleanupParties(partyIds.splice(0)));
+
+  it("records the handover date the parties put on the table", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+    await loginAs(buyer.user.id);
+
+    await proposeMatchTerms(formData({
+      matchId: match.id,
+      quantity: "15",
+      unit: "tonne",
+      price: "500",
+      priceBasis: "PER_UNIT",
+      priceCurrency: "USD",
+      priceUnit: "tonne",
+      handoverOn: "2026-09-20",
+    }));
+
+    const terms = await prisma.agreementTerms.findFirstOrThrow({ where: { matchId: match.id } });
+    expect(terms.handoverOn?.toISOString()).toBe("2026-09-20T00:00:00.000Z");
   });
 });
 

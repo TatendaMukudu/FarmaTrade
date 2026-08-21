@@ -194,6 +194,22 @@ describe("generateMatchesForIntent", () => {
       expect(match!.reasons).toContain("same district");
     });
 
+    it("does not use cross-border opt-in to bypass domestic geography", async () => {
+      const seller = await createTestParty({ countryCode: "ZW", province: "Manicaland", district: "Mutare" });
+      const buyer = await createTestParty({ countryCode: "ZW", province: "Harare", district: "Harare" });
+      partyIds.push(seller.party.id, buyer.party.id);
+      const have = await createTestIntent(seller.party.id, {
+        side: "SUPPLY", category: "PRODUCE", province: "Manicaland", district: "Mutare", openToCrossBorder: true,
+      });
+      const need = await createTestIntent(buyer.party.id, {
+        side: "DEMAND", category: "PRODUCE", province: "Harare", district: "Harare", openToCrossBorder: true,
+      });
+
+      await generateMatchesForIntent(need.id);
+
+      expect(await prisma.match.findFirst({ where: { intentAId: have.id, intentBId: need.id } })).toBeNull();
+    });
+
     it("does not match two same-named provinces in different countries", async () => {
       // Both Zimbabwe and Zambia have a province a farmer might call
       // "Southern"; without the country guard these would look local to

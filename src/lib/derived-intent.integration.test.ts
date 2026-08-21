@@ -18,7 +18,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({ redirect: () => {} }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { confirmProposedIntent } = await import("@/app/dashboard/intent/actions");
+const { confirmProposedIntent } = await import("@/app/dashboard/trade/actions");
 const { createSession } = await import("@/lib/auth");
 
 const DAY = 24 * 60 * 60 * 1000;

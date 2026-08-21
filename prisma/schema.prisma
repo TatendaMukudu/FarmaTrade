@@ -95,6 +95,7 @@ model Party {
   confirmations TransactionConfirmation[]
   termsProposed AgreementTerms[]
   termsAccepted TermsAcceptance[]
+  cancellations AgreementCancellation[]
 
   relationsAsA Relation[] @relation("RelationPartyA")
   relationsAsB Relation[] @relation("RelationPartyB")
@@ -592,6 +593,7 @@ model Match {
   ratings       Rating[]
   conversation  Conversation?
   terms         AgreementTerms[]
+  cancellation  AgreementCancellation?
 
   @@unique([intentAId, intentBId])
   @@index([intentBId])
@@ -657,7 +659,8 @@ model AgreementTerms {
   proposedBy   Party  @relation(fields: [proposedById], references: [id])
   createdAt    DateTime @default(now())
 
-  acceptances TermsAcceptance[]
+  acceptances   TermsAcceptance[]
+  cancellations AgreementCancellation[]
 
   @@unique([matchId, version])
   @@index([matchId])
@@ -686,6 +689,26 @@ model TermsAcceptance {
 
   @@unique([termsId, partyId])
   @@index([partyId])
+}
+
+// Append-only evidence that a bilateral commitment was cancelled.
+//
+// Match.status remains the current projection used by matching/capacity. This
+// row is the durable fact: who cancelled, when, and which immutable terms were
+// governing. Reasons remain deliberately absent because PRODUCT_TRUTH §38
+// leaves their taxonomy and dispute consequences unresolved.
+model AgreementCancellation {
+  id            String         @id @default(cuid())
+  matchId       String         @unique
+  match         Match          @relation(fields: [matchId], references: [id])
+  termsId       String
+  terms         AgreementTerms @relation(fields: [termsId], references: [id])
+  cancelledById String
+  cancelledBy   Party          @relation(fields: [cancelledById], references: [id])
+  createdAt     DateTime       @default(now())
+
+  @@index([termsId])
+  @@index([cancelledById])
 }
 
 // A conversation only exists once a match is ACCEPTED — it's the transaction

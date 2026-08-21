@@ -95,12 +95,14 @@ An integration test proves a completed trade with no review still increments
 the completion record while rating count remains zero and average stays
 unknown.
 
-## INV-13 — Cancellation persists · **PARTIAL**
+## INV-13 — Cancellation persists · **HELD (test)**
 
-The agreed terms survive a cancellation. But `Match.status` is mutable with
-no history and there is no cancellation *record*, reason or timestamp — so
-"recent cancellation behaviour remains visible" (§37) is not supported.
-Same gap as P0.6 case 10.
+An `AgreementCancellation` row now preserves the cancelling party, timestamp,
+and exact immutable terms version that governed when the agreement was
+cancelled. The current `Match.status` still releases capacity, while the event
+survives in trade history. A pre-agreement decline creates no cancellation.
+Cancellation-reason taxonomy and dispute consequences remain unresolved under
+§38/§57 and are deliberately not guessed.
 
 ## INV-14 — Personal identity remains protected · **HELD (test)** — was VIOLATED
 

@@ -120,6 +120,7 @@ export async function cleanupParties(partyIds: string[]) {
       where: { matchId: { in: matchIds } },
       select: { id: true },
     });
+    await prisma.agreementCancellation.deleteMany({ where: { matchId: { in: matchIds } } });
     if (terms.length) {
       await prisma.termsAcceptance.deleteMany({
         where: { termsId: { in: terms.map((t) => t.id) } },

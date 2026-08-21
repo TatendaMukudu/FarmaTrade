@@ -536,6 +536,13 @@ export async function closeEngagement(matchId: string, partyId: string): Promise
     if (current.match.status === "COMPLETED" || current.match.status === "DECLINED") {
       return { ok: false, reason: "closed" };
     }
+
+    const governing = governingTerms(current.versions, current.participants);
+    if (governing) {
+      await tx.agreementCancellation.create({
+        data: { matchId, termsId: governing.id, cancelledById: partyId },
+      });
+    }
     await tx.match.update({ where: { id: matchId }, data: { status: "DECLINED" } });
     await syncEngagement(tx, intentIds);
 

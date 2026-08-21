@@ -113,6 +113,8 @@ export async function proposeMatchTerms(formData: FormData) {
   const price = Number(formData.get("price"));
 
   const priceBasis = String(formData.get("priceBasis") || "");
+  const handoverText = String(formData.get("handoverOn") || "");
+  const handoverOn = handoverText ? new Date(`${handoverText}T00:00:00.000Z`) : null;
 
   await proposeTerms(id, party.id, {
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
@@ -123,6 +125,7 @@ export async function proposeMatchTerms(formData: FormData) {
     priceCurrency: (formData.get("priceCurrency") as string) || null,
     priceBasis: priceBasis === "TOTAL" || priceBasis === "PER_UNIT" ? priceBasis : null,
     priceUnit: (formData.get("priceUnit") as string) || null,
+    handoverOn: handoverOn && !Number.isNaN(handoverOn.getTime()) ? handoverOn : null,
   });
 
   revalidatePath("/dashboard/opportunities");

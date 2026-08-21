@@ -80,6 +80,7 @@ export default async function ConversationPage({
       conversation: {
         include: { messages: { include: { author: true }, orderBy: { createdAt: "asc" } } },
       },
+      cancellation: { include: { cancelledBy: { select: { name: true } }, terms: true } },
     },
   });
   if (!match) notFound();
@@ -157,6 +158,8 @@ export default async function ConversationPage({
                 ? formatQuantity(governing.quantity, governing.unit)
                 : "an amount you have not put a number to"}
               {governing.price != null && ` at ${describePrice(governing)}`}
+              {governing.handoverOn &&
+                ` · handover ${governing.handoverOn.toLocaleDateString("en-GB")}`}
               {(() => {
                 const value = valuationOfTerms(governing);
                 return value.ok ? ` — ${formatMoneyAmount(value.total)} in total` : "";
@@ -172,6 +175,7 @@ export default async function ConversationPage({
                 ? formatQuantity(open.quantity, open.unit)
                 : "no particular amount"}
               {open.price != null && ` at ${describePrice(open)}`}
+              {open.handoverOn && ` · handover ${open.handoverOn.toLocaleDateString("en-GB")}`}
               {(() => {
                 const value = valuationOfTerms(open);
                 return value.ok ? ` — ${formatMoneyAmount(value.total)} in total` : "";
@@ -284,6 +288,15 @@ export default async function ConversationPage({
                 className="w-24 rounded-control border border-border bg-background px-2 py-1 text-sm"
               />
             </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-fg">
+              Handover date
+              <input
+                type="date"
+                name="handoverOn"
+                defaultValue={(open?.handoverOn ?? governing?.handoverOn)?.toISOString().slice(0, 10) ?? ""}
+                className="rounded-control border border-border bg-background px-2 py-1 text-sm"
+              />
+            </label>
             <button type="submit" className={buttonClass("secondary", "sm")}>
               Propose
             </button>
@@ -291,6 +304,32 @@ export default async function ConversationPage({
           <p className="mt-2 text-xs text-subtle-fg">
             {theirs.party.name} has to agree before anything is settled.
           </p>
+        </details>
+      )}
+
+      {match.cancellation && (
+        <div className="rounded-card border border-border bg-warning-bg p-4 text-sm">
+          <p className="font-medium text-warning-fg">Agreement cancelled</p>
+          <p className="mt-1 text-muted-fg">
+            {match.cancellation.cancelledBy.name} cancelled this agreement on{" "}
+            {match.cancellation.createdAt.toLocaleDateString("en-GB")}.
+            The agreed terms remain in the trade record.
+          </p>
+        </div>
+      )}
+
+      {settled && !match.cancellation && (
+        <details className="rounded-card border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-medium">Cancel this agreement</summary>
+          <p className="mt-2 text-sm text-muted-fg">
+            This releases the committed quantity but keeps a permanent record of who cancelled and what was agreed.
+          </p>
+          <form action={respondToMatch} className="mt-3">
+            <input type="hidden" name="id" value={match.id} />
+            <button type="submit" name="decision" value="DECLINED" className={buttonClass("secondary", "sm")}>
+              Confirm cancellation
+            </button>
+          </form>
         </details>
       )}
 
