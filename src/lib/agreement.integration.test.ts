@@ -65,6 +65,35 @@ describe("bilateral agreement", () => {
   const statusOf = async (matchId: string) =>
     (await prisma.match.findUnique({ where: { id: matchId } }))!.status;
 
+  async function revisedBagSourceWithCommitments() {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Revised Source Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 100, unit: "BAG" },
+    });
+    const agreeBags = async (quantity: number) => {
+      const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 100, unit: "bag" });
+      await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
+      const { buyer, demand } = await buyerNeeding(quantity, "bag");
+      const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+      await proposeTerms(match.id, buyer.id, { quantity, unit: "bag" });
+      expect(await acceptTerms(match.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+      return { match, buyer };
+    };
+    const commitments = [await agreeBags(40), await agreeBags(50)];
+    await prisma.produceStock.update({ where: { id: produce.id }, data: { quantity: 5_000, unit: "KG" } });
+    return { seller, produce, commitments };
+  }
+
+  async function proposeKgAgainstSource(sellerId: string, produceId: string, quantity: number) {
+    const supply = await createTestIntent(sellerId, { side: "SUPPLY", quantity: 5_000, unit: "kg" });
+    await prisma.intent.update({ where: { id: supply.id }, data: { produceId } });
+    const { buyer, demand } = await buyerNeeding(quantity, "kg");
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity, unit: "kg" });
+    return { match, outcome: await acceptTerms(match.id, sellerId) };
+  }
+
   // ------------------------------------------------------------------
   // A. One party acting alone takes nothing from the other
   // ------------------------------------------------------------------
@@ -671,6 +700,43 @@ describe("bilateral agreement", () => {
     // This is an explicit farm-state correction, not a package conversion.
     await prisma.produceStock.update({ where: { id: produce.id }, data: { quantity: 5_000, unit: "KG" } });
     expect(await acceptTerms(match.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+    expect(await stockOf(produce.id)).toBe(5_000);
+  });
+
+  it("refuses new KG capacity when existing BAG commitments became unmeasurable after revision", async () => {
+    const { seller, produce } = await revisedBagSourceWithCommitments();
+
+    const next = await proposeKgAgainstSource(seller.id, produce.id, 5_000);
+
+    expect(next.outcome).toEqual({ ok: false, reason: "source_measurement_mismatch" });
+    expect(await statusOf(next.match.id)).toBe("NEGOTIATING");
+    expect(await stockOf(produce.id)).toBe(5_000);
+  });
+
+  it("allows KG capacity after every incompatible BAG commitment is cancelled", async () => {
+    const { seller, produce, commitments } = await revisedBagSourceWithCommitments();
+    for (const { match, buyer } of commitments) {
+      expect(await closeEngagement(match.id, buyer.id)).toMatchObject({ ok: true });
+    }
+
+    const next = await proposeKgAgainstSource(seller.id, produce.id, 5_000);
+
+    expect(next.outcome).toMatchObject({ ok: true, status: "agreed" });
+    expect(await stockOf(produce.id)).toBe(5_000);
+  });
+
+  it("keeps same-basis KG quantity revisions allocatable", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Same Basis Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 6_000, unit: "KG" },
+    });
+    expect((await proposeKgAgainstSource(seller.id, produce.id, 1_000)).outcome)
+      .toMatchObject({ ok: true, status: "agreed" });
+
+    await prisma.produceStock.update({ where: { id: produce.id }, data: { quantity: 5_000 } });
+    expect((await proposeKgAgainstSource(seller.id, produce.id, 4_000)).outcome)
+      .toMatchObject({ ok: true, status: "agreed" });
     expect(await stockOf(produce.id)).toBe(5_000);
   });
 

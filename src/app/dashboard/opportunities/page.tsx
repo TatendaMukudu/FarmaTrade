@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
 import { summarizeReputation } from "@/lib/reputation";
+import { pilotVisibleReason } from "@/lib/reputation-core";
 import {
   resolveMatchSides,
   groupMatchesByOwnIntent,
@@ -292,7 +293,7 @@ export default async function OpportunitiesPage() {
                           />
                           {m.reasons.length > 0 && (
                             <p className="mt-2 text-sm font-medium text-foreground">
-                              Why: <span className="font-normal">{m.reasons.join(" · ")}</span>
+                              Why: <span className="font-normal">{m.reasons.map(pilotVisibleReason).join(" · ")}</span>
                             </p>
                           )}
                           {/* What has happened before on this route, in

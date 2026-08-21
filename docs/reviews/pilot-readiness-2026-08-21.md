@@ -4,10 +4,11 @@ Branch audited: `claude/farmatrade-intelliqs-improvements-e4nexp`.
 Baseline head: `6ba52b09a006464a5a4f165e646dbce3bf8d2c05` (23 commits ahead, 0 behind `origin/main`).
 Baseline gate: PASS 7/7, 563 passed / 4 skipped by suite design. GitHub CI run 32221500935: success.
 P0.6 closure gate: PASS 7/7, 591 passed / 4 skipped by suite design. GitHub CI run 32450699114 succeeded on the implementation checkpoint.
+P0.6.1 correction gate: PASS 7/7, 597 passed / 4 skipped by suite design; pushed-head CI must still succeed.
 
 ## Verdict
 
-**READY FOR 5–10 FRIENDLY PILOTS**, subject to the external launch checklist below.
+**READY AFTER BLOCKERS**. The code correction is green; the production legacy-row count and external launch checklist still require the operator.
 
 The visible product can execute most of a friendly commercial loop. This
 checkpoint makes Home opportunity-first, calls commercial intent “Trade”,
@@ -38,21 +39,18 @@ Buyer B needs 15 tonnes in a currently supported location/timing shape.
 | 13 | Record completion | PASS | Each party writes one append-only `TransactionConfirmation`; two confirmations complete the match. |
 | 14 | Record cancellation | PASS | Agreed trades can now be cancelled from the trade room; actor, timestamp and governing terms persist and capacity is released. Reasons remain unresolved. |
 | 15 | Preserve observed history | PASS | Immutable terms, confirmations and cancellation events survive current-status changes. |
-| 16 | Update reputation/history | BROKEN | Quiet success and review/fact separation are tested. Role-scoped reputation is still violated; reviews are immediately visible because the review-window duration is unresolved. |
+| 16 | Update reputation/history | BROKEN | Quiet success and review/fact separation are tested, and pilot UI now hides rating averages while retaining completion history. Role-scoped reputation is still violated and the permanent review-window duration remains unresolved. |
 | 17 | Reuse remaining quantity | PASS | Remaining intent capacity stays derived; the shared-source tests prove 40 + 50 BAG leaves exactly 10 BAG allocatable, while cancellation releases its governing allocation without changing inventory or erasing terms. |
 
 ## Minimum gate for 5–10 friendly pilots
 
 ### P0 — must be resolved or explicitly constrained before onboarding
 
-No known P0 code blocker remains. The shared-source ceiling is executable, and
+No known P0 code blocker remains. P0.6.1 now fails closed when existing source commitments are unmeasurable after a source-unit revision. The shared-source ceiling is executable, and
 an upgrade/backup/restore rehearsal from the 11-migration `origin/main` schema
 to all 20 development migrations preserved 15 commercial rows and 9 users.
 
-The **external launch checklist remains human operational work**, not a code
-blocker: take a real Neon snapshot, stop/confirm all Render writes and rolling
-overlap, deploy with `npm start`, smoke the pilot login, and confirm the Sentry,
-Render and Neon dashboards with the account holder.
+The **remaining pilot blockers are human operational checks**: take a real Neon snapshot, stop/confirm all Render writes and rolling overlap, run and record `SELECT count(*) FROM "Match" WHERE status = 'ACCEPTED'` on production (zero required before onboarding; never backfill consent), deploy with `npm start`, smoke the pilot login, and confirm the Sentry, Render and Neon dashboards with the account holder.
 
 ### P1 — end-to-end loop blockers
 
@@ -74,9 +72,7 @@ record the outcome afterwards.
 - Messaging is match-scoped but begins before mutual interest. Closed-cohort
   risk is limited, and personal contact remains protected; do not guess the
   permanent consent boundary.
-- Review retaliation protection needs an exact window. Recommendation: hide
-  ratings during the 5–10-user pilot rather than invent a duration, if the
-  founder wants this resolved before onboarding.
+- Rating rows continue to be written, but the pilot display flag now hides star averages and rating counts while leaving observed completion history visible. The permanent review-window duration remains unresolved.
 
 ### P3 — before expansion toward ~40
 

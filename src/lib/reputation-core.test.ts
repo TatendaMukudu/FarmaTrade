@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeReputation, MIN_RATINGS_FOR_AVERAGE } from "./reputation-core";
+import { pilotVisibleReason, summarizeReputation, MIN_RATINGS_FOR_AVERAGE } from "./reputation-core";
 import type { Reputation } from "@/generated/prisma/client";
 
 type ReputationInput = Pick<Reputation, "completedCount" | "averageRating" | "ratingCount">;
@@ -24,9 +24,11 @@ describe("summarizeReputation", () => {
   it("shows stars only once ratingCount reaches MIN_RATINGS_FOR_AVERAGE", () => {
     const belowThreshold = summarizeReputation(
       reputation({ completedCount: 2, averageRating: 5, ratingCount: MIN_RATINGS_FOR_AVERAGE - 1 }),
+      { showRatings: true },
     );
     const atThreshold = summarizeReputation(
       reputation({ completedCount: 2, averageRating: 5, ratingCount: MIN_RATINGS_FOR_AVERAGE }),
+      { showRatings: true },
     );
     expect(belowThreshold.hasStars).toBe(false);
     expect(belowThreshold.headline).toBe(`Building history (${MIN_RATINGS_FOR_AVERAGE - 1})`);
@@ -37,16 +39,41 @@ describe("summarizeReputation", () => {
   it("only 'Building history'/'★' states use tone 'success', and only once starred", () => {
     const starred = summarizeReputation(
       reputation({ completedCount: 4, averageRating: 4.5, ratingCount: MIN_RATINGS_FOR_AVERAGE }),
+      { showRatings: true },
     );
-    const building = summarizeReputation(reputation({ completedCount: 4, ratingCount: 1 }));
+    const building = summarizeReputation(reputation({ completedCount: 4, ratingCount: 1 }), {
+      showRatings: true,
+    });
     expect(starred.tone).toBe("success");
     expect(building.tone).toBe("new");
   });
 
   it("says 'Not yet rated' for a party with completed trades but zero ratings", () => {
-    const summary = summarizeReputation(reputation({ completedCount: 3, ratingCount: 0 }));
+    const summary = summarizeReputation(reputation({ completedCount: 3, ratingCount: 0 }), {
+      showRatings: true,
+    });
     expect(summary.headline).toBe("Not yet rated");
     expect(summary.hasHistory).toBe(true);
+  });
+
+  it("hides pilot star averages while preserving observed completion history", () => {
+    const summary = summarizeReputation(
+      reputation({ completedCount: 4, averageRating: 4.8, ratingCount: 12 }),
+    );
+    expect(summary).toMatchObject({
+      hasHistory: true,
+      hasStars: false,
+      headline: "Trade history",
+      completedLine: "4 completed trades",
+    });
+  });
+
+  it("removes rating details from stored match reasons only at display time", () => {
+    expect(pilotVisibleReason("counterparty: 12 completed, 4.7★ (9 ratings)"))
+      .toBe("counterparty: 12 completed");
+    expect(pilotVisibleReason("counterparty: 2 completed (still building rating history)"))
+      .toBe("counterparty: 2 completed");
+    expect(pilotVisibleReason("same district")).toBe("same district");
   });
 
   it("pluralizes the completed-trade count correctly", () => {

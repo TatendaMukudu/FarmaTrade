@@ -155,15 +155,24 @@ deploy must use this exact sequence:
 1. In Neon, create a restorable snapshot/branch and record its identifier.
 2. Disable pilot writes and stop every Render application instance. Confirm
    there is no old instance or zero-downtime overlap still accepting requests.
-3. Deploy the new build and run `npm start`. Its ordered startup runs
+3. Against the stopped production database, run the legacy-engagement check:
+
+   ```sql
+   SELECT count(*) FROM "Match" WHERE status = 'ACCEPTED';
+   ```
+
+   Record the result in the deployment log. A non-zero count blocks onboarding:
+   inspect those rows with the parties because their bilateral consent was never
+   recorded. Do not manufacture `TermsAcceptance` rows or backfill consent.
+4. Deploy the new build and run `npm start`. Its ordered startup runs
    `prisma migrate deploy`, then the idempotent product catalogue seed, then
    `next start`; do not run the general demo seed against pilot data.
-4. Confirm all 20 migrations are applied with `npx prisma migrate status`.
-5. Smoke `/login`, authenticate one designated test pilot, and read an
+5. Confirm all 20 migrations are applied with `npx prisma migrate status`.
+6. Smoke `/login`, authenticate one designated test pilot, and read an
    existing Farm, Trade and opportunity record before restoring writes.
-6. Confirm Sentry receives a deliberate test exception, Render shows the
+7. Confirm Sentry receives a deliberate test exception, Render shows the
    deploy/request logs and bandwidth, and Neon shows connections/query/transfer.
-7. Re-enable writes only after those checks pass.
+8. Re-enable writes only after those checks pass.
 
 The rollback boundary is the first successful schema migration. The old build
 cannot run against the renamed schema. If migration or smoke verification

@@ -163,6 +163,15 @@ export function fitsWithinPhysicalSource(
   if (required == null) return { fits: false, reason: "no_quantity" };
   if (reading.remaining === null) return { fits: false, reason: "unknown_unit" };
 
+  // `remaining` cannot be trusted as a physical ceiling when an existing
+  // agreement could not be expressed in this source's current basis. This
+  // happens, for example, when 90 BAG were agreed and the farmer later
+  // restates the source as KG. Those bags are still owed; they must never
+  // disappear into zero merely because their weight is unknown.
+  for (const reason of ["context_required", "incompatible_dimension", "unknown_unit", "no_quantity"] as const) {
+    if (reading.unmeasured[reason] > 0) return { fits: false, reason };
+  }
+
   const contribution = contributionOf(
     { reserves: true, quantity: required, unit: null, unitCode: unitCode ?? null, basis: "mutual_agreement" },
     reading.basis,

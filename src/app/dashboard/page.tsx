@@ -260,7 +260,7 @@ export default async function DashboardPage() {
         />
         <StatTile
           icon={<StarIcon />}
-          value={reputation.hasHistory ? reputation.headline.replace("★", "").trim() : "—"}
+          value={reputation.hasHistory ? String(party.reputation?.completedCount ?? 0) : "—"}
           label={reputation.hasHistory ? reputation.completedLine : "no trade history yet"}
         />
         {topProduce ? (

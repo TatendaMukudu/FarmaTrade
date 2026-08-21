@@ -141,7 +141,7 @@ both parties accepting the same terms version, proven under concurrency.
 P0.6 also locks a linked produce/livestock source and derives reservations
 across every supply intent sharing it. A 100 BAG source cannot commit more
 than 100 BAG, and KG/TONNE terms cannot pass that package ceiling by turning
-an unknown conversion into unlimited capacity.
+an unknown conversion into unlimited capacity. P0.6.1 also refuses new commitments when a later source-unit revision makes any existing reservation unmeasurable; an unknown existing obligation cannot silently become zero.
 
 ## INV-19 — Commercial truth does not require a post · **HELD (structural)**
 

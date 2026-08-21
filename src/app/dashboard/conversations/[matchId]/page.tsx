@@ -125,9 +125,9 @@ export default async function ConversationPage({
 
       {query.agreementError === "source-measurement-mismatch" && (
         <div className="rounded-card border border-border bg-warning-bg p-4 text-sm text-warning-fg" role="alert">
-          These terms use a measurement that cannot be compared with the farm source. Use the source package unit
-          (for example, bags with bags), or first update the source measurement in Farm to a measured mass or volume.
-          FarmaTrade will not assume a package weight.
+          The farm source and its commitments now use different measurements. Settle or cancel those commitments,
+          or restate the source in their measurement, before making a new commitment. FarmaTrade will not assume a
+          package weight.
         </div>
       )}
 

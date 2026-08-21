@@ -32,7 +32,7 @@ export default async function DirectoryPage({
         transportProfile: true,
         reputation: true,
       },
-      orderBy: [{ reputation: { averageRating: "desc" } }, { createdAt: "desc" }],
+      orderBy: { createdAt: "desc" },
     }),
     currentParty
       ? prisma.relation.findMany({
@@ -52,7 +52,7 @@ export default async function DirectoryPage({
       <div>
         <h1 className="text-2xl font-semibold">Directory</h1>
         <p className="text-sm text-muted-fg">
-          Buyers, sellers, and transport providers, ranked by reputation.
+          Buyers, sellers, and transport providers in the pilot.
         </p>
       </div>
 

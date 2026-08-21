@@ -83,6 +83,19 @@ describe("fitsWithinPhysicalSource", () => {
     expect(fitsWithinPhysicalSource(tenLeft, 10, "BAG")).toMatchObject({ fits: true });
     expect(fitsWithinPhysicalSource(tenLeft, 11, "BAG")).toEqual({ fits: false, reason: "insufficient" });
   });
+
+  it("fails closed when existing commitments cannot be measured in the revised source basis", () => {
+    const revisedToKg = readCapacity({ quantity: 5_000, unitCode: "KILOGRAM" }, [
+      allocation({ quantity: 40, unitCode: "BAG" }),
+      allocation({ quantity: 50, unitCode: "BAG" }),
+    ]);
+    expect(revisedToKg.remaining).toBe(5_000);
+    expect(revisedToKg.unmeasured.context_required).toBe(2);
+    expect(fitsWithinPhysicalSource(revisedToKg, 5_000, "KILOGRAM")).toEqual({
+      fits: false,
+      reason: "context_required",
+    });
+  });
 });
 
 describe("readCapacity", () => {
