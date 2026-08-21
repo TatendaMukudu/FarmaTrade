@@ -441,20 +441,23 @@ describe("bilateral agreement", () => {
     expect((await prisma.intent.findUnique({ where: { id: supply.id } }))!.status).toBe("ENGAGED");
   });
 
-  it("reserves nothing measurable when the agreed unit does not match the intent's", async () => {
-    // No conversion exists and none is guessed. The agreement is real; the
-    // reservation is simply not countable against tonnes.
+  it("refuses terms that cannot be measured against a linked physical source", async () => {
+    // A package may remain unknown on an unbounded/unlinked intent. Once a
+    // physical source is linked, however, the source is a hard ceiling and
+    // an unprovable comparison cannot become a commitment.
     const { seller, supply } = await farmerOffering(20, 26);
     const { buyer, demand } = await buyerNeeding(30, "bag");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
     await proposeTerms(match.id, buyer.id, { quantity: 30, unit: "bag" });
-    await acceptTerms(match.id, seller.id);
+    expect(await acceptTerms(match.id, seller.id)).toEqual({
+      ok: false,
+      reason: "source_measurement_mismatch",
+    });
 
     expect(await remainingOf(supply.id)).toBe(kg(20));
     const capacity = await loadCapacity(supply.id);
-    // Reported, not silently dropped.
-    expect(capacity!.unquantified).toBe(1);
+    expect(capacity!.unquantified).toBe(0);
   });
 
   // ------------------------------------------------------------------
@@ -603,6 +606,119 @@ describe("bilateral agreement", () => {
     expect(results.filter((result) => result.ok)).toHaveLength(1);
     expect(results.filter((result) => !result.ok && result.reason === "insufficient_capacity")).toHaveLength(1);
     expect(await stockOf(produce.id)).toBe(26);
+  });
+
+  it("allocates 40 and 50 of a 100 BAG source but refuses another 11 BAG", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Package Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 100, unit: "BAG" },
+    });
+
+    const agree = async (quantity: number) => {
+      const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 100, unit: "bag" });
+      await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
+      const { buyer, demand } = await buyerNeeding(quantity, "bag");
+      const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+      await proposeTerms(match.id, buyer.id, { quantity, unit: "bag" });
+      return { match, outcome: await acceptTerms(match.id, seller.id) };
+    };
+
+    expect((await agree(40)).outcome).toMatchObject({ ok: true, status: "agreed" });
+    expect((await agree(50)).outcome).toMatchObject({ ok: true, status: "agreed" });
+    expect((await agree(11)).outcome).toEqual({ ok: false, reason: "insufficient_capacity" });
+    // Exactly ten remains allocatable across the shared physical source.
+    expect((await agree(10)).outcome).toMatchObject({ ok: true, status: "agreed" });
+    expect(await stockOf(produce.id)).toBe(100);
+  });
+
+  it.each(["kg", "tonne"])("refuses a BAG source commitment stated in %s", async (unit) => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Unknown Weight Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 100, unit: "BAG" },
+    });
+    const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 100_000, unit: "kg" });
+    await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
+    const { buyer, demand } = await buyerNeeding(1, unit);
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 1, unit });
+
+    expect(await acceptTerms(match.id, seller.id)).toEqual({
+      ok: false,
+      reason: "source_measurement_mismatch",
+    });
+    expect(await statusOf(match.id)).toBe("NEGOTIATING");
+    expect(await stockOf(produce.id)).toBe(100);
+  });
+
+  it("honours an explicit source measurement revision before mass commitment", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Measured Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 100, unit: "BAG" },
+    });
+    const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 5_000, unit: "kg" });
+    await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
+    const { buyer, demand } = await buyerNeeding(1_000, "kg");
+    const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+    await proposeTerms(match.id, buyer.id, { quantity: 1_000, unit: "kg" });
+    expect(await acceptTerms(match.id, seller.id)).toMatchObject({
+      ok: false,
+      reason: "source_measurement_mismatch",
+    });
+
+    // This is an explicit farm-state correction, not a package conversion.
+    await prisma.produceStock.update({ where: { id: produce.id }, data: { quantity: 5_000, unit: "KG" } });
+    expect(await acceptTerms(match.id, seller.id)).toMatchObject({ ok: true, status: "agreed" });
+    expect(await stockOf(produce.id)).toBe(5_000);
+  });
+
+  it("releases shared source capacity on cancellation without erasing evidence", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Cancellation Farm" } });
+    const produce = await prisma.produceStock.create({
+      data: { farmId: farm.id, cropType: "Maize", quantity: 100, unit: "BAG" },
+    });
+    const agree = async (quantity: number) => {
+      const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 100, unit: "bag" });
+      await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
+      const { buyer, demand } = await buyerNeeding(quantity, "bag");
+      const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+      await proposeTerms(match.id, buyer.id, { quantity, unit: "bag" });
+      await acceptTerms(match.id, seller.id);
+      return { match, buyer };
+    };
+    const first = await agree(60);
+    await agree(40);
+
+    await closeEngagement(first.match.id, first.buyer.id);
+    const replacement = await agree(60);
+    expect(await statusOf(replacement.match.id)).toBe("AGREED");
+    const cancellation = await prisma.agreementCancellation.findUnique({ where: { matchId: first.match.id } });
+    expect(cancellation).toMatchObject({ cancelledById: first.buyer.id });
+    expect(await prisma.agreementTerms.count({ where: { matchId: first.match.id } })).toBe(1);
+    expect(await stockOf(produce.id)).toBe(100);
+  });
+
+  it("enforces one livestock headcount across linked supply intents", async () => {
+    const seller = await party();
+    const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Livestock Farm" } });
+    const livestock = await prisma.livestock.create({
+      data: { farmId: farm.id, species: "CATTLE", sex: "MIXED", quantity: 10 },
+    });
+    const agree = async (quantity: number) => {
+      const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 10, unit: "head" });
+      await prisma.intent.update({ where: { id: supply.id }, data: { livestockId: livestock.id } });
+      const { buyer, demand } = await buyerNeeding(quantity, "head");
+      const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
+      await proposeTerms(match.id, buyer.id, { quantity, unit: "head" });
+      return acceptTerms(match.id, seller.id);
+    };
+
+    expect(await agree(6)).toMatchObject({ ok: true, status: "agreed" });
+    expect(await agree(5)).toEqual({ ok: false, reason: "insufficient_capacity" });
+    expect((await prisma.livestock.findUnique({ where: { id: livestock.id } }))!.quantity).toBe(10);
   });
 
 

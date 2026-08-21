@@ -11,7 +11,14 @@ import {
   type Participants,
   type TermsVersion,
 } from "@/lib/agreement-core";
-import { fitsWithin, pairwiseQuantity, readCapacity, type Allocation } from "@/lib/capacity";
+import {
+  fitsWithin,
+  fitsWithinPhysicalSource,
+  pairwiseQuantity,
+  readCapacity,
+  type Allocation,
+  type FitResult,
+} from "@/lib/capacity";
 import { PRODUCE_UNIT_CANONICAL, resolveUnit, type CanonicalUnit } from "@/lib/measurement";
 import type { PriceBasis } from "@/generated/prisma/client";
 import { isAuthorizedToMatch } from "@/lib/intent";
@@ -50,6 +57,7 @@ export type AgreementOutcome =
         | "not_a_participant"
         | "not_authorized"
         | "insufficient_capacity"
+        | "source_measurement_mismatch"
         | "closed";
     };
 
@@ -155,15 +163,15 @@ async function fitsSupplySource(
   quantity: number,
   unitCode: string | null,
   exceptMatchId: string,
-): Promise<boolean> {
-  if (intent.side !== "SUPPLY") return true;
+): Promise<FitResult> {
+  if (intent.side !== "SUPPLY") return { fits: true, canonical: null };
 
   const sourceWhere = intent.produceId
     ? { produceId: intent.produceId }
     : intent.livestockId
       ? { livestockId: intent.livestockId }
       : null;
-  if (!sourceWhere) return true;
+  if (!sourceWhere) return { fits: true, canonical: null };
 
   const sourceIntents = await tx.intent.findMany({
     where: { side: "SUPPLY", ...sourceWhere },
@@ -175,15 +183,19 @@ async function fitsSupplySource(
 
   if (intent.produceId) {
     const source = await tx.produceStock.findUnique({ where: { id: intent.produceId } });
-    if (!source) return false;
-    return fitsWithin(
+    if (!source) return { fits: false, reason: "unknown_unit" };
+    return fitsWithinPhysicalSource(
       readCapacity({ quantity: source.quantity, unitCode: PRODUCE_UNIT_CANONICAL[source.unit] }, reservations),
       quantity, unitCode,
-    ).fits;
+    );
   }
   const source = await tx.livestock.findUnique({ where: { id: intent.livestockId! } });
-  if (!source) return false;
-  return fitsWithin(readCapacity({ quantity: source.quantity, unitCode: "HEAD" }, reservations), quantity, unitCode).fits;
+  if (!source) return { fits: false, reason: "unknown_unit" };
+  return fitsWithinPhysicalSource(
+    readCapacity({ quantity: source.quantity, unitCode: "HEAD" }, reservations),
+    quantity,
+    unitCode,
+  );
 }
 
 // Every reservation held against these intents, resolved through the one
@@ -456,8 +468,16 @@ export async function acceptTerms(
       if (!fits) return { ok: false, reason: "insufficient_capacity" };
 
       const supply = intents.find((intent) => intent.side === "SUPPLY");
-      if (supply && !(await fitsSupplySource(tx, supply, target.quantity, target.unitCode, matchId))) {
-        return { ok: false, reason: "insufficient_capacity" };
+      if (supply) {
+        const sourceFit = await fitsSupplySource(tx, supply, target.quantity, target.unitCode, matchId);
+        if (!sourceFit.fits) {
+          return {
+            ok: false,
+            reason: sourceFit.reason === "insufficient"
+              ? "insufficient_capacity"
+              : "source_measurement_mismatch",
+          };
+        }
       }
     }
 

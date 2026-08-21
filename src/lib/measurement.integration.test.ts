@@ -26,11 +26,16 @@ describe("canonical measurement", () => {
     return party;
   }
 
-  async function farmerOffering(quantity: number | null, unit: string | null, stock = 26) {
+  async function farmerOffering(
+    quantity: number | null,
+    unit: string | null,
+    stock = 26,
+    sourceUnit: "TONNE" | "BAG" = "TONNE",
+  ) {
     const seller = await party();
     const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Test Farm" } });
     const produce = await prisma.produceStock.create({
-      data: { farmId: farm.id, cropType: "Maize", quantity: stock, unit: "TONNE" },
+      data: { farmId: farm.id, cropType: "Maize", quantity: stock, unit: sourceUnit },
     });
     const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity, unit });
     await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
@@ -171,7 +176,7 @@ describe("canonical measurement", () => {
   });
 
   // H/Q. Packaging stays contextual through the whole round trip.
-  it("refuses to say whether ten bags fit inside two tonnes", async () => {
+  it("refuses a package commitment against a mass source", async () => {
     // The spec's own case. FarmaTrade does not know what a bag weighs and
     // must not pretend to until somebody tells it.
     const { seller, supply, produce } = await farmerOffering(2, "tonnes");
@@ -181,18 +186,17 @@ describe("canonical measurement", () => {
     await proposeTerms(match.id, buyer.id, { quantity: 10, unit: "bags" });
     const result = await acceptTerms(match.id, seller.id);
 
-    // The agreement is real — two people agreed to it.
-    expect(result).toMatchObject({ ok: true, status: "agreed" });
+    expect(result).toEqual({ ok: false, reason: "source_measurement_mismatch" });
     const capacity = await capacityOf(supply.id);
     // But not a single kilogram was deducted on the strength of a guess.
     expect(capacity!.remaining).toBe(2000);
-    expect(capacity!.unmeasured.context_required).toBe(1);
+    expect(capacity!.unmeasured.context_required).toBe(0);
     expect(capacity!.unmeasured.unknown_unit).toBe(0);
     expect(await stockOf(produce.id)).toBe(26);
   });
 
   it("does count bags against an intent that is itself denominated in bags", async () => {
-    const { seller, supply } = await farmerOffering(30, "bags");
+    const { seller, supply } = await farmerOffering(30, "bags", 30, "BAG");
     const { buyer, demand } = await buyerNeeding(10, "bags");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
@@ -206,7 +210,8 @@ describe("canonical measurement", () => {
 
   // I/J/K. The three failure modes stay distinct after a round trip.
   it("distinguishes why each unmeasurable agreement could not be counted", async () => {
-    const { seller, supply } = await farmerOffering(2, "tonnes");
+    const seller = await party();
+    const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 2, unit: "tonnes" });
 
     const cases: [number, string][] = [
       [10, "bags"], // context_required
@@ -343,7 +348,8 @@ describe("canonical measurement", () => {
 
   // T. Historical safety.
   it("leaves a legacy agreement in an unresolvable unit alone rather than inventing one", async () => {
-    const { seller, supply } = await farmerOffering(20, "tonnes");
+    const seller = await party();
+    const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 20, unit: "tonnes" });
     const { buyer, demand } = await buyerNeeding(30, "punnets");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
     await proposeTerms(match.id, buyer.id, { quantity: 30, unit: "punnets" });

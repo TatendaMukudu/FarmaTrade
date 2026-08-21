@@ -146,3 +146,43 @@ not treated as proof.
   range shown is now built only from prices that state what they mean.
 - New intents and terms require a basis and currency through the UI; both
   forms now ask.
+
+## Pilot stop/start runbook and rehearsal — 2026-08-21
+
+Because `20260809150000_post_to_intent` is not rolling-safe, the first pilot
+deploy must use this exact sequence:
+
+1. In Neon, create a restorable snapshot/branch and record its identifier.
+2. Disable pilot writes and stop every Render application instance. Confirm
+   there is no old instance or zero-downtime overlap still accepting requests.
+3. Deploy the new build and run `npm start`. Its ordered startup runs
+   `prisma migrate deploy`, then the idempotent product catalogue seed, then
+   `next start`; do not run the general demo seed against pilot data.
+4. Confirm all 20 migrations are applied with `npx prisma migrate status`.
+5. Smoke `/login`, authenticate one designated test pilot, and read an
+   existing Farm, Trade and opportunity record before restoring writes.
+6. Confirm Sentry receives a deliberate test exception, Render shows the
+   deploy/request logs and bandwidth, and Neon shows connections/query/transfer.
+7. Re-enable writes only after those checks pass.
+
+The rollback boundary is the first successful schema migration. The old build
+cannot run against the renamed schema. If migration or smoke verification
+fails after that boundary, keep writes stopped, stop the new build, restore the
+recorded Neon snapshot/branch, and then restart the old build. Do not attempt to
+roll the rename backward in place.
+
+A disposable local rehearsal started from `origin/main` (11 migrations), ran
+the existing demo seed, and captured an 89,147-byte custom-format `pg_dump`.
+With all application writers stopped, `prisma migrate deploy` applied the nine
+remaining migrations and `prisma/seed-products.ts` installed 26 products and
+110 aliases. The renamed `Intent` table retained all 15 former `Post` rows and
+all 9 users. `npm run build` succeeded; `npm start` reported no pending
+migrations, repeated the seed safely, and served `/login` with HTTP 200 while
+an unauthenticated `/dashboard` correctly returned 307 to `/login`. Restoring
+the pre-upgrade dump into a second disposable database recovered all 15 Post
+rows and 9 users.
+
+This proves the repository sequence and recovery artifact, not access to the
+production services. Before launch, the account holder must still execute and
+record the Neon snapshot, Render write-stop/no-overlap confirmation, authenticated
+pilot smoke, and the three external observability checks above.

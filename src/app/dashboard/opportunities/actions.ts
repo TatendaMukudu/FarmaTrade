@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
@@ -65,7 +66,13 @@ export async function respondToMatch(formData: FormData) {
   const existing = await prisma.agreementTerms.count({ where: { matchId: id } });
 
   if (existing > 0) {
-    await acceptTerms(id, party.id, version ? Number(version) : undefined);
+    const outcome = await acceptTerms(id, party.id, version ? Number(version) : undefined);
+    if (!outcome.ok) {
+      logger.warn("agreement.accept_refused", { matchId: id, partyId: party.id, reason: outcome.reason });
+      if (outcome.reason === "source_measurement_mismatch") {
+        redirect(`/dashboard/conversations/${id}?agreementError=source-measurement-mismatch`);
+      }
+    }
   } else {
     const sides = await loadCapacities([match.intentA.id, match.intentB.id]);
     const supply = match.intentA.side === "SUPPLY" ? match.intentA : match.intentB;

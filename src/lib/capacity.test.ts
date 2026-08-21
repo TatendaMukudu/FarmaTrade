@@ -4,6 +4,7 @@ import {
   combinedRemaining,
   consumesCapacity,
   fitsWithin,
+  fitsWithinPhysicalSource,
   hasRemainingCapacity,
   pairwiseQuantity,
   readCapacity,
@@ -53,6 +54,34 @@ describe("basisFor", () => {
   it("has no basis for an intent with no resolvable unit", () => {
     expect(basisFor({ unitCode: null })).toBeNull();
     expect(basisFor({ unitCode: "PUNNET" })).toBeNull();
+  });
+});
+
+describe("fitsWithinPhysicalSource", () => {
+  const bags = readCapacity({ quantity: 100, unitCode: "BAG" }, []);
+
+  it("accepts only a deterministically comparable package quantity", () => {
+    expect(fitsWithinPhysicalSource(bags, 40, "BAG")).toEqual({ fits: true, canonical: 40 });
+  });
+
+  it("refuses to invent BAG to KG or TONNE conversions", () => {
+    expect(fitsWithinPhysicalSource(bags, 40, "KILOGRAM")).toEqual({
+      fits: false,
+      reason: "context_required",
+    });
+    expect(fitsWithinPhysicalSource(bags, 1, "METRIC_TONNE")).toEqual({
+      fits: false,
+      reason: "context_required",
+    });
+  });
+
+  it("enforces the package ceiling", () => {
+    const tenLeft = readCapacity({ quantity: 100, unitCode: "BAG" }, [
+      allocation({ quantity: 40, unitCode: "BAG" }),
+      allocation({ quantity: 50, unitCode: "BAG" }),
+    ]);
+    expect(fitsWithinPhysicalSource(tenLeft, 10, "BAG")).toMatchObject({ fits: true });
+    expect(fitsWithinPhysicalSource(tenLeft, 11, "BAG")).toEqual({ fits: false, reason: "insufficient" });
   });
 });
 

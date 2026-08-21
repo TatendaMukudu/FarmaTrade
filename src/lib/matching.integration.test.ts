@@ -118,13 +118,18 @@ describe("generateMatchesForIntent", () => {
     const buyer = await createTestParty({ province: "Harare", district: "Harare" });
     partyIds.push(seller.party.id, buyer.party.id);
 
-    await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
+    const have = await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
     const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
 
     await generateMatchesForIntent(need.id);
     await generateMatchesForIntent(need.id);
 
-    const matches = await prisma.match.findMany({ where: { intentBId: need.id } });
+    // Other suites may legitimately create other compatible suppliers in
+    // the shared integration database. Idempotence is about this pair, not
+    // about there being only one opportunity for the buyer in the world.
+    const matches = await prisma.match.findMany({
+      where: { intentAId: have.id, intentBId: need.id },
+    });
     expect(matches).toHaveLength(1);
   });
 

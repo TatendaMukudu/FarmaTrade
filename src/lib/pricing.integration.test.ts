@@ -30,11 +30,16 @@ describe("commercial pricing", () => {
     return party;
   }
 
-  async function farmerOffering(quantity: number | null, unit: string | null, stock = 26) {
+  async function farmerOffering(
+    quantity: number | null,
+    unit: string | null,
+    stock = 26,
+    sourceUnit: "TONNE" | "BAG" = "TONNE",
+  ) {
     const seller = await party();
     const farm = await prisma.farm.create({ data: { partyId: seller.id, farmName: "Test Farm" } });
     const produce = await prisma.produceStock.create({
-      data: { farmId: farm.id, cropType: "Maize", quantity: stock, unit: "TONNE" },
+      data: { farmId: farm.id, cropType: "Maize", quantity: stock, unit: sourceUnit },
     });
     const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity, unit });
     await prisma.intent.update({ where: { id: supply.id }, data: { produceId: produce.id } });
@@ -124,7 +129,7 @@ describe("commercial pricing", () => {
 
   // E. Package price needs no package mass.
   it("values 10 bags agreed at 20 USD per bag as 200 USD", async () => {
-    const { seller, supply } = await farmerOffering(30, "bags");
+    const { seller, supply } = await farmerOffering(30, "bags", 30, "BAG");
     const { buyer, demand } = await buyerNeeding(10, "bags");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
@@ -146,7 +151,7 @@ describe("commercial pricing", () => {
 
   // I. A stated total survives an unweighable quantity.
   it("values a stated total for bags whose mass nobody knows", async () => {
-    const { seller, supply } = await farmerOffering(30, "bags");
+    const { seller, supply } = await farmerOffering(30, "bags", 30, "BAG");
     const { buyer, demand } = await buyerNeeding(10, "bags");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 
@@ -170,7 +175,8 @@ describe("commercial pricing", () => {
     // A package mass would resolve this. Nothing on the branch supplies one,
     // so it stays unresolved rather than being guessed — the same answer
     // capacity gives for the same reason.
-    const { seller, supply } = await farmerOffering(2, "tonnes");
+    const seller = await party();
+    const supply = await createTestIntent(seller.id, { side: "SUPPLY", quantity: 2, unit: "tonnes" });
     const { buyer, demand } = await buyerNeeding(10, "bags");
     const match = await createTestMatch(supply.id, demand.id, "SUGGESTED");
 

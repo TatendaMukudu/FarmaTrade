@@ -3,17 +3,18 @@
 Branch audited: `claude/farmatrade-intelliqs-improvements-e4nexp`.
 Baseline head: `6ba52b09a006464a5a4f165e646dbce3bf8d2c05` (23 commits ahead, 0 behind `origin/main`).
 Baseline gate: PASS 7/7, 563 passed / 4 skipped by suite design. GitHub CI run 32221500935: success.
+P0.6 closure gate: PASS 7/7, 591 passed / 4 skipped by suite design. The closure commit still requires pushed-head CI success before launch.
 
 ## Verdict
 
-**READY AFTER BLOCKERS**, not yet safe to call generally pilot-ready.
+**READY FOR 5–10 FRIENDLY PILOTS**, subject to the external launch checklist below.
 
 The visible product can execute most of a friendly commercial loop. This
 checkpoint makes Home opportunity-first, calls commercial intent “Trade”,
 removes three deterministic correctness defects, proves future-supply and
-reputation boundaries, and makes cancellation durable and visible. One P0
-commercial blocker remains: source-level commitment enforcement is not on the
-development branch, and PR #29 still has an unresolved package-unit decision.
+reputation boundaries, and makes cancellation durable and visible. The last known P0 commercial blocker is closed: shared produce and livestock
+sources now have a transactionally locked ceiling, and the founder-selected
+package rule refuses any commitment that cannot be compared with its source.
 
 ## Representative pilot loop
 
@@ -31,27 +32,27 @@ Buyer B needs 15 tonnes in a currently supported location/timing shape.
 | 7 | Propose structured terms | PASS | Quantity, unit, price meaning/currency and handover date are visible inputs and immutable `AgreementTerms`. |
 | 8 | Counteroffer | PASS | A counteroffer creates a new version; old consent is not inherited. |
 | 9 | Accept the same version | PASS | `TermsAcceptance` is per-party/per-version; the UI shows whose move it is. |
-| 10 | Allocate only at bilateral agreement | BROKEN (cross-intent source) | Intent-level capacity is correct and concurrent. The development branch can still commit across multiple intents linked to one physical source. PR #29 addresses measurable produce/livestock, but package-vs-mass policy is unresolved. |
+| 10 | Allocate only at bilateral agreement | PASS | The second acceptance locks the produce/livestock source, recomputes all authoritative reservations across linked supply intents, and refuses either an exceeded ceiling or an unprovable package conversion. Separate-process safety is provided by PostgreSQL row locks and exercised concurrently. |
 | 11 | Communication/contact | ROUGH | Match participants can message immediately; personal contact waits for `AGREED`/`COMPLETED`. INV-15 and the exact unlock boundary remain unresolved. |
 | 12 | Trade progresses | MISSING | Messaging, agreed terms and transport suggestions support off-platform coordination, but no on-platform pickup/delivery/dispute state exists. The friendly pilot must coordinate movement off-platform. |
 | 13 | Record completion | PASS | Each party writes one append-only `TransactionConfirmation`; two confirmations complete the match. |
 | 14 | Record cancellation | PASS | Agreed trades can now be cancelled from the trade room; actor, timestamp and governing terms persist and capacity is released. Reasons remain unresolved. |
 | 15 | Preserve observed history | PASS | Immutable terms, confirmations and cancellation events survive current-status changes. |
 | 16 | Update reputation/history | BROKEN | Quiet success and review/fact separation are tested. Role-scoped reputation is still violated; reviews are immediately visible because the review-window duration is unresolved. |
-| 17 | Reuse remaining quantity | BROKEN | A partially committed intent stays matchable and its remaining quantity is derived correctly, but cross-intent physical-source safety remains the step-10 blocker. |
+| 17 | Reuse remaining quantity | PASS | Remaining intent capacity stays derived; the shared-source tests prove 40 + 50 BAG leaves exactly 10 BAG allocatable, while cancellation releases its governing allocation without changing inventory or erasing terms. |
 
 ## Minimum gate for 5–10 friendly pilots
 
 ### P0 — must be resolved or explicitly constrained before onboarding
 
-1. **Physical-source overcommitment.** Decide how a packaged source interacts
-   with mass-denominated terms, finish PR #29, and prove the source lock and
-   ceiling across linked intents. Until then, a supervised pilot must enforce
-   one active supply intent per physical source and same-basis terms; that is
-   an operating constraint, not a code guarantee.
-2. **Deployment rehearsal.** The Post→Intent migration is stop/start, not
-   rolling-safe (`docs/deployment.md`). Rehearse backup, migration, seed and
-   rollback on a copy of pilot data before the first live account.
+No known P0 code blocker remains. The shared-source ceiling is executable, and
+an upgrade/backup/restore rehearsal from the 11-migration `origin/main` schema
+to all 20 development migrations preserved 15 commercial rows and 9 users.
+
+The **external launch checklist remains human operational work**, not a code
+blocker: take a real Neon snapshot, stop/confirm all Render writes and rolling
+overlap, deploy with `npm start`, smoke the pilot login, and confirm the Sentry,
+Render and Neon dashboards with the account holder.
 
 ### P1 — end-to-end loop blockers
 
@@ -91,17 +92,13 @@ across competing deals, sponsored content and speculative coordination modes.
 
 ## Decisions still required
 
-### Packaged source commitment boundary — blocks safe pilot
+### Packaged source commitment boundary — founder decision implemented
 
-- **Option A: refuse an unmeasurable acceptance.** Safest; may block legitimate
-  bag↔kg deals.
-- **Option B: allow and visibly surface it.** Preserves trade but cannot uphold
-  the no-double-promise invariant.
-- **Option C: require packaged-source terms in the source package unit.**
-  Narrow and deterministic; parties can still agree mass only after explicitly
-  changing the farm/source measurement.
-- **Recommendation: C.** It preserves unknown-as-unknown and makes the ceiling
-  enforceable without inventing bag weight.
+Option C is now the rule. Same-package terms are comparable; package-to-mass
+or package-to-volume terms are refused rather than warned through. The trade
+room explains that parties must keep terms in the source package unit or the
+owner must deliberately revise the Farm measurement first. No package weight
+is stored or inferred.
 
 ### Review window — does not block a supervised pilot if ratings are hidden
 

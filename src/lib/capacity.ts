@@ -149,6 +149,31 @@ function contributionOf(
   };
 }
 
+// Physical farm state is a hard ceiling, unlike an intent whose unknown
+// measurement can remain commercially visible. A commitment must therefore
+// be provably comparable with its source: an unweighed BAG is not a KG and a
+// CRATE is not a TONNE. Callers receive the precise measurement failure so
+// they can tell the owner whether to keep the terms in the package unit or
+// deliberately revise the farm record.
+export function fitsWithinPhysicalSource(
+  reading: CapacityReading,
+  required: number | null,
+  unitCode: string | null | undefined,
+): FitResult {
+  if (required == null) return { fits: false, reason: "no_quantity" };
+  if (reading.remaining === null) return { fits: false, reason: "unknown_unit" };
+
+  const contribution = contributionOf(
+    { reserves: true, quantity: required, unit: null, unitCode: unitCode ?? null, basis: "mutual_agreement" },
+    reading.basis,
+  );
+  if (!contribution.ok) return { fits: false, reason: contribution.reason };
+
+  return coversQuantity(reading.remaining, contribution.value)
+    ? { fits: true, canonical: contribution.value }
+    : { fits: false, reason: "insufficient" };
+}
+
 // What an intent has authorized, reserved and left, in one canonical pass.
 export function readCapacity(
   intent: { quantity: number | null; unitCode: string | null | undefined },

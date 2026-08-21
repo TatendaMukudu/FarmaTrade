@@ -62,8 +62,10 @@ function valuationOfTerms(terms: TermsVersion) {
 
 export default async function ConversationPage({
   params,
+  searchParams,
 }: PageProps<"/dashboard/conversations/[matchId]">) {
   const { matchId } = await params;
+  const query = await searchParams;
   const party = await getCurrentParty();
   if (!party) return null;
 
@@ -120,6 +122,14 @@ export default async function ConversationPage({
       <Link href="/dashboard/opportunities" className="text-sm text-muted-fg underline">
         ← Back to opportunities
       </Link>
+
+      {query.agreementError === "source-measurement-mismatch" && (
+        <div className="rounded-card border border-border bg-warning-bg p-4 text-sm text-warning-fg" role="alert">
+          These terms use a measurement that cannot be compared with the farm source. Use the source package unit
+          (for example, bags with bags), or first update the source measurement in Farm to a measured mass or volume.
+          FarmaTrade will not assume a package weight.
+        </div>
+      )}
 
       <div>
         <h1 className="text-xl font-semibold">

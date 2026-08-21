@@ -138,6 +138,10 @@ Same check as INV-01, law 9.
 
 The strongest invariant in the codebase. P0.4: no capacity moves without
 both parties accepting the same terms version, proven under concurrency.
+P0.6 also locks a linked produce/livestock source and derives reservations
+across every supply intent sharing it. A 100 BAG source cannot commit more
+than 100 BAG, and KG/TONNE terms cannot pass that package ceiling by turning
+an unknown conversion into unlimited capacity.
 
 ## INV-19 — Commercial truth does not require a post · **HELD (structural)**
 
