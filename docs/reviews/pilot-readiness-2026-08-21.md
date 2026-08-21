@@ -3,7 +3,7 @@
 Branch audited: `claude/farmatrade-intelliqs-improvements-e4nexp`.
 Baseline head: `6ba52b09a006464a5a4f165e646dbce3bf8d2c05` (23 commits ahead, 0 behind `origin/main`).
 Baseline gate: PASS 7/7, 563 passed / 4 skipped by suite design. GitHub CI run 32221500935: success.
-P0.6 closure gate: PASS 7/7, 591 passed / 4 skipped by suite design. The closure commit still requires pushed-head CI success before launch.
+P0.6 closure gate: PASS 7/7, 591 passed / 4 skipped by suite design. GitHub CI run 32450699114 succeeded on the implementation checkpoint.
 
 ## Verdict
 
