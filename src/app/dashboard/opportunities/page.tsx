@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { loadActiveOpportunities } from "@/lib/opportunity-data";
 import { respondToMatch } from "./actions";
 import { ConfirmForm } from "./confirm-form";
 import { summarizeReputation } from "@/lib/reputation";
@@ -92,23 +93,7 @@ export default async function OpportunitiesPage() {
   if (!party) return null;
 
   const [active, history, relations, matchingHistory] = await Promise.all([
-    prisma.match.findMany({
-      where: {
-        status: { in: ["SUGGESTED", "NEGOTIATING", "AGREED", "ACCEPTED"] },
-        OR: [{ intentA: { partyId: party.id } }, { intentB: { partyId: party.id } }],
-      },
-      include: {
-        intentA: {
-          include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
-        },
-        intentB: {
-          include: { party: { include: { reputation: true } }, photos: { select: { id: true } } },
-        },
-        confirmations: true,
-        terms: { include: { acceptances: { select: { partyId: true } } } },
-      },
-      orderBy: { score: "desc" },
-    }),
+    loadActiveOpportunities(party.id),
     prisma.match.findMany({
       where: {
         AND: [
@@ -369,7 +354,7 @@ export default async function OpportunitiesPage() {
                             <Link href={`/dashboard/conversations/${m.id}`} className={OUTLINE_BUTTON}>
                               Message
                             </Link>
-                            <Link href={`/dashboard/directory/${theirs.party.id}`} className={OUTLINE_BUTTON}>
+                            <Link href={`/dashboard/network/${theirs.party.id}`} className={OUTLINE_BUTTON}>
                               View profile
                             </Link>
                           </div>

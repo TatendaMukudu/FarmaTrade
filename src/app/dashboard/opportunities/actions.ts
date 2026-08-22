@@ -264,6 +264,6 @@ export async function confirmMatch(
   ]);
 
   revalidatePath("/dashboard/opportunities");
-  revalidatePath("/dashboard/directory");
+  revalidatePath("/dashboard/network");
   return {};
 }

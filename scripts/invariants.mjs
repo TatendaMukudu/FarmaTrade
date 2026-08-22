@@ -90,6 +90,8 @@ function law(name, detail, offenders) {
     "matching-core.ts",
     "measurement.ts",
     "money.ts",
+    "navigation.ts",
+    "network-route.ts",
     "price-signals.ts",
     "pricing.ts",
     "products.ts",

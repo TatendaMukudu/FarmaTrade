@@ -14,15 +14,13 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const hasFarm = !!party.farm;
-
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-card p-4 md:flex">
         <Link href="/dashboard" className="mb-6 px-3 text-lg font-semibold">
           FarmaTrade
         </Link>
-        <Sidebar hasFarm={hasFarm} />
+        <Sidebar />
         <div className="mt-auto flex flex-col gap-1 border-t border-border pt-4">
           <Link
             href="/dashboard/settings"
@@ -41,7 +39,7 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
           <Link href="/dashboard" className="font-semibold">
             FarmaTrade
@@ -60,7 +58,7 @@ export default async function DashboardLayout({
         <main className="flex-1 px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">{children}</main>
       </div>
 
-      <BottomTabs hasFarm={hasFarm} />
+      <BottomTabs />
     </div>
   );
 }

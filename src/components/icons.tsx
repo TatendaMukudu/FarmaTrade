@@ -151,7 +151,7 @@ export function HomeIcon({ className }: IconProps) {
   );
 }
 
-export function DirectoryIcon({ className }: IconProps) {
+export function NetworkIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
       <circle cx="9" cy="9" r="3" />

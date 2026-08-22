@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentParty } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { loadFarmInventory } from "@/lib/farm-data";
 import { LivestockForm } from "./livestock-form";
 import { ProduceForm } from "./produce-form";
 import { EquipmentForm } from "./equipment-form";
@@ -14,20 +14,7 @@ export default async function FarmPage() {
     redirect("/dashboard");
   }
 
-  const [livestock, produce, equipment] = await Promise.all([
-    prisma.livestock.findMany({
-      where: { farmId: party.farm.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.produceStock.findMany({
-      where: { farmId: party.farm.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.equipment.findMany({
-      where: { farmId: party.farm.id },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  const { livestock, produce, equipment } = await loadFarmInventory(party.farm.id);
 
   return (
     <div className="flex flex-col gap-10">

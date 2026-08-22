@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { intentHref } from "./intent";
+import { PRIMARY_DESTINATIONS } from "./navigation";
 import { normalizeLegacyTradeParams } from "./trade-route";
 
 describe("farmer-facing Trade language", () => {
@@ -11,9 +12,13 @@ describe("farmer-facing Trade language", () => {
   });
 
   it("names the navigation Trade rather than exposing the Intent implementation concept", () => {
-    const navigation = readFileSync("src/components/dashboard-nav.tsx", "utf8");
-    expect(navigation).toContain('href: "/dashboard/trade", label: "Trade"');
-    expect(navigation).not.toContain('href: "/dashboard/intent"');
+    expect(PRIMARY_DESTINATIONS).toContainEqual({
+      href: "/dashboard/trade",
+      label: "Trade",
+      alwaysVisible: true,
+    });
+    expect(PRIMARY_DESTINATIONS.map((destination) => destination.href))
+      .not.toContain("/dashboard/intent");
   });
 
   it("keeps the old Intent URL only as a redirect to Trade", () => {

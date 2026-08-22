@@ -133,7 +133,7 @@ export default async function ConversationPage({
 
       <div>
         <h1 className="text-xl font-semibold">
-          <Link href={`/dashboard/directory/${theirs.party.id}`} className="hover:underline">
+          <Link href={`/dashboard/network/${theirs.party.id}`} className="hover:underline">
             {theirs.party.name}
           </Link>
         </h1>
@@ -387,7 +387,7 @@ export default async function ConversationPage({
                 >
                   <div className="min-w-0">
                     <Link
-                      href={`/dashboard/directory/${t.party.id}`}
+                      href={`/dashboard/network/${t.party.id}`}
                       className="text-sm font-medium hover:underline"
                     >
                       {t.party.name}
