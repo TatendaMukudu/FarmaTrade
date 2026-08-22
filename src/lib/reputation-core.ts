@@ -5,6 +5,18 @@ import type { Reputation } from "@/generated/prisma/client";
 // instead until there's a real signal.
 export const MIN_RATINGS_FOR_AVERAGE = 3;
 
+// Pilot display switch only. Rating rows continue to be written and
+// reputation continues to be recomputed; the 5–10-user pilot must not show
+// a cross-role star average that PRODUCT_TRUTH says is not yet trustworthy.
+export const SHOW_PILOT_RATINGS = false;
+
+export function pilotVisibleReason(reason: string): string {
+  if (SHOW_PILOT_RATINGS || !reason.startsWith("counterparty:")) return reason;
+  return reason
+    .replace(/, [0-9]+(?:\.[0-9]+)?★ \([0-9]+ ratings?\)/, "")
+    .replace(/ \(still building rating history\)/, "");
+}
+
 export type ReputationSummary = {
   hasHistory: boolean;
   hasStars: boolean;
@@ -29,6 +41,7 @@ export type ReputationSummary = {
 // behind that file's `server-only` import so a test runner can reach it.
 export function summarizeReputation(
   reputation: Pick<Reputation, "completedCount" | "averageRating" | "ratingCount"> | null,
+  options: { showRatings?: boolean } = {},
 ): ReputationSummary {
   const completedCount = reputation?.completedCount ?? 0;
   const completedLine = `${completedCount} completed trade${completedCount === 1 ? "" : "s"}`;
@@ -38,6 +51,17 @@ export function summarizeReputation(
       hasHistory: false,
       hasStars: false,
       headline: "New · no history yet",
+      completedLine,
+      tone: "new",
+    };
+  }
+
+  const showRatings = options.showRatings ?? SHOW_PILOT_RATINGS;
+  if (!showRatings) {
+    return {
+      hasHistory: true,
+      hasStars: false,
+      headline: "Trade history",
       completedLine,
       tone: "new",
     };

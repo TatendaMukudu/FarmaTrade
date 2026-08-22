@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatQuantity, pluralizeUnit, unitPerLabel } from "./units";
+import { formatQuantity, normalizeUnit, pluralizeUnit, unitPerLabel, unitsComparable } from "./units";
 
 describe("pluralizeUnit", () => {
   it("pluralises the units that take an s", () => {
@@ -20,7 +20,7 @@ describe("pluralizeUnit", () => {
   });
 
   it("leaves a unit we don't know exactly as the farmer typed it", () => {
-    // Post.unit is free text. Guessing a plural risks inventing something
+    // Intent.unit is free text. Guessing a plural risks inventing something
     // wrong inside a listing title other farmers read.
     expect(pluralizeUnit("punnet", 5)).toBe("punnet");
     expect(pluralizeUnit("Sack", 5)).toBe("sack");
@@ -56,5 +56,47 @@ describe("unitPerLabel", () => {
   it("stays singular, since 'per' is singular whatever the number", () => {
     expect(unitPerLabel("TONNE")).toBe("tonne");
     expect(unitPerLabel("CRATE")).toBe("crate");
+  });
+});
+
+describe("normalizeUnit", () => {
+  it("gives one spelling per unit, whichever way it was written", () => {
+    expect(normalizeUnit("TONNE")).toBe("tonne");
+    expect(normalizeUnit("tonnes")).toBe("tonne");
+    expect(normalizeUnit(" Tonnes ")).toBe("tonne");
+    expect(normalizeUnit("head")).toBe("head");
+  });
+
+  it("leaves a farmer's own word alone", () => {
+    // "punnet", "sack", "bale" — normalising means one spelling, not a
+    // vocabulary we approve of.
+    expect(normalizeUnit("Punnet")).toBe("punnet");
+  });
+
+  it("reads a missing unit as missing rather than empty string", () => {
+    expect(normalizeUnit(null)).toBeNull();
+    expect(normalizeUnit("   ")).toBeNull();
+  });
+});
+
+describe("unitsComparable", () => {
+  it("compares the same unit spelled differently", () => {
+    expect(unitsComparable("TONNE", "tonnes")).toBe(true);
+  });
+
+  it("refuses two units it has no conversion for", () => {
+    // This is the whole no-fake-precision rule. There is no conversion
+    // table, and a bag of maize and a bag of groundnuts are different
+    // weights, so pretending would be worse than declining.
+    expect(unitsComparable("tonne", "kg")).toBe(false);
+    expect(unitsComparable("bag", "crate")).toBe(false);
+  });
+
+  it("lets an unstated unit compare with anything", () => {
+    // Refusing would break every intent recorded before units were asked
+    // for, and "20" alongside "20 tonnes" is almost certainly one measure.
+    expect(unitsComparable(null, "tonne")).toBe(true);
+    expect(unitsComparable("tonne", null)).toBe(true);
+    expect(unitsComparable(null, null)).toBe(true);
   });
 });

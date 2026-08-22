@@ -6,7 +6,7 @@
 // Postgres, not just asserted against mocked Prisma calls.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeCookies, resetNextRuntime } from "@/test/next-runtime-stub";
-import { createTestParty, createTestPost, createTestMatch, cleanupParties } from "@/test/factories";
+import { createTestParty, createTestIntent, createTestMatch, cleanupParties } from "@/test/factories";
 
 vi.mock("next/headers", () => ({
   cookies: async () => fakeCookies,
@@ -15,7 +15,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({ redirect: () => {} }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { respondToMatch, confirmMatch } = await import("./actions");
+const { respondToMatch, confirmMatch, proposeMatchTerms } = await import("./actions");
 const { createSession } = await import("@/lib/auth");
 const { prisma } = await import("@/lib/prisma");
 
@@ -32,8 +32,8 @@ async function loginAs(userId: string) {
 async function setUpMatchedPair(matchStatus: "SUGGESTED" | "ACCEPTED" = "ACCEPTED") {
   const seller = await createTestParty({ province: "Harare", district: "Harare" });
   const buyer = await createTestParty({ province: "Harare", district: "Harare" });
-  const have = await createTestPost(seller.party.id, { type: "HAVE", category: "PRODUCE" });
-  const need = await createTestPost(buyer.party.id, { type: "NEED", category: "PRODUCE" });
+  const have = await createTestIntent(seller.party.id, { side: "SUPPLY", category: "PRODUCE" });
+  const need = await createTestIntent(buyer.party.id, { side: "DEMAND", category: "PRODUCE" });
   const match = await createTestMatch(have.id, need.id, matchStatus);
   return { seller, buyer, match };
 }
@@ -45,7 +45,11 @@ describe("respondToMatch", () => {
     await cleanupParties(partyIds.splice(0));
   });
 
-  it("lets a party in the match accept it", async () => {
+  it("records one party's acceptance without settling the trade", async () => {
+    // This assertion used to read ACCEPTED, which was the bug: one party
+    // clicking accept moved the engagement to a state that reserved the
+    // counterparty's capacity. Now it records where the seller stands and
+    // waits for an answer.
     const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
     partyIds.push(seller.party.id, buyer.party.id);
 
@@ -53,7 +57,43 @@ describe("respondToMatch", () => {
     await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
 
     const updated = await prisma.match.findUnique({ where: { id: match.id } });
-    expect(updated!.status).toBe("ACCEPTED");
+    expect(updated!.status).toBe("NEGOTIATING");
+
+    const terms = await prisma.agreementTerms.findMany({
+      where: { matchId: match.id },
+      include: { acceptances: true },
+    });
+    expect(terms).toHaveLength(1);
+    expect(terms[0].acceptances.map((a) => a.partyId)).toEqual([seller.party.id]);
+  });
+
+  it("settles the trade when the second party agrees to the same terms", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    await loginAs(buyer.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    const updated = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(updated!.status).toBe("AGREED");
+  });
+
+  it("records who cancelled after both parties agreed", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+    await loginAs(buyer.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "ACCEPTED" }));
+
+    await loginAs(seller.user.id);
+    await respondToMatch(formData({ id: match.id, decision: "DECLINED" }));
+
+    expect(await prisma.agreementCancellation.findUnique({ where: { matchId: match.id } }))
+      .toMatchObject({ cancelledById: seller.party.id });
   });
 
   it("lets a party in the match decline it", async () => {
@@ -77,6 +117,32 @@ describe("respondToMatch", () => {
 
     const updated = await prisma.match.findUnique({ where: { id: match.id } });
     expect(updated!.status).toBe("SUGGESTED");
+  });
+});
+
+describe("proposeMatchTerms", () => {
+  const partyIds: string[] = [];
+  beforeEach(() => resetNextRuntime());
+  afterEach(async () => cleanupParties(partyIds.splice(0)));
+
+  it("records the handover date the parties put on the table", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("SUGGESTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+    await loginAs(buyer.user.id);
+
+    await proposeMatchTerms(formData({
+      matchId: match.id,
+      quantity: "15",
+      unit: "tonne",
+      price: "500",
+      priceBasis: "PER_UNIT",
+      priceCurrency: "USD",
+      priceUnit: "tonne",
+      handoverOn: "2026-09-20",
+    }));
+
+    const terms = await prisma.agreementTerms.findFirstOrThrow({ where: { matchId: match.id } });
+    expect(terms.handoverOn?.toISOString()).toBe("2026-09-20T00:00:00.000Z");
   });
 });
 
@@ -176,5 +242,67 @@ describe("confirmMatch", () => {
 
     const count = await prisma.transactionConfirmation.count({ where: { matchId: match.id, partyId: seller.party.id } });
     expect(count).toBe(1);
+  });
+
+  // Scenario I. Counting two rows and calling it done meant a disagreement
+  // produced a COMPLETED trade — and COMPLETED is also what unlocks personal
+  // contact details, so the fiction escaped the label.
+  it("does not record a completed trade when the two sides disagree about whether it happened", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).not.toBe("COMPLETED");
+
+    // Both reports survive. FarmaTrade holds the evidence; it does not judge.
+    const reports = await prisma.transactionConfirmation.findMany({
+      where: { matchId: match.id },
+      select: { outcome: true },
+    });
+    expect(reports.map((r) => r.outcome).sort()).toEqual(["COMPLETED_GOOD", "DID_NOT_HAPPEN"]);
+  });
+
+  it("does not leak contact details on the strength of a disputed trade", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const { canSeeContactDetails } = await import("@/lib/identity-safety");
+    expect(await canSeeContactDetails(seller.party.id, buyer.party.id)).toBe(false);
+  });
+
+  it("records an agreed non-event as a non-event rather than a completed trade", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).not.toBe("COMPLETED");
+  });
+
+  it("still completes a trade that happened but went badly for one side", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_ISSUE" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).toBe("COMPLETED");
   });
 });

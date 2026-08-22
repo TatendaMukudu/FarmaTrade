@@ -12,7 +12,7 @@
 //   - "You usually list maize about every three weeks; it has been seven"
 //     is useful to a two-hectare farm. "You post less than average" is not,
 //     and would only ever tell a smallholder they are small.
-//   - A buyer who reliably posts a standing order every month and has gone
+//   - A buyer who reliably records a standing order every month and has gone
 //     quiet is a fact worth surfacing. Silence is otherwise invisible to
 //     every other signal FarmaTrade has, because nothing is there to see.
 //
@@ -21,14 +21,14 @@
 // normal is for them — and with samples this small, a mean is almost all
 // outlier.
 //
-// No new recording needed: Post.createdAt, partyId and category have been
+// No new recording needed: Intent.createdAt, partyId and category have been
 // there since launch, so this reads a history that already exists rather
 // than starting a clock today.
 //
 // Pure and DB-free.
 
 // Below this many recorded gaps we do not claim to know a rhythm. Four gaps
-// means five posts, which is the least that can distinguish a pattern from a
+// means five records, which is the least that can distinguish a pattern from a
 // coincidence.
 export const MIN_GAPS = 4;
 
@@ -53,7 +53,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export type RhythmConfidence = "learning" | "tentative" | "emerging" | "clear";
 
 export type Rhythm = {
-  // Typical days between posts, or null while still learning.
+  // Typical days between records, or null while still learning.
   normalDays: number | null;
   // Typical variation around that, in days — how irregular this party
   // normally is, which is itself part of their rhythm.
@@ -80,7 +80,7 @@ export function medianAbsoluteDeviation(values: number[]): number | null {
   return median(values.map((v) => Math.abs(v - mid)));
 }
 
-// Days between consecutive posts, oldest first. Same-day posts produce a
+// Days between consecutive records, oldest first. Same-day records produce a
 // zero gap, which is real information about how this party works and is kept
 // rather than filtered.
 export function gapsBetween(timestamps: Date[]): number[] {
@@ -101,7 +101,7 @@ function confidenceFor(gaps: number): RhythmConfidence {
 
 // What this party's own posting looks like. Returns `learning` with null
 // numbers below the floor rather than a shaky estimate — there is no honest
-// way to describe a rhythm from two posts, and saying so is better than
+// way to describe a rhythm from two records, and saying so is better than
 // hedging.
 export function computeRhythm(timestamps: Date[]): Rhythm {
   const gaps = gapsBetween(timestamps);
@@ -113,7 +113,7 @@ export function computeRhythm(timestamps: Date[]): Rhythm {
       spreadDays: null,
       gaps: gaps.length,
       confidence,
-      basis: `not enough history yet (${gaps.length}/${MIN_GAPS} gaps between posts)`,
+      basis: `not enough history yet (${gaps.length}/${MIN_GAPS} gaps between records)`,
     };
   }
 
@@ -125,7 +125,7 @@ export function computeRhythm(timestamps: Date[]): Rhythm {
     spreadDays: Math.round(spreadDays),
     gaps: gaps.length,
     confidence,
-    basis: `based on ${gaps.length} gaps between posts`,
+    basis: `based on ${gaps.length} gaps between records`,
   };
 }
 
@@ -142,7 +142,7 @@ export type QuietRead = {
 //
 // Compares the current open-ended gap against the party's median gap. Never
 // fires below MIN_GAPS, and never fires on a party whose rhythm is too
-// irregular for "late" to mean anything — a farm that posts at 5, 60 and 200
+// irregular for "late" to mean anything — a farm that records at 5, 60 and 200
 // day intervals does not have a schedule to be late for.
 export function detectQuiet(timestamps: Date[], now: Date): QuietRead {
   const rhythm = computeRhythm(timestamps);
@@ -166,7 +166,7 @@ export function detectQuiet(timestamps: Date[], now: Date): QuietRead {
     // idea whether the farmer is between seasons, ill, or has left — and
     // saying any of those would be inventing a cause.
     line: quiet
-      ? `Usually posts about every ${rhythm.normalDays} days — it has been ${sinceDays}.`
+      ? `Usually records something about every ${rhythm.normalDays} days — it has been ${sinceDays}.`
       : null,
   };
 }

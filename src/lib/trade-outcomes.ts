@@ -10,7 +10,7 @@
 // That is a different and more useful kind of evidence, and FarmaTrade has
 // been recording it since launch without reading it back: Match.status says
 // whether a pairing was taken up, TransactionConfirmation.outcome says
-// whether it survived contact with reality, and Post.category/district say
+// whether it survived contact with reality, and Intent.category/district say
 // what kind of trade it was.
 //
 // Two deliberate limits, both of which the rest of this file enforces rather
@@ -28,7 +28,7 @@
 // Pure and DB-free, so the honesty rules above are unit-testable. The
 // server-side wrapper that feeds it lives in match-ranking.ts.
 
-import type { ConfirmationOutcome, MatchStatus, PostCategory } from "@/generated/prisma/client";
+import type { ConfirmationOutcome, MatchStatus, CommerceCategory } from "@/generated/prisma/client";
 
 // At or below this many recorded trades, a lane's numbers are reported with
 // an explicit small_sample caveat. Three is not a track record; it is three
@@ -127,7 +127,7 @@ function rate(part: number, total: number): number | null {
 // on it would halve an already-thin sample, and what this module answers —
 // "do trades like this hold up" — is not directional.
 export function laneKey(
-  category: PostCategory,
+  category: CommerceCategory,
   districtA: string,
   districtB: string,
 ): { lane: string; laneLabel: string } {

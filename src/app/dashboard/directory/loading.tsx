@@ -1,5 +1,5 @@
 import { LoadingPage } from "@/components/ui";
 
 export default function Loading() {
-  return <LoadingPage label="Loading the directory" />;
+  return <LoadingPage label="Opening Network" />;
 }

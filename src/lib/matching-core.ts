@@ -1,4 +1,4 @@
-import type { Post, Reputation, VerificationSource } from "@/generated/prisma/client";
+import type { Intent, Reputation, VerificationSource } from "@/generated/prisma/client";
 import type { ReasonKind } from "@/lib/reason-reliability";
 import { regionFor } from "@/lib/regions";
 
@@ -40,17 +40,20 @@ export type MatchScore = {
 // geography before scoring ever ran, so it is not a zero.
 export const BASE_SCORE = 50;
 
+// `candidate` is the pre-existing intent, `incoming` the one that just
+// became active. Both are stored rows — the Intent type is the persistence
+// name and stays until the table rename lands.
 export function scoreMatch(
-  candidate: Post,
-  newPost: Post,
+  candidate: Intent,
+  incoming: Intent,
   reputation: Reputation | null,
   verifiedBy: VerificationSource | null,
 ): MatchScore {
   const signals: MatchSignal[] = [];
 
-  const sameCountry = candidate.countryCode === newPost.countryCode;
-  const sameProvince = sameCountry && candidate.province === newPost.province;
-  const sameDistrict = sameProvince && candidate.district === newPost.district;
+  const sameCountry = candidate.countryCode === incoming.countryCode;
+  const sameProvince = sameCountry && candidate.province === incoming.province;
+  const sameDistrict = sameProvince && candidate.district === incoming.district;
   // TRANSPORT only: a HAVE post's destination is a transporter's route, a
   // NEED post's destination is where goods need to end up. A candidate
   // qualifies on the route even when pickup provinces differ, as long as
@@ -58,9 +61,9 @@ export function scoreMatch(
   const onRoute =
     sameCountry &&
     !sameProvince &&
-    newPost.category === "TRANSPORT" &&
-    ((candidate.destinationProvince != null && candidate.destinationProvince === newPost.province) ||
-      (newPost.destinationProvince != null && newPost.destinationProvince === candidate.province));
+    incoming.category === "TRANSPORT" &&
+    ((candidate.destinationProvince != null && candidate.destinationProvince === incoming.province) ||
+      (incoming.destinationProvince != null && incoming.destinationProvince === candidate.province));
 
   if (sameProvince) {
     signals.push({ kind: "same_province", points: 0, reason: "same province" });
@@ -106,7 +109,7 @@ export function scoreMatch(
     });
   }
 
-  if (candidate.urgent || newPost.urgent) {
+  if (candidate.urgent || incoming.urgent) {
     signals.push({ kind: "time_sensitive", points: 0, reason: "time-sensitive" });
   }
 

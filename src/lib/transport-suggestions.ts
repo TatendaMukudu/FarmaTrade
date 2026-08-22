@@ -12,10 +12,10 @@ const MAX_SUGGESTIONS = 5;
 // posting a TRANSPORT NEED and waiting for the matching engine to run
 // again. This closes that gap directly: given the trade's origin (where the
 // goods are) and destination (where they need to go), find open TRANSPORT
-// HAVE posts that actually cover it.
+// SUPPLY intents that actually cover it.
 export async function findTransportersForRoute(origin: RouteEnd, destination: RouteEnd) {
-  const candidates = await prisma.post.findMany({
-    where: { type: "HAVE", category: "TRANSPORT", status: "OPEN" },
+  const candidates = await prisma.intent.findMany({
+    where: { side: "SUPPLY", category: "TRANSPORT", status: "ACTIVE" },
     include: { party: { include: { reputation: true } } },
     orderBy: { createdAt: "desc" },
   });
