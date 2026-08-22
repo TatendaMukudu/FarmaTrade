@@ -28,6 +28,7 @@ import { pairwiseQuantity } from "@/lib/capacity";
 import { formatMoneyAmount } from "@/lib/money";
 import { formatQuantity, pluralizeUnit } from "@/lib/units";
 import { formatCanonical } from "@/lib/measurement";
+import { settlementLine, settlementOf, type SettlementReport } from "@/lib/confirmations-core";
 import { Badge } from "@/components/badge";
 import { SproutIcon } from "@/components/icons";
 import { EmptyState, SectionHeading, buttonClass } from "@/components/ui";
@@ -76,6 +77,12 @@ const OUTCOME_LABEL: Record<string, string> = {
   COMPLETED_ISSUE: "Completed, with an issue",
   DID_NOT_HAPPEN: "Did not happen",
 };
+
+// The same predicate the write path uses, so the page can never tell a farmer
+// something the database disagrees with.
+function settlementFor(confirmations: readonly { outcome: string }[]) {
+  return settlementOf(confirmations.map((c) => c.outcome as SettlementReport));
+}
 
 const SOLID_BUTTON = buttonClass("primary", "sm");
 const OUTLINE_BUTTON = buttonClass("secondary", "sm");
@@ -371,10 +378,25 @@ export default async function OpportunitiesPage() {
                       {(view === "agreed" || view === "renegotiating") && (
                         <div className="mt-4 border-t border-border pt-4">
                           {myConfirmation ? (
-                            <p className="text-sm text-muted-fg">
-                              You reported: {OUTCOME_LABEL[myConfirmation.outcome].toLowerCase()}.
-                              Waiting on {theirs.party.name} to confirm their side.
-                            </p>
+                            <div className="flex flex-col gap-1 text-sm">
+                              <p className="text-muted-fg">
+                                You reported: {OUTCOME_LABEL[myConfirmation.outcome].toLowerCase()}.
+                              </p>
+                              {/* What the two reports actually settle, rather
+                                  than "waiting on them" said to someone whose
+                                  counterparty already answered and disagreed. */}
+                              {settlementFor(m.confirmations).kind === "disputed" ? (
+                                <p className="rounded-card border border-border bg-new-bg px-3 py-2 text-fg">
+                                  {settlementLine({ kind: "disputed" })} Contact{" "}
+                                  {theirs.party.name} to sort it out, or raise it with
+                                  FarmaTrade.
+                                </p>
+                              ) : (
+                                <p className="text-muted-fg">
+                                  {settlementLine(settlementFor(m.confirmations))}
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <ConfirmForm matchId={m.id} counterpartyName={theirs.party.name} />
                           )}

@@ -243,4 +243,66 @@ describe("confirmMatch", () => {
     const count = await prisma.transactionConfirmation.count({ where: { matchId: match.id, partyId: seller.party.id } });
     expect(count).toBe(1);
   });
+
+  // Scenario I. Counting two rows and calling it done meant a disagreement
+  // produced a COMPLETED trade — and COMPLETED is also what unlocks personal
+  // contact details, so the fiction escaped the label.
+  it("does not record a completed trade when the two sides disagree about whether it happened", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).not.toBe("COMPLETED");
+
+    // Both reports survive. FarmaTrade holds the evidence; it does not judge.
+    const reports = await prisma.transactionConfirmation.findMany({
+      where: { matchId: match.id },
+      select: { outcome: true },
+    });
+    expect(reports.map((r) => r.outcome).sort()).toEqual(["COMPLETED_GOOD", "DID_NOT_HAPPEN"]);
+  });
+
+  it("does not leak contact details on the strength of a disputed trade", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const { canSeeContactDetails } = await import("@/lib/identity-safety");
+    expect(await canSeeContactDetails(seller.party.id, buyer.party.id)).toBe(false);
+  });
+
+  it("records an agreed non-event as a non-event rather than a completed trade", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "DID_NOT_HAPPEN" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).not.toBe("COMPLETED");
+  });
+
+  it("still completes a trade that happened but went badly for one side", async () => {
+    const { seller, buyer, match } = await setUpMatchedPair("ACCEPTED");
+    partyIds.push(seller.party.id, buyer.party.id);
+
+    await loginAs(seller.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_GOOD" }));
+    await loginAs(buyer.user.id);
+    await confirmMatch({}, formData({ matchId: match.id, outcome: "COMPLETED_ISSUE" }));
+
+    const after = await prisma.match.findUnique({ where: { id: match.id } });
+    expect(after!.status).toBe("COMPLETED");
+  });
 });

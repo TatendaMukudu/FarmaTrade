@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   pendingStamps,
   promptsWorthSurfacing,
+  settlementLine,
+  settlementOf,
   stampBanner,
   stampingRate,
   type StampableMatch,
@@ -130,5 +132,45 @@ describe("stampingRate", () => {
 
   it("says there is nothing to report rather than showing a zero", () => {
     expect(stampingRate(0, 0).rate).toBeNull();
+  });
+});
+
+// PRODUCT_TRUTH.md §36 and the brief's Scenario I. Two reports are not two
+// agreements, and the difference is the difference between a trust record and
+// a fiction.
+describe("settlementOf", () => {
+  it("settles nothing until both sides have reported", () => {
+    expect(settlementOf([])).toEqual({ kind: "awaiting", reported: 0, required: 2 });
+    expect(settlementOf(["COMPLETED_GOOD"])).toEqual({
+      kind: "awaiting",
+      reported: 1,
+      required: 2,
+    });
+  });
+
+  it("completes when both sides say it happened", () => {
+    expect(settlementOf(["COMPLETED_GOOD", "COMPLETED_GOOD"]).kind).toBe("completed");
+  });
+
+  it("still completes when it happened but went badly for one side", () => {
+    // A trade with a problem is still a trade. Quiet success and bumpy
+    // success both count; only "it never happened" is a different claim.
+    expect(settlementOf(["COMPLETED_GOOD", "COMPLETED_ISSUE"]).kind).toBe("completed");
+    expect(settlementOf(["COMPLETED_ISSUE", "COMPLETED_ISSUE"]).kind).toBe("completed");
+  });
+
+  it("records an agreed non-event as exactly that, not as a completed trade", () => {
+    expect(settlementOf(["DID_NOT_HAPPEN", "DID_NOT_HAPPEN"]).kind).toBe("did_not_happen");
+  });
+
+  it("refuses to manufacture success out of a disagreement", () => {
+    expect(settlementOf(["COMPLETED_GOOD", "DID_NOT_HAPPEN"]).kind).toBe("disputed");
+    expect(settlementOf(["DID_NOT_HAPPEN", "COMPLETED_ISSUE"]).kind).toBe("disputed");
+  });
+
+  it("does not pick a winner in its farmer-facing line", () => {
+    const line = settlementLine({ kind: "disputed" });
+    expect(line).toMatch(/different outcomes/i);
+    expect(line).not.toMatch(/\b(lied|wrong|fault|blame)\b/i);
   });
 });

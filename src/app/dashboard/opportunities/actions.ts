@@ -10,6 +10,7 @@ import { recomputeRelation } from "@/lib/relations";
 import { loadCapacities } from "@/lib/allocation";
 import { acceptTerms, closeEngagement, proposeTerms, suggestedTerms, syncEngagementForMatch } from "@/lib/agreement";
 import { logger } from "@/lib/logger";
+import { settlementOf, type SettlementReport } from "@/lib/confirmations-core";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
 export type ConfirmActionState = { error?: string };
@@ -221,16 +222,33 @@ export async function confirmMatch(
     }
   }
 
-  const confirmationCount = await prisma.transactionConfirmation.count({
+  // Two reports are not two agreements. Asking confirmations-core what the
+  // reports actually settle is what stops a disagreement from being recorded
+  // as a completed trade — and, because COMPLETED is also what unlocks
+  // personal contact details, from handing out a phone number on the strength
+  // of a trade one party says never happened.
+  const reports = await prisma.transactionConfirmation.findMany({
     where: { matchId },
+    select: { outcome: true },
   });
+  const settlement = settlementOf(reports.map((r) => r.outcome as SettlementReport));
   let justCompleted = false;
-  if (confirmationCount >= 2) {
+  if (settlement.kind === "completed") {
     const updated = await prisma.match.updateMany({
       where: { id: matchId, status: { not: "COMPLETED" } },
       data: { status: "COMPLETED" },
     });
     justCompleted = updated.count > 0;
+  } else if (settlement.kind === "disputed") {
+    // Left in its agreed state on purpose. There is no automated adjudication
+    // in V1 and inventing one would be worse than saying so: the two reports
+    // are both on the record, the trade room shows the disagreement, and a
+    // supervised pilot resolves it with the people involved.
+    logger.warn("confirmMatch.disputed_outcome", {
+      matchId,
+      reportedBy: party.id,
+      outcomes: reports.map((r) => r.outcome).sort().join(","),
+    });
   }
 
   // Filing a report can change what this engagement holds — "it did not
