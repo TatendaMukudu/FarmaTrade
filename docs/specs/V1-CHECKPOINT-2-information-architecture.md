@@ -209,6 +209,162 @@ Written as things I will actively try to do to the delivered SHA.
 
 ---
 
+---
+
+# Amendment 1 — route ownership (founder ruling, 2026-08-21)
+
+**Provenance:** founder decision issued in the Checkpoint 2 correction brief
+after reviewing `docs/reviews/CHECKPOINT-2-claude-review-2026-08-21.md`
+(commit `dc76098`), in response to the open question I raised there about
+where `/dashboard/opportunities` belongs. Recorded here because a decision
+without a source is not checkable.
+
+## The ruling
+
+Primary navigation is unchanged: **Home · Trade · Network · You**. Deep routes
+belong to them as follows.
+
+| Destination | Owns |
+|---|---|
+| **Home** | `/dashboard`, `/dashboard/opportunities` |
+| **Trade** | `/dashboard/trade`, `/dashboard/conversations/...` |
+| **Network** | `/dashboard/network`, `/dashboard/network/[partyId]` |
+| **You** | `/dashboard/you`, `/dashboard/farm`, `/dashboard/settings` |
+
+Founder rationale, recorded verbatim in substance: opportunities are surfaced
+*by FarmaTrade to the actor* and are primarily a Home concept —
+`/dashboard/opportunities` is the deeper "See all opportunities" surface, and
+**it is not trade history**. A live bilateral trade room orients the actor
+within Trade. Farm stays technically canonical at `/dashboard/farm`; its move
+under You is an information-architecture relationship, not a URL migration.
+
+## Why this cannot be prefix matching
+
+`isDestinationActive(pathname, href)` takes only the destination's own href,
+and the ruling is **not derivable from the URL**: Home owns
+`/dashboard/opportunities`, and You owns `/dashboard/farm` and
+`/dashboard/settings`, neither of which sits under `/dashboard/you`.
+Meanwhile `/dashboard` is a prefix of literally every route, so treating it as
+one would give Home everything.
+
+Ownership must therefore be **declared**, not inferred:
+
+- Each destination declares the routes it owns.
+- `/dashboard` matches **exactly** and never by prefix.
+- Every other owned route `p` matches `r` when `r === p` or
+  `r.startsWith(p + "/")` — the `+ "/"` is what stops `/dashboard/networking`
+  claiming Network and `/dashboard/trades` claiming Trade.
+- Where more than one owned route matches, the **longest** wins. That keeps
+  the result deterministic rather than dependent on declaration order.
+- A route nobody owns returns `null`. That is honest, and test B7 exists so it
+  cannot happen silently.
+
+## The "Trade history" label
+
+You currently labels `/dashboard/opportunities` as **Trade history**. That is
+semantically wrong and the founder has ruled it out: an opportunity is what
+*might* happen; trade history is what *did*.
+
+**I checked, so Codex does not have to:** there is no dedicated completed-trade
+history route. `find src/app -name page.tsx` returns no such surface, and
+completed history renders as a `History` section *inside*
+`src/app/dashboard/opportunities/page.tsx` (line 405).
+
+So the founder's fallback applies definitively: **remove or defer the Trade
+history entry.** Do not relink it, and do not build a history subsystem in
+this correction.
+
+## B6 — `src/lib/navigation.test.ts`, add verbatim
+
+```ts
+import { activeDestination } from "./navigation";
+
+describe("route ownership (founder ruling 2026-08-21)", () => {
+  it.each([
+    ["/dashboard", "Home"],
+    ["/dashboard/opportunities", "Home"],
+    ["/dashboard/trade", "Trade"],
+    ["/dashboard/conversations/match-1", "Trade"],
+    ["/dashboard/network", "Network"],
+    ["/dashboard/network/party-1", "Network"],
+    ["/dashboard/you", "You"],
+    ["/dashboard/farm", "You"],
+    ["/dashboard/settings", "You"],
+  ])("%s orients the actor within %s", (pathname, label) => {
+    expect(activeDestination(pathname)).toBe(label);
+  });
+
+  it("never lets Home claim a route it does not own", () => {
+    // /dashboard is a prefix of every route in the product. Exact match only.
+    for (const p of ["/dashboard/trade", "/dashboard/network", "/dashboard/you"]) {
+      expect(activeDestination(p)).not.toBe("Home");
+    }
+  });
+
+  it("does not let a sibling route steal a destination", () => {
+    expect(activeDestination("/dashboard/networking")).not.toBe("Network");
+    expect(activeDestination("/dashboard/trades")).not.toBe("Trade");
+  });
+
+  it("resolves exactly one destination for every owned route", () => {
+    const routes = [
+      "/dashboard", "/dashboard/opportunities", "/dashboard/trade",
+      "/dashboard/conversations/m1", "/dashboard/network",
+      "/dashboard/network/p1", "/dashboard/you", "/dashboard/farm",
+      "/dashboard/settings",
+    ];
+    for (const r of routes) {
+      const active = PRIMARY_DESTINATIONS.filter((d) => isDestinationActive(r, d.href));
+      expect(active, `${r} lit ${active.map((a) => a.label)}`).toHaveLength(1);
+    }
+  });
+});
+```
+
+## B7 — every real route must have an owner
+
+This is the test that stops Blocker 2 from ever recurring: it walks the app
+directory rather than trusting a hand-written list, so a future route cannot
+be added without being assigned.
+
+```ts
+import { readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+
+// Legacy compatibility routes redirect away and are never rendered under the
+// dashboard chrome, so they own no navigation state.
+const REDIRECT_ONLY = ["/dashboard/directory", "/dashboard/posts", "/dashboard/intent"];
+
+function dashboardRoutes(dir = "src/app/dashboard", acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) dashboardRoutes(full, acc);
+    else if (entry === "page.tsx") {
+      acc.push("/" + relative("src/app", dir).replace(/\\/g, "/"));
+    }
+  }
+  return acc;
+}
+
+it("assigns every dashboard route to a primary destination", () => {
+  const unowned = dashboardRoutes()
+    .filter((r) => !REDIRECT_ONLY.some((x) => r.startsWith(x)))
+    // A dynamic segment stands in for a real id.
+    .map((r) => r.replace(/\[[^\]]+\]/g, "sample"))
+    .filter((r) => activeDestination(r) === null);
+  expect(unowned, `unowned routes: ${unowned.join(", ")}`).toEqual([]);
+});
+```
+
+## Scope fence for this correction
+
+Fix only Blocker 1 and Blocker 2. **Do not** touch the sub-44px Farm
+`Edit`/`Remove` controls, the Network filter heights, the "Opportunities"
+heading or the "Supply & needs" copy — all four are pre-existing and belong to
+Checkpoint 3's mobile and copy passes. Do not start Checkpoint 3. Do not merge.
+
+---
+
 ## Definition of done for Checkpoint 2
 
 - `src/lib/navigation.ts` and `src/lib/network-route.ts` exist, are pure, and
