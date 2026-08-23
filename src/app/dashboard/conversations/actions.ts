@@ -7,10 +7,10 @@ import { getCurrentParty } from "@/lib/auth";
 async function assertPartyInMatch(matchId: string, partyId: string) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { postA: { select: { partyId: true } }, postB: { select: { partyId: true } } },
+    select: { intentA: { select: { partyId: true } }, intentB: { select: { partyId: true } } },
   });
   if (!match) return false;
-  return match.postA.partyId === partyId || match.postB.partyId === partyId;
+  return match.intentA.partyId === partyId || match.intentB.partyId === partyId;
 }
 
 export async function sendMessage(formData: FormData) {

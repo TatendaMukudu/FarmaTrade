@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   signupSchema,
   loginSchema,
-  postSchema,
+  intentSchema,
   livestockSchema,
   produceSchema,
   equipmentSchema,
@@ -83,9 +83,9 @@ describe("loginSchema", () => {
   });
 });
 
-describe("postSchema", () => {
+describe("intentSchema", () => {
   const base = {
-    type: "HAVE",
+    side: "SUPPLY",
     category: "PRODUCE",
     title: "10 tonnes of maize",
     province: "Mashonaland East",
@@ -93,19 +93,19 @@ describe("postSchema", () => {
   };
 
   it("accepts a minimal valid post", () => {
-    expect(postSchema.safeParse(base).success).toBe(true);
+    expect(intentSchema.safeParse(base).success).toBe(true);
   });
 
   it("rejects an unknown category", () => {
-    expect(postSchema.safeParse({ ...base, category: "NOT_A_CATEGORY" }).success).toBe(false);
+    expect(intentSchema.safeParse({ ...base, category: "NOT_A_CATEGORY" }).success).toBe(false);
   });
 
   it("rejects an empty title", () => {
-    expect(postSchema.safeParse({ ...base, title: "" }).success).toBe(false);
+    expect(intentSchema.safeParse({ ...base, title: "" }).success).toBe(false);
   });
 
   it("coerces quantity/askingPrice from form-data strings", () => {
-    const result = postSchema.safeParse({ ...base, quantity: "12.5", askingPrice: "300" });
+    const result = intentSchema.safeParse({ ...base, quantity: "12.5", askingPrice: "300" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.quantity).toBe(12.5);
@@ -114,8 +114,8 @@ describe("postSchema", () => {
   });
 
   it("rejects a negative or zero quantity", () => {
-    expect(postSchema.safeParse({ ...base, quantity: "0" }).success).toBe(false);
-    expect(postSchema.safeParse({ ...base, quantity: "-5" }).success).toBe(false);
+    expect(intentSchema.safeParse({ ...base, quantity: "0" }).success).toBe(false);
+    expect(intentSchema.safeParse({ ...base, quantity: "-5" }).success).toBe(false);
   });
 });
 

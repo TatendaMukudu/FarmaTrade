@@ -158,6 +158,72 @@ export function stampBanner(prompts: StampablePrompt[]): StampBanner | null {
   };
 }
 
+// ---------------------------------------------------------------------------
+// What two reports actually settle.
+// ---------------------------------------------------------------------------
+//
+// Both sides filing a report is not the same as both sides agreeing. Counting
+// the rows and calling the trade done was the old rule, and it meant one party
+// saying "it went fine" and the other saying "it never happened" produced a
+// COMPLETED trade — a success FarmaTrade manufactured out of a disagreement.
+// That is the one thing a trust record may never do, and it leaked further
+// than the label: COMPLETED is also what unlocks personal contact details.
+//
+// The distinction that matters is DID IT HAPPEN, not did it go well.
+// COMPLETED_GOOD and COMPLETED_ISSUE are both "it happened" — a trade with a
+// problem is still a trade, and PRODUCT_TRUTH.md §36 is explicit that a quiet
+// success and a bumpy one both count. Only DID_NOT_HAPPEN says otherwise, and
+// when the two sides disagree about that, FarmaTrade has no basis to pick a
+// winner. It says so and leaves the record for a human.
+//
+// Pure: this decides nothing about capacity. An engagement that fell through
+// releases what it was speaking for through the existing agreement sync,
+// exactly as it did before.
+
+export type SettlementReport = "COMPLETED_GOOD" | "COMPLETED_ISSUE" | "DID_NOT_HAPPEN";
+
+export type Settlement =
+  // Not everyone has reported yet. Nothing is settled.
+  | { kind: "awaiting"; reported: number; required: number }
+  // Everyone agrees it happened, whether or not it went smoothly.
+  | { kind: "completed" }
+  // Everyone agrees it did not happen. Also settled — just not a trade.
+  | { kind: "did_not_happen" }
+  // One side says it happened and the other says it did not.
+  | { kind: "disputed" };
+
+// A trade is settled by agreement, never by arithmetic on row counts.
+export function settlementOf(
+  reports: readonly SettlementReport[],
+  required = 2,
+): Settlement {
+  if (reports.length < required) {
+    return { kind: "awaiting", reported: reports.length, required };
+  }
+
+  const happened = reports.filter((r) => r !== "DID_NOT_HAPPEN").length;
+  const didNot = reports.length - happened;
+
+  if (didNot === 0) return { kind: "completed" };
+  if (happened === 0) return { kind: "did_not_happen" };
+  return { kind: "disputed" };
+}
+
+// What a participant should be told, in their own terms. Deliberately does
+// not adjudicate: FarmaTrade has no evidence about a field it was not in.
+export function settlementLine(settlement: Settlement): string {
+  switch (settlement.kind) {
+    case "awaiting":
+      return "Waiting for the other side to confirm.";
+    case "completed":
+      return "Both sides confirmed this trade.";
+    case "did_not_happen":
+      return "Both sides reported this trade did not go ahead.";
+    case "disputed":
+      return "You and the other side reported different outcomes. FarmaTrade has not recorded this as a completed trade.";
+  }
+}
+
 // How this farmer is doing at keeping their own record straight. Shown on
 // their profile as an honest number rather than a scolding.
 export function stampingRate(

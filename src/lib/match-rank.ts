@@ -2,7 +2,7 @@
 // every page load rather than frozen into the row when the match was made.
 //
 // The problem this fixes: `Match.score` is computed once inside
-// `generateMatchesForPost` and never revisited. A counterparty who completes
+// `generateMatchesForIntent` and never revisited. A counterparty who completes
 // ten trades tomorrow does not move up. `neededBy` and `expiresAt` are
 // declared in the schema and read by nothing in the scoring path. A match
 // found six weeks ago outranks one found this morning purely because it
@@ -65,6 +65,16 @@ const CONFIDENCE_ORDER: Confidence[] = ["confirmed", "reliable", "promising", "c
 
 // A deadline inside this many days is the whole reason to look at the app
 // today.
+// An engagement somebody has to act on rather than merely consider.
+//
+// AGREED is the real one. Legacy ACCEPTED is included for ordering only —
+// those rows reserve no capacity, because nothing proves the counterparty
+// ever agreed, but they are still sitting in somebody's list waiting to be
+// dealt with and burying them would not make them go away.
+function isLiveObligation(status: MatchStatus): boolean {
+  return status === "AGREED" || status === "ACCEPTED";
+}
+
 export const URGENT_WINDOW_DAYS = 3;
 // Far enough out to plan around, close enough to not be background noise.
 export const SOON_WINDOW_DAYS = 14;
@@ -104,7 +114,7 @@ const PENALTY = {
 const STALENESS_PER_DAY = 1.5;
 const MAX_STALENESS_PENALTY = 24;
 
-export type RankablePost = {
+export type RankableIntent = {
   id: string;
   urgent: boolean;
   neededBy: Date | null;
@@ -122,11 +132,11 @@ export type RankableMatch = {
   id: string;
   status: MatchStatus;
   createdAt: Date;
-  // Freshly computed against today's posts and today's reputation — not the
+  // Freshly computed against today's intents and today's reputation — not the
   // signals frozen into the row when the match was written.
   signals: MatchSignal[];
-  yours: RankablePost;
-  theirs: RankablePost;
+  yours: RankableIntent;
+  theirs: RankableIntent;
   counterpartyReputation: RankableReputation;
   counterpartyVerifiedBy: VerificationSource | null;
   // Which category-and-route bucket this trade sits in, and how well known
@@ -183,9 +193,11 @@ export function priorityOf(match: RankableMatch, now: Date): Priority {
   if (match.yours.urgent || match.theirs.urgent) return "urgent";
   if (daysToDeadline != null && daysToDeadline <= URGENT_WINDOW_DAYS) return "urgent";
 
-  // An accepted match is a live obligation with a real counterparty on the
-  // other end, whether or not anything about it is time-boxed.
-  if (match.status === "ACCEPTED" && !match.awaitingCounterparty) return "high";
+  // An agreed match is a live obligation with a real counterparty on the
+  // other end, whether or not anything about it is time-boxed. Legacy
+  // unilateral acceptances are treated the same way for ordering: they
+  // reserve nothing, but somebody still has to deal with them.
+  if (isLiveObligation(match.status) && !match.awaitingCounterparty) return "high";
   if (daysToDeadline != null && daysToDeadline <= SOON_WINDOW_DAYS) return "high";
   if ((match.relationStrength ?? 0) >= 2) return "high";
 
@@ -234,7 +246,7 @@ export function confidenceOf(match: RankableMatch, rel?: ReasonReliability): Con
 // without pretending to be urgent.
 export function bucketOf(match: RankableMatch, priority: Priority, now: Date): Bucket {
   if (priority === "urgent") return "time_critical";
-  if (match.status === "ACCEPTED") return "in_progress";
+  if (isLiveObligation(match.status)) return "in_progress";
   if (match.status === "SUGGESTED" && daysBetween(match.createdAt, now) <= STALE_DAYS) {
     return "needs_response";
   }

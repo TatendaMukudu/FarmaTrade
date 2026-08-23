@@ -1,12 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentParty } from "@/lib/auth";
 import { confirmationSchema } from "@/lib/validation";
 import { recomputeReputation } from "@/lib/reputation";
 import { recomputeRelation } from "@/lib/relations";
+import { loadCapacities } from "@/lib/allocation";
+import { acceptTerms, closeEngagement, proposeTerms, suggestedTerms, syncEngagementForMatch } from "@/lib/agreement";
 import { logger } from "@/lib/logger";
+import { settlementOf, type SettlementReport } from "@/lib/confirmations-core";
 import { Prisma, type ConfirmationOutcome } from "@/generated/prisma/client";
 
 export type ConfirmActionState = { error?: string };
@@ -21,20 +25,120 @@ export async function respondToMatch(formData: FormData) {
 
   const match = await prisma.match.findUnique({
     where: { id },
-    select: { postA: { select: { partyId: true } }, postB: { select: { partyId: true } } },
+    select: {
+      intentA: {
+        select: {
+          id: true, partyId: true, side: true, unit: true,
+          askingPrice: true, priceCurrency: true, priceBasis: true, priceUnitCode: true,
+        },
+      },
+      intentB: {
+        select: {
+          id: true, partyId: true, side: true, unit: true,
+          askingPrice: true, priceCurrency: true, priceBasis: true, priceUnitCode: true,
+        },
+      },
+    },
   });
   if (!match) return;
 
   const ownsMatch =
-    match.postA.partyId === party.id || match.postB.partyId === party.id;
+    match.intentA.partyId === party.id || match.intentB.partyId === party.id;
   if (!ownsMatch) return;
 
-  await prisma.match.update({
-    where: { id },
-    data: { status: decision },
+  if (decision === "DECLINED") {
+    await closeEngagement(id, party.id);
+    revalidatePath("/dashboard/opportunities");
+    revalidatePath("/dashboard/trade");
+    return;
+  }
+
+  // "Accept" no longer reserves anything by itself, and that is the whole
+  // correction. One party saying yes is one party saying yes: it records
+  // their consent to specific terms and waits for the other side. Capacity
+  // moves when the second acceptance lands, inside the transaction that
+  // checks it still fits.
+  //
+  // With terms already on the table, this agrees to the version the party
+  // was shown. With none, it puts the obvious ones there — as much as both
+  // sides can still do, at whatever asking price was named — as an opening
+  // position the counterparty must still answer.
+  const version = formData.get("version");
+  const existing = await prisma.agreementTerms.count({ where: { matchId: id } });
+
+  if (existing > 0) {
+    const outcome = await acceptTerms(id, party.id, version ? Number(version) : undefined);
+    if (!outcome.ok) {
+      logger.warn("agreement.accept_refused", { matchId: id, partyId: party.id, reason: outcome.reason });
+      if (outcome.reason === "source_measurement_mismatch") {
+        redirect(`/dashboard/conversations/${id}?agreementError=source-measurement-mismatch`);
+      }
+    }
+  } else {
+    const sides = await loadCapacities([match.intentA.id, match.intentB.id]);
+    const supply = match.intentA.side === "SUPPLY" ? match.intentA : match.intentB;
+    const demand = match.intentA.side === "SUPPLY" ? match.intentB : match.intentA;
+    await proposeTerms(
+      id,
+      party.id,
+      suggestedTerms(
+        {
+          remaining: sides.get(supply.id)?.remaining ?? null,
+          basis: sides.get(supply.id)?.basis ?? null,
+          askingPrice: supply.askingPrice == null ? null : Number(supply.askingPrice),
+          priceCurrency: supply.priceCurrency,
+          priceBasis: supply.priceBasis,
+          priceUnitCode: supply.priceUnitCode,
+        },
+        {
+          remaining: sides.get(demand.id)?.remaining ?? null,
+          basis: sides.get(demand.id)?.basis ?? null,
+          askingPrice: demand.askingPrice == null ? null : Number(demand.askingPrice),
+          priceCurrency: demand.priceCurrency,
+          priceBasis: demand.priceBasis,
+          priceUnitCode: demand.priceUnitCode,
+        },
+      ),
+    );
+  }
+
+  revalidatePath("/dashboard/opportunities");
+  revalidatePath("/dashboard/trade");
+}
+
+// Put different terms on the table — the renegotiation path.
+//
+// Creates a new version rather than editing the current one, so consent to
+// the old terms cannot silently carry forward onto the new ones. Any
+// agreement already in force keeps governing until this version is agreed
+// by both sides too.
+export async function proposeMatchTerms(formData: FormData) {
+  const party = await getCurrentParty();
+  if (!party) return;
+
+  const id = String(formData.get("matchId"));
+  const quantity = Number(formData.get("quantity"));
+  const price = Number(formData.get("price"));
+
+  const priceBasis = String(formData.get("priceBasis") || "");
+  const handoverText = String(formData.get("handoverOn") || "");
+  const handoverOn = handoverText ? new Date(`${handoverText}T00:00:00.000Z`) : null;
+
+  await proposeTerms(id, party.id, {
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+    unit: (formData.get("unit") as string) || null,
+    price: Number.isFinite(price) && price > 0 ? price : null,
+    // A price without these is a number nobody can total, so the form
+    // always sends them and the domain records exactly what arrived.
+    priceCurrency: (formData.get("priceCurrency") as string) || null,
+    priceBasis: priceBasis === "TOTAL" || priceBasis === "PER_UNIT" ? priceBasis : null,
+    priceUnit: (formData.get("priceUnit") as string) || null,
+    handoverOn: handoverOn && !Number.isNaN(handoverOn.getTime()) ? handoverOn : null,
   });
 
   revalidatePath("/dashboard/opportunities");
+  revalidatePath(`/dashboard/conversations/${id}`);
+  revalidatePath("/dashboard/trade");
 }
 
 export async function confirmMatch(
@@ -59,17 +163,20 @@ export async function confirmMatch(
     where: { id: matchId },
     select: {
       status: true,
-      postA: { select: { partyId: true } },
-      postB: { select: { partyId: true } },
+      intentA: { select: { partyId: true } },
+      intentB: { select: { partyId: true } },
     },
   });
-  if (!match || match.status !== "ACCEPTED") {
+  // AGREED is the state a trade can be reported on. Legacy ACCEPTED rows
+  // are allowed too: they reserve nothing, but two parties may genuinely
+  // have traded on one before agreement became bilateral.
+  if (!match || (match.status !== "AGREED" && match.status !== "ACCEPTED")) {
     return { error: "This match isn't in a confirmable state" };
   }
 
   const counterpartyId =
-    match.postA.partyId === party.id ? match.postB.partyId : match.postA.partyId;
-  if (match.postA.partyId !== party.id && match.postB.partyId !== party.id) {
+    match.intentA.partyId === party.id ? match.intentB.partyId : match.intentA.partyId;
+  if (match.intentA.partyId !== party.id && match.intentB.partyId !== party.id) {
     return { error: "Not part of this match" };
   }
 
@@ -115,17 +222,40 @@ export async function confirmMatch(
     }
   }
 
-  const confirmationCount = await prisma.transactionConfirmation.count({
+  // Two reports are not two agreements. Asking confirmations-core what the
+  // reports actually settle is what stops a disagreement from being recorded
+  // as a completed trade — and, because COMPLETED is also what unlocks
+  // personal contact details, from handing out a phone number on the strength
+  // of a trade one party says never happened.
+  const reports = await prisma.transactionConfirmation.findMany({
     where: { matchId },
+    select: { outcome: true },
   });
+  const settlement = settlementOf(reports.map((r) => r.outcome as SettlementReport));
   let justCompleted = false;
-  if (confirmationCount >= 2) {
+  if (settlement.kind === "completed") {
     const updated = await prisma.match.updateMany({
       where: { id: matchId, status: { not: "COMPLETED" } },
       data: { status: "COMPLETED" },
     });
     justCompleted = updated.count > 0;
+  } else if (settlement.kind === "disputed") {
+    // Left in its agreed state on purpose. There is no automated adjudication
+    // in V1 and inventing one would be worse than saying so: the two reports
+    // are both on the record, the trade room shows the disagreement, and a
+    // supervised pilot resolves it with the people involved.
+    logger.warn("confirmMatch.disputed_outcome", {
+      matchId,
+      reportedBy: party.id,
+      outcomes: reports.map((r) => r.outcome).sort().join(","),
+    });
   }
+
+  // Filing a report can change what this engagement holds — "it did not
+  // happen" releases the capacity it was speaking for — so both intents are
+  // re-derived from their engagements rather than left describing a trade
+  // that turned out not to exist.
+  await syncEngagementForMatch(matchId);
 
   await Promise.all([
     recomputeReputation(party.id),
@@ -134,6 +264,6 @@ export async function confirmMatch(
   ]);
 
   revalidatePath("/dashboard/opportunities");
-  revalidatePath("/dashboard/directory");
+  revalidatePath("/dashboard/network");
   return {};
 }

@@ -1,4 +1,4 @@
-import type { PostCategory } from "@/generated/prisma/enums";
+import type { CommerceCategory } from "@/generated/prisma/enums";
 
 // Line icons, drawn inline.
 //
@@ -151,7 +151,7 @@ export function HomeIcon({ className }: IconProps) {
   );
 }
 
-export function DirectoryIcon({ className }: IconProps) {
+export function NetworkIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
       <circle cx="9" cy="9" r="3" />
@@ -189,7 +189,7 @@ export function LogoutIcon({ className }: IconProps) {
   );
 }
 
-const CATEGORY_ICON: Record<PostCategory, (props: IconProps) => React.JSX.Element> = {
+const CATEGORY_ICON: Record<CommerceCategory, (props: IconProps) => React.JSX.Element> = {
   LIVESTOCK: LivestockIcon,
   PRODUCE: ProduceIcon,
   EQUIPMENT: EquipmentIcon,
@@ -201,7 +201,7 @@ export function CategoryIcon({
   category,
   className,
 }: {
-  category: PostCategory;
+  category: CommerceCategory;
   className?: string;
 }) {
   const Icon = CATEGORY_ICON[category] ?? ListingIcon;

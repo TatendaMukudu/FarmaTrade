@@ -1,6 +1,6 @@
 // What things are actually going for, near you.
 //
-// `Post.askingPrice` has been collected since launch and read by exactly one
+// `Intent.askingPrice` has been collected since launch and read by exactly one
 // thing: a single card's "Est. value" line. Nothing ever aggregated it. For
 // a smallholder deciding whether to accept an offer, "maize is going for
 // $280-320 a tonne in your district this week" is plausibly the most useful
@@ -19,6 +19,7 @@
 // Pure and DB-free.
 
 import { unitPerLabel } from "@/lib/units";
+import { CURRENCIES, currencyByCode, moneyToMajor } from "@/lib/money";
 
 // Below this many listings there is no range worth quoting — it would be
 // one or two neighbours' opinions with a statistic painted on.
@@ -29,13 +30,32 @@ export const PRICE_WINDOW_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// One listing's asking RATE, already resolved into unambiguous terms by the
+// caller.
+//
+// `unitPrice` used to be `askingPrice / quantity` computed here-ish, which
+// silently assumed the stored number was a total. That assumption was one
+// half of a contradiction — estimatedIntentValue assumed the opposite — and
+// this module no longer does the division at all. The caller resolves the
+// price through the one valuation primitive and hands over a rate that
+// already knows what it is.
+//
+// A listing whose price meaning is unknown never reaches here. Excluded
+// rather than guessed: a market signal built from numbers that might be
+// totals and might be rates is worse than no signal, because it looks
+// authoritative.
 export type PricedListing = {
   // What is being priced. Crop type where a post is linked to real produce,
   // otherwise the category — a title string is not something to group on.
   subject: string;
   district: string;
+  // The canonical unit the rate is per, and the word for it.
   unit: string;
-  // Price for one unit, already divided out by the caller's quantity.
+  // ISO 4217. Part of the grouping key, because a range that blends USD and
+  // ZAR asking prices is not a range of anything.
+  currencyCode: string;
+  // Minor units per one `unit`. Integers, so a median never lands on a
+  // fraction of a cent.
   unitPrice: number;
   postedAt: Date;
 };
@@ -44,6 +64,7 @@ export type PriceSignal = {
   subject: string;
   district: string;
   unit: string;
+  currencyCode: string;
   listings: number;
   low: number;
   median: number;
@@ -74,11 +95,7 @@ function money(value: number): string {
 // Groups listings by what they are, where they are, and what they're
 // measured in — all three, because a tonne and a crate of the same crop in
 // the same district are not comparable numbers.
-export function summarizePrices(
-  listings: PricedListing[],
-  now: Date,
-  currencySymbol = "$",
-): PriceSignal[] {
+export function summarizePrices(listings: PricedListing[], now: Date): PriceSignal[] {
   const fresh = listings.filter(
     (l) => (now.getTime() - l.postedAt.getTime()) / DAY_MS <= PRICE_WINDOW_DAYS,
   );
@@ -86,7 +103,7 @@ export function summarizePrices(
   const groups = new Map<string, PricedListing[]>();
   for (const listing of fresh) {
     if (!(listing.unitPrice > 0)) continue;
-    const key = `${listing.subject}|${listing.district}|${listing.unit}`;
+    const key = `${listing.subject}|${listing.district}|${listing.unit}|${listing.currencyCode}`;
     const group = groups.get(key) ?? [];
     group.push(listing);
     groups.set(key, group);
@@ -95,15 +112,25 @@ export function summarizePrices(
   return [...groups.values()]
     .filter((group) => group.length >= MIN_LISTINGS)
     .map((group) => {
+      // Quantiles over integer minor units, so the median of an even-sized
+      // group cannot land on a fraction of a cent that then gets rendered
+      // as a plausible-looking price nobody quoted.
       const prices = group.map((l) => l.unitPrice).sort((a, b) => a - b);
-      const low = round(quantile(prices, 0.25));
-      const median = round(quantile(prices, 0.5));
-      const high = round(quantile(prices, 0.75));
-      const { subject, district, unit } = group[0];
+      const { subject, district, unit, currencyCode } = group[0];
+      const currency = currencyByCode(currencyCode) ?? CURRENCIES.USD;
+      const toMajor = (minor: number) =>
+        round(moneyToMajor({ minor: Math.round(minor), currency }));
+      const low = toMajor(quantile(prices, 0.25));
+      const median = toMajor(quantile(prices, 0.5));
+      const high = toMajor(quantile(prices, 0.75));
+      // The symbol comes from the group's own currency, not from the
+      // viewer's country. A ZAR listing is a ZAR listing whoever is reading.
+      const currencySymbol = currency.symbol;
       return {
         subject,
         district,
         unit,
+        currencyCode,
         listings: group.length,
         low,
         median,

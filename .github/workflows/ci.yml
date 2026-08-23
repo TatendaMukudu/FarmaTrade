@@ -49,3 +49,7 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # The product laws and the full gate. One verdict, the same one an
+      # agent runs locally before offering work for review.
+      - run: npm run verify

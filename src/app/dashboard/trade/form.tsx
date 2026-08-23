@@ -5,7 +5,10 @@ import { createPost, type PostActionState } from "./actions";
 import { regionFor } from "@/lib/regions";
 import { formatQuantity } from "@/lib/units";
 import { CATEGORY_LABEL } from "@/lib/categories";
-import type { PostCategory as Category } from "@/generated/prisma/enums";
+import { CURRENCIES } from "@/lib/money";
+
+const CURRENCY_CODES = Object.keys(CURRENCIES);
+import type { CommerceCategory as Category } from "@/generated/prisma/enums";
 
 const initialState: PostActionState = {};
 
@@ -24,7 +27,7 @@ export function PostForm({
   countryCode,
   defaultProvince,
   defaultDistrict,
-  defaultType = "HAVE",
+  defaultSide = "SUPPLY",
   defaultCategory = "PRODUCE",
   onDone,
 }: {
@@ -32,11 +35,15 @@ export function PostForm({
   countryCode: string;
   defaultProvince: string;
   defaultDistrict: string;
-  defaultType?: "HAVE" | "NEED";
+  defaultSide?: "SUPPLY" | "DEMAND";
   defaultCategory?: Category;
   onDone?: () => void;
 }) {
   const region = regionFor(countryCode);
+  // Mirrored into the price row, so "per tonne" fills itself in for a
+  // listing already measured in tonnes.
+  const [unit, setUnit] = useState("");
+  const [priceBasis, setPriceBasis] = useState<"PER_UNIT" | "TOTAL">("PER_UNIT");
   const formRef = useRef<HTMLFormElement>(null);
   const [category, setCategory] = useState<Category>(defaultCategory);
   const forThisCategory = inventory.filter((i) => i.category === category);
@@ -45,6 +52,11 @@ export function PostForm({
       const result = await createPost(prev, formData);
       if (!result.error) {
         formRef.current?.reset();
+        // Native reset cannot clear controlled fields. Carrying the previous
+        // unit into a new quantity would make the next intent commercially
+        // mean something the farmer did not choose.
+        setUnit("");
+        setPriceBasis("PER_UNIT");
         setCategory(defaultCategory);
         onDone?.();
       }
@@ -60,14 +72,14 @@ export function PostForm({
       className="flex flex-col gap-3 rounded-card border border-border bg-card p-4"
     >
       <div className="flex flex-wrap gap-3">
-        <Field label="What?">
+        <Field label="Direction">
           <select
-            name="type"
-            defaultValue={defaultType}
+            name="side"
+            defaultValue={defaultSide}
             className="rounded-card border border-border px-2 py-1 text-sm"
           >
-            <option value="HAVE">I have</option>
-            <option value="NEED">I need</option>
+            <option value="SUPPLY">Offering</option>
+            <option value="DEMAND">Looking for</option>
           </select>
         </Field>
         <Field label="Category">
@@ -99,12 +111,11 @@ export function PostForm({
               if (!form || !picked) return;
               const title = form.elements.namedItem("title") as HTMLInputElement | null;
               const quantity = form.elements.namedItem("quantity") as HTMLInputElement | null;
-              const unit = form.elements.namedItem("unit") as HTMLInputElement | null;
               if (title && !title.value) title.value = picked.label;
               if (quantity && !quantity.value && picked.quantity != null) {
                 quantity.value = String(picked.quantity);
               }
-              if (unit && !unit.value && picked.unit) unit.value = picked.unit;
+              if (picked.unit) setUnit((current) => current || picked.unit!);
             }}
             className="w-full rounded-card border border-border px-2 py-1 text-sm"
           >
@@ -148,8 +159,21 @@ export function PostForm({
           />
         </Field>
         <Field label="Unit (optional)">
-          <input name="unit" className="w-24 rounded-card border border-border px-2 py-1 text-sm" />
+          <input
+            name="unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="w-24 rounded-card border border-border px-2 py-1 text-sm"
+          />
         </Field>
+      </div>
+
+      {/* Price used to be one unlabelled box, and nothing recorded whether
+          the number was for the whole lot or for each tonne. Two parts of
+          the app then read it in opposite ways. Saying it out loud costs a
+          dropdown and ends the ambiguity — and it is what a farmer says
+          anyway: "three hundred a tonne", not "three hundred". */}
+      <div className="flex flex-wrap items-end gap-3">
         <Field label="Price (optional)">
           <input
             name="askingPrice"
@@ -158,6 +182,45 @@ export function PostForm({
             className="w-32 rounded-card border border-border px-2 py-1 text-sm"
           />
         </Field>
+        <Field label="Currency">
+          <select
+            name="priceCurrency"
+            defaultValue={region.currencyCode}
+            className="rounded-card border border-border px-2 py-1 text-sm"
+          >
+            {CURRENCY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="That price is">
+          <select
+            name="priceBasis"
+            value={priceBasis}
+            onChange={(e) => setPriceBasis(e.target.value as "PER_UNIT" | "TOTAL")}
+            className="rounded-card border border-border px-2 py-1 text-sm"
+          >
+            <option value="PER_UNIT">per unit</option>
+            <option value="TOTAL">for the whole lot</option>
+          </select>
+        </Field>
+        {priceBasis === "PER_UNIT" && (
+          <Field label="Per">
+            {/* Defaults to whatever they are measuring in, because "$300 a
+                tonne" for a listing of tonnes is the overwhelmingly common
+                case. Editable, because a farmer selling tonnes may quote
+                per bag. */}
+            <input
+              name="priceUnit"
+              defaultValue={unit}
+              key={unit}
+              placeholder="tonne"
+              className="w-24 rounded-card border border-border px-2 py-1 text-sm"
+            />
+          </Field>
+        )}
       </div>
 
       {category === "TRANSPORT" && (
@@ -261,7 +324,7 @@ export function PostForm({
 
           <label className="flex w-fit items-center gap-2 text-sm">
             <input type="checkbox" name="recurring" />
-            Standing order (e.g. &ldquo;I buy this every month&rdquo;) — stays open and keeps matching
+            Recurring (e.g. &ldquo;every month&rdquo;) — stays available and keeps matching
           </label>
 
           {/* Off by default. Local matches keep coming either way; this only
@@ -286,7 +349,7 @@ export function PostForm({
         disabled={pending}
         className="w-fit rounded-card bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50"
       >
-        {pending ? "Posting…" : "Post"}
+        {pending ? "Saving…" : "Save"}
       </button>
     </form>
   );

@@ -101,8 +101,8 @@ async function recomputeRelation(partyId1: string, partyId2: string) {
     where: {
       status: "COMPLETED",
       OR: [
-        { postA: { partyId: partyAId }, postB: { partyId: partyBId } },
-        { postA: { partyId: partyBId }, postB: { partyId: partyAId } },
+        { intentA: { partyId: partyAId }, intentB: { partyId: partyBId } },
+        { intentA: { partyId: partyBId }, intentB: { partyId: partyAId } },
       ],
     },
   });
@@ -137,7 +137,7 @@ async function main() {
   await prisma.conversation.deleteMany();
   await prisma.match.deleteMany();
   await prisma.photo.deleteMany();
-  await prisma.post.deleteMany();
+  await prisma.intent.deleteMany();
   await prisma.reputation.deleteMany();
   await prisma.equipment.deleteMany();
   await prisma.produceStock.deleteMany();
@@ -341,13 +341,13 @@ async function main() {
     },
   });
 
-  console.log("Creating posts and matches...");
+  console.log("Creating intents and matches...");
 
   // Live opportunity: Rudo's oranges <-> Patricia's export demand (Mutare)
-  const orangesHave = await prisma.post.create({
+  const orangesHave = await prisma.intent.create({
     data: {
       partyId: rudo.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "PRODUCE",
       title: "3 tonnes of oranges, need to move before they spoil",
       province: "Manicaland",
@@ -357,10 +357,10 @@ async function main() {
       urgent: true,
     },
   });
-  const orangesNeed = await prisma.post.create({
+  const orangesNeed = await prisma.intent.create({
     data: {
       partyId: patricia.party.id,
-      type: "NEED",
+      side: "DEMAND",
       category: "PRODUCE",
       title: "Oranges for export, any quantity",
       province: "Manicaland",
@@ -369,8 +369,8 @@ async function main() {
   });
   await prisma.match.create({
     data: {
-      postAId: orangesHave.id,
-      postBId: orangesNeed.id,
+      intentAId: orangesHave.id,
+      intentBId: orangesNeed.id,
       score: 78,
       status: "SUGGESTED",
       reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
@@ -378,10 +378,10 @@ async function main() {
   });
 
   // Live opportunity: Rudo needs refrigerated transport <-> Nyasha has it (Mutare)
-  const transportNeed = await prisma.post.create({
+  const transportNeed = await prisma.intent.create({
     data: {
       partyId: rudo.party.id,
-      type: "NEED",
+      side: "DEMAND",
       category: "TRANSPORT",
       title: "Refrigerated truck needed this week",
       province: "Manicaland",
@@ -389,10 +389,10 @@ async function main() {
       urgent: true,
     },
   });
-  const transportHave = await prisma.post.create({
+  const transportHave = await prisma.intent.create({
     data: {
       partyId: nyasha.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "TRANSPORT",
       title: "Refrigerated truck, based in Mutare",
       province: "Manicaland",
@@ -401,49 +401,49 @@ async function main() {
   });
   await prisma.match.create({
     data: {
-      postAId: transportNeed.id,
-      postBId: transportHave.id,
+      intentAId: transportNeed.id,
+      intentBId: transportHave.id,
       score: 82,
       status: "SUGGESTED",
       reasons: ["same district", "counterparty: new, no history yet", "time-sensitive"],
     },
   });
 
-  // Open posts with no live match yet — realistic "waiting" state
-  await prisma.post.create({
+  // Active intents with no live match yet — realistic "waiting" state
+  await prisma.intent.create({
     data: {
       partyId: tendai.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "EQUIPMENT",
       title: "Idle tractor, available most of the season",
       province: "Mashonaland West",
       district: "Chinhoyi",
     },
   });
-  await prisma.post.create({
+  await prisma.intent.create({
     data: {
       partyId: tapiwa.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "TRANSPORT",
       title: "7-tonne truck available for local hauls",
       province: "Mashonaland West",
       district: "Chinhoyi",
     },
   });
-  await prisma.post.create({
+  await prisma.intent.create({
     data: {
       partyId: blessing.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "EQUIPMENT",
       title: "Plough available to borrow after planting season",
       province: "Midlands",
       district: "Gweru",
     },
   });
-  await prisma.post.create({
+  await prisma.intent.create({
     data: {
       partyId: isaac.party.id,
-      type: "NEED",
+      side: "DEMAND",
       category: "PRODUCE",
       title: "50 bags of maize, monthly",
       province: "Midlands",
@@ -453,10 +453,10 @@ async function main() {
       neededBy: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     },
   });
-  await prisma.post.create({
+  await prisma.intent.create({
     data: {
       partyId: farai.party.id,
-      type: "HAVE",
+      side: "SUPPLY",
       category: "LIVESTOCK",
       title: "Goats available, various ages",
       province: "Matabeleland South",
@@ -480,34 +480,34 @@ async function main() {
     tendaiScore: number;
     tendaiComment: string;
   }) {
-    const have = await prisma.post.create({
+    const have = await prisma.intent.create({
       data: {
         partyId: tendai.party.id,
-        type: "HAVE",
+        side: "SUPPLY",
         category: "LIVESTOCK",
         title: opts.title,
         province: "Mashonaland West",
         district: "Chinhoyi",
         quantity: opts.quantity,
-        status: "CLOSED",
+        status: "WITHDRAWN",
       },
     });
-    const need = await prisma.post.create({
+    const need = await prisma.intent.create({
       data: {
         partyId: grace.party.id,
-        type: "NEED",
+        side: "DEMAND",
         category: "LIVESTOCK",
         title: `Need: ${opts.title}`,
         province: "Mashonaland West",
         district: "Chinhoyi",
         quantity: opts.quantity,
-        status: "CLOSED",
+        status: "WITHDRAWN",
       },
     });
     const match = await prisma.match.create({
       data: {
-        postAId: have.id,
-        postBId: need.id,
+        intentAId: have.id,
+        intentBId: need.id,
         score: 90,
         status: "COMPLETED",
         reasons: ["same district", "repeat trading partner"],
