@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { loadNetworkParty } from "@/lib/network-data";
 import { summarizeReputation } from "@/lib/reputation";
 import { canSeeContactDetails } from "@/lib/identity-safety";
+import { roleOutcomesFor } from "@/lib/role-reputation";
+import { roleRecordLine } from "@/lib/reputation-core";
 import { Badge } from "@/components/badge";
 
 export default async function PartyProfilePage({
@@ -36,6 +38,7 @@ export default async function PartyProfilePage({
   // itself who may see a phone number is a page that can be copied without
   // the rule.
   const engaged = await canSeeContactDetails(currentParty?.id, partyId);
+  const roles = await roleOutcomesFor(partyId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,8 +72,17 @@ export default async function PartyProfilePage({
           >
             {reputation.headline}
           </p>
-          {reputation.hasHistory && <p className="mt-1 text-xs text-muted-fg">{reputation.completedLine}</p>}
         </div>
+      </div>
+
+      {/* INV-10. The same actor's supplying and buying records are different
+          claims, and one combined "N completed trades" answers neither. Both
+          are shown so a reader deciding whether to BUY from this party is not
+          reading their record as a buyer. */}
+      <div className="rounded-card border border-border bg-card p-4">
+        <p className="text-xs text-muted-fg">Commercial record</p>
+        <p className="mt-1 text-sm">{roleRecordLine("SUPPLIER", roles.SUPPLIER)}</p>
+        <p className="mt-0.5 text-sm">{roleRecordLine("BUYER", roles.BUYER)}</p>
       </div>
 
       {party.farm && (

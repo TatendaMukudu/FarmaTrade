@@ -89,3 +89,83 @@ export function summarizeReputation(
     tone: "new",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Role-scoped outcomes.
+// ---------------------------------------------------------------------------
+//
+// PRODUCT_TRUTH.md §31 / INV-10. One actor is one actor — a farmer who sells
+// maize and buys fertilizer does not become two identities. But their record
+// as a supplier and their record as a buyer are different claims, and a single
+// aggregate says neither of them honestly.
+//
+// The flatten had two halves and the invisible one was worse. The visible half
+// is a cross-role "12 completed trades", which is coarse but not a quality
+// claim. The invisible half is that ranking reads completedCount and
+// didNotHappenCount across ALL roles, so a party who repeatedly fails as a
+// buyer is penalised when ranked as a supplier — and nobody can see it happen.
+//
+// No schema is needed for this. A party's role in a match is already recorded:
+// it is the side of their own intent. SUPPLY means they were supplying, DEMAND
+// means they were buying. So role-scoped counts derive from rows that already
+// exist, which is the rule this repo runs on everywhere else.
+
+export type CommercialRole = "SUPPLIER" | "BUYER";
+
+export type RoleOutcomes = {
+  completedGood: number;
+  completedIssue: number;
+  didNotHappen: number;
+  // Completed means it happened, well or badly. A trade that never happened
+  // is not a completed one — the same distinction settlementOf() draws.
+  completed: number;
+};
+
+export type RoleScopedRecord = Record<CommercialRole, RoleOutcomes>;
+
+const NO_OUTCOMES: RoleOutcomes = {
+  completedGood: 0,
+  completedIssue: 0,
+  didNotHappen: 0,
+  completed: 0,
+};
+
+export function emptyRoleRecord(): RoleScopedRecord {
+  return { SUPPLIER: { ...NO_OUTCOMES }, BUYER: { ...NO_OUTCOMES } };
+}
+
+// The role a party played, from the side of their own intent.
+export function roleOfSide(side: string): CommercialRole {
+  return side === "SUPPLY" ? "SUPPLIER" : "BUYER";
+}
+
+export type RoleConfirmation = {
+  outcome: "COMPLETED_GOOD" | "COMPLETED_ISSUE" | "DID_NOT_HAPPEN";
+  // The side of the confirming party's OWN intent in that match.
+  side: string;
+};
+
+export function roleOutcomesFrom(confirmations: readonly RoleConfirmation[]): RoleScopedRecord {
+  const record = emptyRoleRecord();
+  for (const c of confirmations) {
+    const bucket = record[roleOfSide(c.side)];
+    if (c.outcome === "COMPLETED_GOOD") bucket.completedGood += 1;
+    else if (c.outcome === "COMPLETED_ISSUE") bucket.completedIssue += 1;
+    else bucket.didNotHappen += 1;
+    bucket.completed = bucket.completedGood + bucket.completedIssue;
+  }
+  return record;
+}
+
+// What to show about a party in the role that matters right now. A supplier's
+// buying record is not hidden — it is simply not what this reader is deciding
+// about, and mixing them in would be the flatten again.
+export function roleRecordLine(role: CommercialRole, outcomes: RoleOutcomes): string {
+  const noun = role === "SUPPLIER" ? "supplying" : "buying";
+  if (outcomes.completed === 0 && outcomes.didNotHappen === 0) {
+    return `No completed trades ${noun} yet`;
+  }
+  const trades = `${outcomes.completed} completed trade${outcomes.completed === 1 ? "" : "s"} ${noun}`;
+  if (outcomes.didNotHappen === 0) return trades;
+  return `${trades} · ${outcomes.didNotHappen} did not go ahead`;
+}
