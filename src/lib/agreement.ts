@@ -58,6 +58,7 @@ export type AgreementOutcome =
         | "not_authorized"
         | "insufficient_capacity"
         | "source_measurement_mismatch"
+        | "already_accepted"
         | "closed";
     };
 
@@ -481,7 +482,23 @@ export async function acceptTerms(
       }
     }
 
-    await tx.termsAcceptance.create({ data: { termsId: target.id, partyId } });
+    // Accepting the same version twice is a double tap, not a second consent.
+    //
+    // The unique constraint on (termsId, partyId) is what makes one party
+    // unable to fake bilateral agreement by clicking twice, and it stays. But
+    // letting it throw meant an ordinary double tap on a slow phone produced a
+    // 500 rather than "you have already accepted this" — a support ticket
+    // manufactured out of a guard doing its job. Swallowing exactly this
+    // violation, and only after the capacity checks above have passed, keeps
+    // the guarantee and makes the action idempotent.
+    try {
+      await tx.termsAcceptance.create({ data: { termsId: target.id, partyId } });
+    } catch (err) {
+      const alreadyAccepted =
+        err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+      if (!alreadyAccepted) throw err;
+      return { ok: false, reason: "already_accepted" };
+    }
 
     const updated = versions.map((t) =>
       t.id === target.id ? { ...t, acceptedBy: [...t.acceptedBy, partyId] } : t,
