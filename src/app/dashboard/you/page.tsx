@@ -1,52 +1,20 @@
 import Link from "next/link";
 import { getCurrentParty } from "@/lib/auth";
-import { FarmIcon, ListingIcon, NetworkIcon, SettingsIcon, StarIcon } from "@/components/icons";
+import { youEntries, type YouEntryKey } from "@/lib/you-hub";
+import { FarmIcon, NetworkIcon, SettingsIcon, StarIcon } from "@/components/icons";
 
-type HubLink = {
-  label: string;
-  description: string;
-  href: string;
-  Icon: (props: { className?: string }) => React.JSX.Element;
+const ENTRY_ICON: Record<YouEntryKey, (props: { className?: string }) => React.JSX.Element> = {
+  farm: FarmIcon,
+  record: StarIcon,
+  profile: NetworkIcon,
+  settings: SettingsIcon,
 };
 
 export default async function YouPage() {
   const party = await getCurrentParty();
   if (!party) return null;
 
-  const links: HubLink[] = [
-    {
-      label: "Farm",
-      description: party.farm
-        ? "Keep your produce, livestock and equipment records up to date."
-        : "Your farm records will appear here when a farm is added.",
-      href: "/dashboard/farm",
-      Icon: FarmIcon,
-    },
-    {
-      label: "Trade history",
-      description: "Return to current conversations and trades you have completed.",
-      href: "/dashboard/opportunities",
-      Icon: ListingIcon,
-    },
-    {
-      label: "Commercial record",
-      description: "See the business record other FarmaTrade members see.",
-      href: `/dashboard/network/${party.id}`,
-      Icon: StarIcon,
-    },
-    {
-      label: "Profile",
-      description: "Update your name, location and business details.",
-      href: "/dashboard/settings#profile",
-      Icon: NetworkIcon,
-    },
-    {
-      label: "Settings",
-      description: "Manage the details FarmaTrade uses for your account.",
-      href: "/dashboard/settings",
-      Icon: SettingsIcon,
-    },
-  ];
+  const entries = youEntries({ partyId: party.id, hasFarm: !!party.farm });
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -56,20 +24,41 @@ export default async function YouPage() {
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-2">
-        {links.map(({ label, description, href, Icon }) => (
-          <li key={label}>
-            <Link
-              href={href}
-              className="flex min-h-24 items-start gap-3 rounded-card border border-border bg-card p-4 hover:border-accent"
-            >
+        {entries.map(({ key, label, description, href }) => {
+          const Icon = ENTRY_ICON[key];
+          const body = (
+            <>
               <Icon className="mt-0.5 text-accent" />
               <span>
                 <span className="block font-medium">{label}</span>
                 <span className="mt-1 block text-sm text-muted-fg">{description}</span>
               </span>
-            </Link>
-          </li>
-        ))}
+            </>
+          );
+          return (
+            <li key={key}>
+              {href ? (
+                <Link
+                  href={href}
+                  className="flex min-h-24 items-start gap-3 rounded-card border border-border bg-card p-4 hover:border-accent"
+                >
+                  {body}
+                </Link>
+              ) : (
+                // Not a link on purpose. See you-hub.ts: sending an actor to a
+                // route that redirects them away is worse than saying plainly
+                // that there is nothing there.
+                <div
+                  data-unavailable="true"
+                  aria-disabled="true"
+                  className="flex min-h-24 items-start gap-3 rounded-card border border-dashed border-border bg-card p-4 opacity-70"
+                >
+                  {body}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

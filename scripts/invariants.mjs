@@ -91,6 +91,7 @@ function law(name, detail, offenders) {
     "measurement.ts",
     "money.ts",
     "navigation.ts",
+    "you-hub.ts",
     "network-route.ts",
     "price-signals.ts",
     "pricing.ts",
